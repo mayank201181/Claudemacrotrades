@@ -1,5 +1,5 @@
 :root {
-  --bg: #f6f7f9; --panel: #ffffff; --panel-2: #f1f3f6; --ink: #14181f; --muted: #626b78; --line: #e2e6ec;
+  --bg: #ffffff; --panel: #ffffff; --panel-2: #f1f3f6; --ink: #14181f; --muted: #626b78; --line: #e2e6ec;
   --accent: #0f766e; --accent-soft: #e6f4f2; --pos: #15803d; --neg: #b91c1c; --warn: #b45309;
   --hl-yellow: #fef3c7; --hl-green: #dcfce7; --hl-red: #fee2e2; --hl-blue: #dbeafe;
   --mono: 'JetBrains Mono', ui-monospace, monospace; --sans: 'Inter', system-ui, -apple-system, sans-serif;
@@ -60,8 +60,9 @@ select { font: inherit; padding: 5px 8px; border-radius: 6px; border: 1px solid 
 details > summary { cursor: pointer; color: var(--accent); font-size: 13px; margin-top: 8px; list-style: none; }
 details > summary::-webkit-details-marker { display: none; }
 details > summary::before { content: '▸ '; } details[open] > summary::before { content: '▾ '; }
-/* reading comfort: larger type, looser leading, and a line length the eye can track */
-.rich, .lean { font-size: 15px; line-height: 1.68; }
+/* digest text set like the emails: Georgia 15.5px, near-black on white, ~720px measure */
+.rich, .lean { font-family: Georgia, 'Times New Roman', serif; font-size: 15.5px; line-height: 1.6; }
+:root[data-theme="light"] .rich, :root[data-theme="light"] .lean { color: #1a1a1a; }
 .rich p, .rich li, .lean p { max-width: 100ch; }
 .rich { overflow-wrap: anywhere; }
 .rich p { margin: 8px 0; }

@@ -3,13 +3,13 @@
 //   - dash.live_marks: latest hourly mark of each open trade in R, intraday touches since fill,
 //     and the latest complete daily close (the book's official exit basis) with close-breaches;
 //   - dash.idea_outcomes: forward move of every tested idea in its own direction, in ATR(20) units,
-//     at 1/5/10/20 sessions after the idea's date (ref = last hourly close at or before 08:00 SGT).
+//     at 1/5/10/20 sessions after the idea's date, from the first price a reader could deal at
+//     after the 08:00 SGT digest (see ideaRef: a gap over a market closure is not credited).
 // Invoked by pg_cron with the ingest token; read-only towards trades.
 import postgres from 'npm:postgres@3.4.4';
+import { type Bar, HOUR, ideaRef, markLive } from '../_shared/marks.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
-
-type Bar = { ts: number; o: number; h: number; l: number; c: number };
 
 function legs(proxy: string): { legs: string[]; op: '' | '-' | '/' } {
   const m = proxy.match(/^([^\s\/]+?)([\-\/])([\^A-Z][^\s\/]*)$/);
@@ -41,12 +41,12 @@ function combine(a: Bar[], b: Bar[], op: '-' | '/', daily: boolean): Bar[] {
   return a.filter((x) => mb.has(key(x.ts))).map((x) => {
     const y = mb.get(key(x.ts))!;
     const c = f(x.c, y.c);
-    return { ts: x.ts, o: f(x.o, y.o), h: c, l: c, c }; // spread highs/lows are not knowable from legs
+    // Spread highs/lows are not knowable from legs; the bar is live only when both legs traded.
+    return { ts: x.ts, o: f(x.o, y.o), h: c, l: c, c, live: !!x.live && !!y.live };
   });
 }
 
 const SGT = 8 * 3600000;
-const HOUR = 3600000;
 const sgtDate = (t: number) => new Date(t + SGT).toISOString().slice(0, 10);
 // Yahoo stamps a daily bar at the exchange's local midnight; +12h lands inside the trading
 // day for every venue (NY, London/FX, Asia), so this is the bar's own session date.
@@ -84,8 +84,8 @@ Deno.serve(async (req) => {
       where proxy is not null and status = 'open'`;
     // Live marks only ever describe open trades.
     await sql`delete from dash.live_marks v where not exists (select 1 from dash.trades t where t.model = v.model and t.pid = v.pid and t.status = 'open')`;
-    // References computed by the current method (ref_v = 2) are frozen; older ones are recomputed once.
-    const known = new Map((await sql`select model, d::text d, idea, ref, ref_d::text ref_d from dash.idea_outcomes where ref_v = 2`).map((r) => [`${r.model}|${r.d}|${r.idea}`, r]));
+    // References computed by the current method (ref_v = 4) are frozen; older ones are recomputed once.
+    const known = new Map((await sql`select model, d::text d, idea, ref, ref_d::text ref_d from dash.idea_outcomes where ref_v = 4`).map((r) => [`${r.model}|${r.d}|${r.idea}`, r]));
     const ideas = await sql`select model, d::text d, idea, proxy, direction from dash.tested
       where proxy is not null and direction is not null and d >= current_date - 120`;
     const proxies = new Set<string>([...trades.map((t) => t.proxy), ...ideas.map((i) => i.proxy)]);
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     const hourly = new Map<string, Bar[]>(), daily = new Map<string, Bar[]>();
     for (const s of symbols) {
       const [h, d] = await Promise.all([yahoo(s, '60m', '1mo'), yahoo(s, '1d', '1y')]);
-      hourly.set(s, h); daily.set(s, d);
+      hourly.set(s, markLive(h)); daily.set(s, d);
       const rows = [
         ...h.slice(-200).map((b) => ({ symbol: s, interval: '60m', ts: new Date(b.ts), o: b.o, h: b.h, l: b.l, c: b.c })),
         ...d.slice(-60).map((b) => ({ symbol: s, interval: '1d', ts: new Date(b.ts), o: b.o, h: b.h, l: b.l, c: b.c })),
@@ -150,24 +150,27 @@ Deno.serve(async (req) => {
       const d = completeDaily(series(i.proxy, true));
       const h = series(i.proxy, false);
       const cut = Date.parse(i.d + 'T00:00:00Z'); // 08:00 SGT on the idea's date
-      // Hourly bars are stamped at their start: the last bar that finished by 08:00 SGT is the reference.
-      const hRef = h.filter((b) => b.ts + HOUR <= cut).pop();
       const before = d.filter((b) => barDate(b.ts) < i.d);
       const after = d.filter((b) => barDate(b.ts) >= i.d);
-      // Once set, the reference never moves (hourly history only reaches back a month).
-      const prev = known.get(`${i.model}|${i.d}|${i.idea}`);
-      const ref = prev?.ref != null ? Number(prev.ref) : hRef?.c ?? before[before.length - 1]?.c;
       const atr = atr20(before, spread);
-      if (ref == null || !atr) continue;
+      if (!atr) continue;
+      // Once set, the reference never moves (hourly history only reaches back a month). Ideas older
+      // than the hourly history fall back to the prior daily close.
+      const prev = known.get(`${i.model}|${i.d}|${i.idea}`);
+      let ref: number | null = null, refD: string | null = null;
+      if (prev?.ref != null) { ref = Number(prev.ref); refD = prev.ref_d; }
+      else if (h.length && h[0].ts <= cut - 2 * 86400000) {
+        const r = ideaRef(h, cut, now); // null: the market has not printed since the digest
+        if (r) { ref = r.px; refD = sgtDate(r.ts); }
+      } else if (before.length) { ref = before[before.length - 1].c; refD = barDate(before[before.length - 1].ts); }
       const dir = Number(i.direction);
-      const ret = (k: number) => (after.length >= k ? (dir * (after[k - 1].c - ref)) / atr : null);
+      const ret = (k: number) => (ref != null && after.length >= k ? (dir * (after[k - 1].c - ref)) / atr : null);
       const lastB = after[after.length - 1];
       const row = {
         model: i.model, d: i.d, idea: i.idea, proxy: i.proxy, direction: dir,
-        ref_d: prev?.ref_d ?? (hRef ? sgtDate(hRef.ts) : barDate(before[before.length - 1].ts)),
-        ref, atr20: atr, ret1: ret(1), ret5: ret(5), ret10: ret(10), ret20: ret(20),
-        last_d: lastB ? barDate(lastB.ts) : null,
-        ret_last: lastB ? (dir * (lastB.c - ref)) / atr : null, updated_at: new Date(), ref_v: 2,
+        ref_d: refD, ref, atr20: atr, ret1: ret(1), ret5: ret(5), ret10: ret(10), ret20: ret(20),
+        last_d: lastB && ref != null ? barDate(lastB.ts) : null,
+        ret_last: lastB && ref != null ? (dir * (lastB.c - ref)) / atr : null, updated_at: new Date(), ref_v: 4,
       };
       await sql`insert into dash.idea_outcomes ${sql(row)} on conflict (model, d, idea) do update set
         proxy = excluded.proxy, direction = excluded.direction, ref_d = excluded.ref_d, ref = excluded.ref, atr20 = excluded.atr20,

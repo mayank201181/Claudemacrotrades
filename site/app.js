@@ -17,6 +17,7 @@
   // Carded levels print exactly as written; only computed prices (live marks) are rounded.
   const lvl = (v) => { const x = n(v); if (x == null) return '—'; return String(+x.toPrecision(10)); };
   const px = (v) => { const x = n(v); if (x == null) return '—'; const a = Math.abs(x); return a >= 1000 ? x.toFixed(1) : a >= 10 ? x.toFixed(2) : a >= 1 ? x.toFixed(3) : x.toFixed(4); };
+  const avg = (arr, f) => (arr.length ? arr.reduce((a, x) => a + f(x), 0) / arr.length : null);
   let seq = 0; // guards against a slow response overwriting a newer view
   const dirTxt = (d) => (d == null ? '—' : Number(d) > 0 ? 'Long' : 'Short');
   const dayLabel = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -26,7 +27,8 @@
   // ---------- theme (light/dark) ----------
   const isDark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
   const applyTheme = (t) => { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; adaptAll(); };
-  $('#themeToggle').onclick = () => { const t = isDark() ? 'light' : 'dark'; store('theme', t); applyTheme(t); };
+  // Light is the default so the page reads exactly like the emails; the toggle remembers a dark choice.
+  $('#themeToggle').onclick = () => { const t = isDark() ? 'light' : 'dark'; store('theme2', t); applyTheme(t); };
 
   // The digests colour highlights and text for a white page. On the dark theme a light inline
   // background becomes a translucent tint of the same hue (text stays light) and a dark inline
@@ -78,7 +80,7 @@
   new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => n.nodeType === 1 && adaptIn(n))))
     .observe(document.body, { childList: true, subtree: true });
   matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', adaptAll);
-  applyTheme(store('theme'));
+  applyTheme(store('theme2') || 'light');
 
   // ---------- auth ----------
   async function boot() {
@@ -248,7 +250,6 @@
     const openR = open.reduce((a, t) => a + (curR(t) || 0), 0);
     const notCarded = tested.filter((x) => x.verdict === 'not carded');
     const priced = notCarded.filter((x) => x.outcome && n(x.outcome.ret5) != null);
-    const avg = (arr, f) => (arr.length ? arr.reduce((a, x) => a + f(x), 0) / arr.length : null);
     const near = priced.filter((x) => n(x.ev) != null && n(x.ev) >= 0.15), far = priced.filter((x) => n(x.ev) != null && n(x.ev) < 0.15);
     const dayset = new Set(tested.map((x) => x.d));
     const ideaDays = dayset.size;
@@ -319,6 +320,53 @@
     </div>`;
   }
 
+  // THE TRADE TEST (trade_book_spec): an idea that is not carded names the first letter it failed.
+  const GATES = {
+    a: 'no priceable proxy',
+    b: 'stop and target not at levels with meaning',
+    c: 'expectancy below the gate (EV < +0.30R, or r/r < 1.0)',
+    d: 'no dated catalyst or mechanism in motion',
+    e: 'already priced by the model\u2019s own judgement (for a washout: crowding shown only by price)',
+    f: 'book caps full',
+    g: 'vetoed by you in the last 60 days',
+  };
+  const gateKey = (x) => {
+    if (x.verdict === 'covered') return 'covered';
+    if (x.verdict !== 'not carded') return null;
+    const c = x.fail_code || '?';
+    if (c !== 'c') return c;
+    if (n(x.rr) != null && n(x.rr) < 1) return 'c-rr';
+    return n(x.ev) != null && n(x.ev) >= 0.15 ? 'c-near' : 'c-far';
+  };
+  const GATE_ROWS = [
+    ['c-near', '(c) near miss: EV +0.15 to +0.30R'], ['c-far', '(c) EV below +0.15R'], ['c-rr', '(c) r/r below 1.0'],
+    ['a', '(a) ' + GATES.a], ['b', '(b) ' + GATES.b], ['d', '(d) ' + GATES.d], ['e', '(e) ' + GATES.e],
+    ['f', '(f) ' + GATES.f], ['g', '(g) ' + GATES.g], ['covered', 'covered by an open trade'], ['?', 'no letter given'],
+  ];
+
+  // Did each gate reject ideas that then worked? Shadow outcomes per gate, in ATR(20) units in the
+  // idea's own direction. Ideas overlap across days and models, so the effective sample is smaller than n.
+  function gateAudit(tested) {
+    const rows = GATE_ROWS.map(([k, label]) => {
+      const xs = tested.filter((x) => gateKey(x) === k);
+      if (!xs.length) return '';
+      const p5 = xs.filter((x) => x.outcome && n(x.outcome.ret5) != null), pl = xs.filter((x) => x.outcome && n(x.outcome.ret_last) != null);
+      const a5 = avg(p5, (x) => n(x.outcome.ret5)), al = avg(pl, (x) => n(x.outcome.ret_last));
+      const hit = p5.length ? p5.filter((x) => n(x.outcome.ret5) > 0).length / p5.length : null;
+      const read = p5.length < 20 ? '<span class="muted">too few to judge</span>'
+        : a5 > 0.25 && hit >= 0.6 ? '<span class="warn">worth a look: rejected ideas went on to work</span>'
+        : a5 < 0 ? '<span class="pos">rejections look right</span>' : '<span class="muted">no clear signal</span>';
+      return `<tr><td>${esc(label)}</td><td class="num">${xs.length}</td><td class="num">${p5.length}</td>
+        <td class="num ${cls(a5)}">${a5 == null ? '—' : fmt(a5)}</td><td class="num">${hit == null ? '—' : Math.round(hit * 100) + '%'}</td>
+        <td class="num ${cls(al)}">${al == null ? '—' : fmt(al)}</td><td class="small">${read}</td></tr>`;
+    }).join('');
+    return `<div class="card" style="margin-bottom:14px"><h2 class="sec">Gate audit — what each rejection rule turned away</h2>
+      <div class="tablewrap"><table class="grid"><thead><tr><th>Gate failed</th><th>Ideas</th><th title="Ideas with 5 sessions of outcome">Priced +5d</th>
+      <th title="Average move in the idea's direction 5 sessions later, ATR(20) units">Avg +5d ATR</th><th title="Share that moved the idea's way by +5d">Moved their way</th>
+      <th title="Average move in the idea's direction to the latest close">Avg to date</th><th>Read</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <p class="note">A gate that keeps turning away ideas that then work is a candidate to loosen in the weekly rule review; one whose rejections drift against the idea is doing its job. Read needs 20+ priced ideas, and ideas repeat across days and models, so treat early numbers as anecdote.</p></div>`;
+  }
+
   function renderTested(data) {
     const tested = (data.tested || []);
     if (!tested.length) { $('#tradesBody').innerHTML = '<div class="card empty">No tested ideas recorded yet.</div>'; return; }
@@ -339,20 +387,37 @@
         <td class="num ${cls(o?.ret_last)}">${o?.ret_last != null ? fmt(o.ret_last) : '—'}</td>
       </tr>${isOpen ? `<tr class="detail"><td colspan="9">${ideaDetail(x)}</td></tr>` : ''}`);
     }
-    $('#tradesBody').innerHTML = `<div class="tablewrap"><table class="grid"><thead><tr>
+    $('#tradesBody').innerHTML = gateAudit(tested) + `<div class="tablewrap"><table class="grid"><thead><tr>
       <th>Idea & reason not carded</th><th class="hide-sm">Proxy</th><th class="hide-sm">Dir</th><th>R:R</th><th class="hide-sm">p vs p0</th><th>EV</th><th>Verdict</th><th title="Move in the idea's direction 5 sessions later, in ATR(20) units">+5d ATR</th><th title="Move in the idea's direction to the latest daily close, in ATR(20) units">To date</th>
       </tr></thead><tbody>${out.join('')}</tbody></table></div>
-      <p class="note">Gate: r/r ≥ 1.0 and EV = p·r/r − (1−p) ≥ +0.3R. Fail codes per trade_book_spec — (a) no priceable proxy, (c) expectancy below the gate, (e) washout without crowding evidence beyond price. Outcome columns are shadow-tracked by the hourly job from the idea's 08:00 SGT reference; they are not trades.</p>`;
+      <p class="note">Gate: r/r ≥ 1.0 and EV = p·r/r − (1−p) ≥ +0.3R. Fail codes (trade_book_spec, the first letter failed): (a) no priceable proxy · (b) stop/target without meaning · (c) expectancy · (d) no catalyst · (e) already priced, or a washout whose crowding is price only · (f) caps · (g) vetoed. Outcome columns are shadow-tracked by the hourly job from the first price a reader could deal at after the digest (the last live hourly close before 08:00 SGT, or the next open if the market was shut); they are not trades.</p>`;
     bindRows();
+  }
+
+  // The gate is on EV, not on p: EV = p·rr − (1−p) ≥ +0.3R. Solved for p at the idea's own r/r it
+  // reads p ≥ 1.3 / (1 + rr) in 5% steps — 55% at 1.45, 35% at 3, 25% at 5 — so asymmetric ideas pass at low p.
+  function gateLine(x) {
+    const rr = n(x.rr);
+    if (rr == null || rr <= 0) return '';
+    if (rr < 1) return `r/r ${fmt(rr)} is below the 1.0 floor`;
+    const need = Math.min(100, Math.ceil((130 / (1 + rr)) / 5 - 1e-9) * 5);
+    return `EV ${fmtR(x.ev)} vs the +0.30R gate${x.p != null ? ` (p ${fmt(x.p, 0)}% at r/r ${fmt(rr)}; random walk ${fmt(x.p0, 0)}%)` : ''} — at this r/r EV clears only with p ≥ ${need}%`;
   }
 
   function ideaDetail(x) {
     const o = x.outcome;
+    const g = x.verdict === 'covered' ? `already covered by ${x.covered_by || 'an open trade'}`
+      : x.verdict !== 'not carded' ? '' : x.fail_code === 'c' ? `(c) ${gateLine(x)}`
+      : x.fail_code && GATES[x.fail_code] ? `(${x.fail_code}) ${GATES[x.fail_code]}` : 'no gate letter recorded';
+    const ref = !o ? '' : o.ref == null
+      ? `<div>Graded from</div><div class="muted">pending: the market was shut when the digest landed, so grading starts at its first print after that</div>`
+      : `<div>Graded from</div><div class="mono">${px(o.ref)} on ${esc(o.ref_d)} · ATR20 ${px(o.atr20)}</div>
+      <div>Forward (ATR)</div><div class="mono">+1d ${fmt(o.ret1)} · +5d ${fmt(o.ret5)} · +10d ${fmt(o.ret10)} · +20d ${fmt(o.ret20)} · to ${esc(o.last_d || '—')} ${fmt(o.ret_last)}</div>`;
     return `<div class="kv">
       <div>Reason</div><div>${esc(x.reason || '—')}</div>
+      ${g ? `<div>Why not entered</div><div>${esc(g)}</div>` : ''}
       <div>Source</div><div>${x.source === 'ledger' ? 'trade_book_current ledger (complete list)' : 'digest email (printed lines)'}</div>
-      ${o ? `<div>Reference</div><div class="mono">${px(o.ref)} on ${esc(o.ref_d)} · ATR20 ${px(o.atr20)}</div>
-      <div>Forward (ATR)</div><div class="mono">+1d ${fmt(o.ret1)} · +5d ${fmt(o.ret5)} · +10d ${fmt(o.ret10)} · +20d ${fmt(o.ret20)} · to ${esc(o.last_d || '—')} ${fmt(o.ret_last)}</div>` : '<div>Outcome</div><div class="muted">not priced (no proxy or direction)</div>'}
+      ${o ? ref : '<div>Outcome</div><div class="muted">not priced (no proxy or direction)</div>'}
     </div>`;
   }
 
