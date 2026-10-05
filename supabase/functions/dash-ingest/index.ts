@@ -1,0 +1,111 @@
+// dash-ingest: receives raw digest emails (Gmail get_thread JSON) and trade_book_current
+// Drive docs, stores them verbatim in dash.raw, and parses them into the dash tables.
+// Auth: body.token must equal dash.config.ingest_token. {kind:'reparse'} replays dash.raw.
+import postgres from 'npm:postgres@3.4.4';
+import { parseDigest, parseEmailTested, parseTradeBook, type Tested } from '../_shared/parse.ts';
+
+const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
+
+type Json = Record<string, unknown>;
+
+async function upsertTested(rows: Tested[]) {
+  for (const t of rows) {
+    await sql`insert into dash.tested ${sql({ ...t, idea: t.idea.slice(0, 500) } as Json)}
+      on conflict (model, d, idea) do update set seq = excluded.seq, proxy = excluded.proxy, direction = excluded.direction,
+        verdict = excluded.verdict, fail_code = excluded.fail_code, covered_by = excluded.covered_by, rr = excluded.rr,
+        p = excluded.p, p0 = excluded.p0, ev = excluded.ev, reason = excluded.reason, source = excluded.source`;
+  }
+}
+
+async function ingestThread(data: Json): Promise<string[]> {
+  const out: string[] = [];
+  const msgs = (data.messages as Json[] | undefined) ?? [data];
+  for (const m of msgs) {
+    const msg = m as { id: string; subject: string; date: string; htmlBody?: string };
+    const dg = parseDigest(msg);
+    if (!dg) continue;
+    await sql`insert into dash.raw (kind, model, d, source_id, payload)
+      values ('gmail_thread', ${dg.model}, ${dg.d}, ${msg.id}, ${sql.json(m as Json)})
+      on conflict (kind, source_id) do update set payload = excluded.payload, received_at = now()`;
+    await sql`insert into dash.digests (model, d, subject, gmail_id, sent_at, built, header, sixty, themes, sections, trade_block, parsed_at)
+      values (${dg.model}, ${dg.d}, ${dg.subject}, ${dg.gmail_id}, ${dg.sent_at}, ${dg.built}, ${dg.header},
+        ${sql.json(dg.sixty)}, ${sql.json(dg.themes as unknown as Json)}, ${sql.json(dg.sections as unknown as Json)}, ${dg.trade_block}, now())
+      on conflict (model, d) do update set subject = excluded.subject, gmail_id = excluded.gmail_id, sent_at = excluded.sent_at,
+        built = excluded.built, header = excluded.header, sixty = excluded.sixty, themes = excluded.themes,
+        sections = excluded.sections, trade_block = excluded.trade_block, parsed_at = now()`;
+    // The email prints the top tested lines; the ledger has all of them and wins when present.
+    const [{ n }] = await sql`select count(*)::int n from dash.tested where model = ${dg.model} and d = ${dg.d} and source = 'ledger'`;
+    if (n === 0 && dg.trade_block) {
+      await sql`delete from dash.tested where model = ${dg.model} and d = ${dg.d} and source = 'email'`;
+      await upsertTested(parseEmailTested(dg.trade_block, dg.model, dg.d));
+    }
+    out.push(`digest ${dg.model} ${dg.d}: ${dg.themes.length} themes, ${dg.sixty.length} bullets`);
+  }
+  return out;
+}
+
+async function ingestBook(data: Json | string, fileId?: string): Promise<string[]> {
+  const text = typeof data === 'string' ? data : String((data as Json).fileContent ?? '');
+  const tb = parseTradeBook(text);
+  const today = new Date().toISOString().slice(0, 10);
+  await sql`insert into dash.raw (kind, model, d, source_id, payload)
+    values ('trade_book', ${tb.model}, ${today}, ${`${fileId ?? tb.model}|${tb.updated ?? today}`}, ${sql.json({ text, fileId: fileId ?? null })})
+    on conflict (kind, source_id) do update set payload = excluded.payload, received_at = now()`;
+  await sql`insert into dash.book_state (model, updated, scorecard, rules, ingested_at)
+    values (${tb.model}, ${tb.updated}, ${tb.scorecard}, ${tb.rules}, now())
+    on conflict (model) do update set updated = excluded.updated, scorecard = excluded.scorecard, rules = excluded.rules, ingested_at = now()`;
+  for (const t of tb.trades) {
+    const row = {
+      model: t.model, pid: t.pid, title: t.title, status: t.status, asset_class: t.asset_class, direction: t.direction,
+      tclass: t.tclass, proxy: t.proxy, opened: t.opened, filled: t.filled, closed: t.closed, ref: t.ref, entry: t.entry,
+      stop: t.stop, target: t.target, rr: t.rr, p: t.p, p0: t.p0, ev: t.ev, result_r: t.result_r, exit_reason: t.exit_reason,
+      review: t.review, thesis: t.thesis, invalidation: t.invalidation, structure: t.structure,
+    };
+    // A compressed block (closed trade older than 7 days) can lose thesis lines: never overwrite text with null.
+    await sql`insert into dash.trades ${sql({ ...row, meta: sql.json(t.meta), first_seen: today, last_seen: today } as Json)}
+      on conflict (model, pid) do update set title = excluded.title, status = excluded.status,
+        asset_class = coalesce(excluded.asset_class, dash.trades.asset_class), direction = coalesce(excluded.direction, dash.trades.direction),
+        tclass = coalesce(excluded.tclass, dash.trades.tclass), proxy = coalesce(excluded.proxy, dash.trades.proxy),
+        opened = coalesce(excluded.opened, dash.trades.opened), filled = coalesce(excluded.filled, dash.trades.filled),
+        closed = coalesce(excluded.closed, dash.trades.closed), ref = coalesce(excluded.ref, dash.trades.ref),
+        entry = coalesce(excluded.entry, dash.trades.entry), stop = coalesce(excluded.stop, dash.trades.stop),
+        target = coalesce(excluded.target, dash.trades.target), rr = coalesce(excluded.rr, dash.trades.rr),
+        p = coalesce(excluded.p, dash.trades.p), p0 = coalesce(excluded.p0, dash.trades.p0), ev = coalesce(excluded.ev, dash.trades.ev),
+        result_r = coalesce(excluded.result_r, dash.trades.result_r), exit_reason = coalesce(excluded.exit_reason, dash.trades.exit_reason),
+        review = excluded.review, thesis = coalesce(excluded.thesis, dash.trades.thesis),
+        invalidation = coalesce(excluded.invalidation, dash.trades.invalidation), structure = coalesce(excluded.structure, dash.trades.structure),
+        meta = dash.trades.meta || excluded.meta, last_seen = excluded.last_seen, updated_at = now()`;
+  }
+  for (const m of tb.marks) {
+    await sql`insert into dash.trade_marks ${sql(m as unknown as Json)}
+      on conflict (model, pid, d) do update set mark = excluded.mark, chg = excluded.chg, r = excluded.r, note = excluded.note`;
+  }
+  for (const l of tb.log) {
+    await sql`insert into dash.trade_log (model, d, ref, text) values (${l.model}, ${l.d}, ${l.ref}, ${l.text}) on conflict do nothing`;
+  }
+  const days = [...new Set(tb.tested.map((t) => t.d))];
+  for (const d of days) await sql`delete from dash.tested where model = ${tb.model} and d = ${d} and source = 'email'`;
+  await upsertTested(tb.tested);
+  return [`book ${tb.model} (${tb.updated}): ${tb.trades.length} trades, ${tb.marks.length} marks, ${tb.tested.length} tested over ${days.length} days`];
+}
+
+Deno.serve(async (req) => {
+  try {
+    const body = await req.json();
+    const [{ value }] = await sql`select value from dash.config where key = 'ingest_token'`;
+    if (!body?.token || body.token !== value) return new Response('forbidden', { status: 403 });
+    let out: string[] = [];
+    if (body.kind === 'gmail_thread') out = await ingestThread(body.data);
+    else if (body.kind === 'trade_book') out = await ingestBook(body.data, body.fileId);
+    else if (body.kind === 'reparse') {
+      const rows = await sql`select kind, payload from dash.raw order by kind desc, received_at`;
+      for (const r of rows) {
+        if (r.kind === 'gmail_thread') out.push(...await ingestThread(r.payload));
+        else out.push(...await ingestBook(r.payload.text, r.payload.fileId ?? undefined));
+      }
+    } else return new Response('unknown kind', { status: 400 });
+    return new Response(JSON.stringify({ ok: true, out }), { headers: { 'Content-Type': 'application/json' } });
+  } catch (e) {
+    return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+  }
+});

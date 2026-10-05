@@ -151,8 +151,6 @@ export function extractLean(html: string): string | null {
   return block.length > 8000 ? block.slice(0, 8000) : block;
 }
 
-
-
 export function parseDigest(msg: { id: string; subject: string; date: string; htmlBody?: string; html?: string }): Digest | null {
   const html = msg.htmlBody ?? msg.html ?? '';
   const model = modelFromText(msg.subject);

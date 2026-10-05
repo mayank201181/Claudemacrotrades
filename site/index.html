@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Macro Desk</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230f766e'/><path d='M6 22l6-7 5 4 9-10' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="login" class="login" hidden>
+  <form id="loginForm" class="card login-card">
+    <h1>Macro Desk</h1>
+    <p class="muted">Private. Sign in with the allowed account.</p>
+    <label>Email <input id="email" type="email" autocomplete="username" required></label>
+    <label>Password <input id="password" type="password" autocomplete="current-password" required minlength="8"></label>
+    <div class="row">
+      <button type="submit" class="primary">Sign in</button>
+      <button type="button" id="signupBtn" class="ghost">First time? Create password</button>
+    </div>
+    <p id="loginMsg" class="muted small"></p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header class="topbar">
+    <div class="brand">Macro Desk</div>
+    <nav class="tabs" id="mainTabs">
+      <button data-tab="themes" class="active">Themes</button>
+      <button data-tab="trades">Trades</button>
+    </nav>
+    <div class="seg" id="modelSeg">
+      <button data-model="fable" class="active">Fable 5.1</button>
+      <button data-model="opus">Opus 5.5</button>
+    </div>
+    <div class="spacer"></div>
+    <span id="freshness" class="muted small"></span>
+    <button id="themeToggle" class="ghost icon" title="Toggle light/dark">◐</button>
+    <button id="signout" class="ghost small">Sign out</button>
+  </header>
+
+  <main>
+    <section id="view-themes">
+      <div class="toolbar">
+        <button id="prevDay" class="ghost">‹</button>
+        <select id="dateSel"></select>
+        <button id="nextDay" class="ghost">›</button>
+        <span id="digestMeta" class="muted small"></span>
+      </div>
+      <div id="themesBody"></div>
+    </section>
+
+    <section id="view-trades" hidden>
+      <div id="analytics" class="analytics"></div>
+      <div class="toolbar">
+        <div class="seg" id="tradeSeg">
+          <button data-sub="entered" class="active">Entered</button>
+          <button data-sub="tested">Not entered (tested)</button>
+        </div>
+        <span id="tradeMeta" class="muted small"></span>
+      </div>
+      <div id="tradesBody"></div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
