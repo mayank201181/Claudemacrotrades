@@ -24,12 +24,50 @@
   const rpc = async (fn, args) => { const { data, error } = await sb.rpc(fn, args); if (error) throw error; return data; };
 
   // ---------- theme (light/dark) ----------
-  const applyTheme = (t) => { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; };
-  applyTheme(store('theme'));
-  $('#themeToggle').onclick = () => {
-    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-    const t = dark ? 'light' : 'dark'; store('theme', t); applyTheme(t);
+  const isDark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+  const applyTheme = (t) => { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; adaptAll(); };
+  $('#themeToggle').onclick = () => { const t = isDark() ? 'light' : 'dark'; store('theme', t); applyTheme(t); };
+
+  // The digests colour highlights and text for a white page. On the dark theme a light inline
+  // background becomes a translucent tint of the same hue (text stays light) and a dark inline
+  // text colour is lifted; the original style is kept, so the light theme shows the email as sent.
+  const ctx = document.createElement('canvas').getContext('2d');
+  const rgbOf = (v) => {
+    ctx.fillStyle = '#000'; ctx.fillStyle = v.trim(); const s = ctx.fillStyle;
+    if (s[0] === '#') return [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16));
+    const m = s.match(/[\d.]+/g); return m && !(m[3] === '0') ? m.slice(0, 3).map(Number) : null;
   };
+  const hsl = ([r, g, b]) => {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, d = mx - mn;
+    if (!d) return [0, 0, l];
+    const s = d / (1 - Math.abs(2 * l - 1));
+    const h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [(h * 60 + 360) % 360, s, l];
+  };
+  function adapt(el) {
+    if (el.dataset.s0 === undefined) el.dataset.s0 = el.getAttribute('style') || '';
+    el.setAttribute('style', el.dataset.s0);
+    if (!isDark()) return;
+    const bg = el.style.backgroundColor || el.style.background;
+    const c = bg && rgbOf(bg);
+    if (c) {
+      const [h, s, l] = hsl(c);
+      if (l > 0.5) { el.style.background = ''; el.style.backgroundColor = `hsla(${h.toFixed(0)}, ${Math.round(Math.min(1, s) * 100)}%, 45%, ${s < 0.15 ? 0.12 : 0.28})`; }
+    }
+    const fg = el.style.color && rgbOf(el.style.color);
+    if (fg) {
+      const [h, s, l] = hsl(fg);
+      if (l < 0.6) el.style.color = s < 0.15 ? (l < 0.35 ? '' : `hsl(0, 0%, ${Math.round((1 - l) * 100)}%)`) : `hsl(${h.toFixed(0)}, ${Math.round(s * 100)}%, 72%)`;
+    }
+  }
+  const SEL = '[style*="background"], [style*="color"]';
+  const adaptIn = (root) => { if (root.matches?.(SEL)) adapt(root); root.querySelectorAll?.(SEL).forEach(adapt); };
+  function adaptAll() { if (document.body) adaptIn(document.body); }
+  new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => n.nodeType === 1 && adaptIn(n))))
+    .observe(document.body, { childList: true, subtree: true });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', adaptAll);
+  applyTheme(store('theme'));
 
   // ---------- auth ----------
   async function boot() {
