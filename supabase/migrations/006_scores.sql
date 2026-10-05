@@ -413,6 +413,9 @@ begin
   with u as (update dash.rules set status = 'reverted', decided_at = now(), decided_note = p->>'note'
     where status = 'in_force' and rid in (select jsonb_array_elements_text(coalesce(p->'revert', '[]'))) returning rid)
   select array_agg(rid) into v_reverted from u;
+  -- Reverting a rule that replaced another puts the one it replaced back in force.
+  update dash.rules o set status = 'in_force', decided_at = now(), decided_note = 'restored: ' || n.rid || ' reverted'
+  from dash.rules n where n.rid = any(coalesce(v_reverted, '{}')) and n.supersedes = o.rid and o.status = 'superseded';
   with ap as (
     update dash.rules set status = 'in_force', decided_at = now()
     where status = 'proposed' and apply_after <= now() returning rid, supersedes)
