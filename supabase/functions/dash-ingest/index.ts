@@ -3,7 +3,7 @@
 // Auth: body.token must equal dash.config.ingest_token. {kind:'reparse'} replays dash.raw.
 import postgres from 'npm:postgres@3.4.4';
 import { parseDigest, parseEmailTested, parseTradeBook, setPrivateTerms, type Tested } from '../_shared/parse.ts';
-import { parseFeed } from '../_shared/feeds.ts';
+import { parseFeed, privacyFilter, type Family, type FeedSection } from '../_shared/feeds.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
 
@@ -138,6 +138,14 @@ Deno.serve(async (req) => {
       await sql`delete from dash.idea_outcomes where idea = 'long test idea'`;
       await sql`delete from dash.raw where source_id = 'test|TEST'`;
       out = ['test rows purged'];
+    } else if (body.kind === 'refilter') {
+      // Re-applies the current privacy terms to every stored feed row (the Email Digest is never kept raw).
+      const rows = await sql`select gmail_id, family, intro, sections from dash.feeds`;
+      for (const r of rows) {
+        const f = privacyFilter(r.family as Family, r.sections as FeedSection[], r.intro ?? '');
+        await sql`update dash.feeds set intro = ${f.intro}, sections = ${sql.json(f.sections as unknown as Json)}, parsed_at = now() where gmail_id = ${r.gmail_id}`;
+      }
+      out = [`refiltered ${rows.length} feed rows`];
     } else if (body.kind === 'gmail_thread') out = await ingestThread(body.data);
     else if (body.kind === 'trade_book') out = await ingestBook(body.data, body.fileId);
     else if (body.kind === 'reparse') {

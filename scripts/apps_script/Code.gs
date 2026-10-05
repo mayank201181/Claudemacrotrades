@@ -53,7 +53,8 @@ function syncMacroDesk() {
         if (outOfTime) return;
         if (Date.now() - started > TIME_BUDGET_MS) { outOfTime = true; return; }
         const subject = m.getSubject();
-        if (!re.test(subject) || props.getProperty('s:' + m.getId())) return;
+        // Replies and forwards quote the digest but are not digests.
+        if (/^\s*(re|fwd?|fw)\s*:/i.test(subject) || !re.test(subject) || props.getProperty('s:' + m.getId())) return;
         const res = post_(ENDPOINT, { kind: 'gmail_thread', data: { messages: [{
           id: m.getId(), subject: subject, date: m.getDate().toISOString(), htmlBody: m.getBody() }] } });
         console.log(spec.key + ' ' + subject.slice(0, 70) + ' → ' + res.code + ' ' + res.text.slice(0, 120));

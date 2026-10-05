@@ -80,11 +80,11 @@ export function sanitize(html: string): string {
   return out.trim();
 }
 
-// Personal terms that sometimes leak outside ADMIN FLAGS (ledger, footer). Matching clauses are removed.
+// Personal terms that sometimes leak outside ADMIN FLAGS (ledger, footer). Matching sentences are removed.
 // Only generic words live here (the repo is public); names, places and institutions are loaded at
 // runtime from dash.config.private_terms via setPrivateTerms, and ingest refuses to run without them.
-const GENERIC_SCRUB = String.raw`\bthe girls\b|(?<![a-z])e-vote|trusted[- ]device|\bcpf\b|\bkyc\b|parent portal|school (?:deposit|trip)`;
-const GENERIC_DROP = String.raw`the girls|daughter|school|personal relevance|bank, card|card alert|wallet charge|statement ready|insurer|\bkyc\b|\bcpf\b|subscription renews|renewal|\bcoc\b|e-vote|trusted[- ]device|password|upstash|vercel|deadline|due (today|tomorrow)`;
+const GENERIC_SCRUB = String.raw`\bthe girls\b|(?<![a-z])e-vote|trusted[- ]device|\bcpf\b|\bkyc\b|parent portal|school (?:deposit|trip)|\b(?:two|my|your|both) daughters?\b|school-age children|for the household:|household-relevant|household item`;
+const GENERIC_DROP = String.raw`the girls|daughter|school|personal relevance|bank, card|card alert|wallet charge|statement ready|insurer|\bkyc\b|\bcpf\b|subscription renews|renewal|\bcoc\b|e-vote|trusted[- ]device|password|upstash|vercel|deadline|due (today|tomorrow)|card ending|bank and card|card notices?|monthly statement|consolidated statement|brokerage statement|family medical|\breceipt\b|\binvoice\b`;
 export const privacy = { loaded: false, scrub: new RegExp(GENERIC_SCRUB, 'i'), drop: new RegExp(GENERIC_DROP, 'i') };
 export function setPrivateTerms(t: { scrub?: string; drop?: string } | null | undefined) {
   if (!t?.scrub || !t?.drop) throw new Error('dash.config.private_terms is missing');
@@ -96,19 +96,21 @@ const personal = (s: string) => privacy.scrub.test(s);
 
 export function scrubPersonal(html: string): string {
   if (!personal(stripTags(html))) return html;
-  return html.replace(/<(p|li)\b[^>]*>[\s\S]*?<\/\1>/gi, (block) => {
+  const out = html.replace(/<(p|li)\b[^>]*>[\s\S]*?<\/\1>/gi, (block) => {
     if (!personal(stripTags(block))) return block;
     const open = block.match(/^<[^>]+>/)![0];
     const close = block.match(/<\/[a-z]+>$/i)![0];
     const inner = block.slice(open.length, block.length - close.length);
-    // Clause level first (" · " lists); inside a long clause, drop only the offending sentences.
+    // Clause by clause (" · " lists), dropping only the offending sentences of each clause.
     const kept = inner.split(/\s+·\s+/).map((c) => {
       if (!personal(stripTags(c))) return c;
-      if (stripTags(c).length < 200) return '';
       return c.split(/(?<=[.;!?])\s+(?=[A-Z<])/).filter((x) => !personal(stripTags(x))).join(' ');
-    }).filter((c) => stripTags(c).trim().length > 0);
+    }).filter((c) => /[A-Za-z0-9]/.test(stripTags(c)));
     return kept.length ? open + kept.join(' · ') + close : '';
   });
+  if (!personal(stripTags(out))) return out;
+  // Safety net for text outside p/li blocks (table cells, loose text): blank each matching text node.
+  return out.replace(/(^|>)([^<]+)(?=<|$)/g, (m, lead: string, t: string) => (personal(decodeEntities(t)) ? lead : m));
 }
 
 // Personal admin items never reach the dashboard.

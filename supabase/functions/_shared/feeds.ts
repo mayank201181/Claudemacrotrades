@@ -83,17 +83,26 @@ export function parseFeed(msg: { id: string; subject: string; date: string; html
     return m;
   });
   const { intro, parts } = splitSections(body);
-  const clean = (h: string) => scrubPersonal(sanitize(family === 'substack' ? dropPersonal(h) : h));
-  let sections = parts.map((p) => ({ title: p.title, html: clean(p.html) })).filter((p) => stripTags(p.html).length > 0 || p.title);
-  let introHtml = scrubPersonal(sanitize(intro.replace(/<h1[^>]*>[\s\S]*?<\/h1>/gi, '')));
-  if (family === 'substack') {
-    sections = sections.filter((s) => SUBSTACK_KEEP.test(s.title) && !/personal|family|action|trash|spam|noise|important check/i.test(s.title));
-    introHtml = ''; // the intro line summarises personal to-dos
-  }
+  const f = privacyFilter(family, parts.map((p) => ({ title: p.title, html: sanitize(p.html) })),
+    sanitize(intro.replace(/<h1[^>]*>[\s\S]*?<\/h1>/gi, '')));
+  let { sections, intro: introHtml } = f;
   // Some layouts put the whole take before the first heading: show it as its own section.
   if (stripTags(introHtml).length > 1500) { sections = [{ title: 'Overview', html: introHtml }, ...sections]; introHtml = ''; }
   return {
     family, source: feedSource(subject), d, gmail_id: msg.id, subject, sent_at: msg.date,
     intro: introHtml, sections, stances,
   };
+}
+
+// The privacy pass on already-sanitised sections. It only ever removes content, so running it
+// again over stored rows (dash-ingest {kind:'refilter'}) after the terms change is safe.
+export function privacyFilter(family: Family, sections: FeedSection[], intro: string): { sections: FeedSection[]; intro: string } {
+  const clean = (h: string) => scrubPersonal(family === 'substack' ? dropPersonal(h) : h);
+  let out = sections.map((p) => ({ title: p.title, html: clean(p.html) })).filter((p) => stripTags(p.html).length > 0 || p.title);
+  let introHtml = clean(intro);
+  if (family === 'substack') {
+    out = out.filter((s) => SUBSTACK_KEEP.test(s.title) && !/personal|family|action|trash|spam|noise|important check/i.test(s.title));
+    introHtml = ''; // the intro line summarises personal to-dos
+  }
+  return { sections: out, intro: introHtml };
 }
