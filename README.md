@@ -9,6 +9,7 @@ and the trade books (entered trades with live marks; tested-but-not-entered idea
 - `supabase/functions/dash-mark` — hourly (pg_cron `dash-mark-hourly`): Yahoo bars, live R per open trade,
   forward outcomes of every tested idea in ATR(20) units.
 - `supabase/migrations/` — the `dash` schema (in `macro-state-db`; never touches the routines' own tables).
-- `docs/ingest_routine.md` — the daily ingest routine (09:20 and 12:20 SGT).
+- `scripts/apps_script/Code.gs` — feeder that runs in the owner's Google account every 10 minutes and posts new
+  digests and trade books to `dash-ingest` (set `TOKEN`, run `setup` once).
 
 No trade or theme data lives in this repository (it is public); it all sits in Supabase behind the login.

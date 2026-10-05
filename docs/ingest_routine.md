@@ -1,4 +1,8 @@
-# Dashboard ingest routine
+# Dashboard ingest routine (superseded)
+
+> Superseded by `scripts/apps_script/Code.gs`: an Apps Script in the owner's Google account that posts new
+> digests and trade books every 10 minutes. The Claude routine below was disabled because auto-mode sessions
+> block posting email content to an external endpoint. Kept for reference.
 
 Scheduled routine ("Macro Desk ingest", Full access environment) that pushes each morning's
 Macro Takeaways digests and both trade books into Supabase. The live prompt carries the real
