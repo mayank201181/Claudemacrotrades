@@ -48,12 +48,23 @@
   function adapt(el) {
     if (el.dataset.s0 === undefined) el.dataset.s0 = el.getAttribute('style') || '';
     el.setAttribute('style', el.dataset.s0);
+    el.classList.remove('hl');
     if (!isDark()) return;
     const bg = el.style.backgroundColor || el.style.background;
     const c = bg && rgbOf(bg);
     if (c) {
       const [h, s, l] = hsl(c);
-      if (l > 0.5) { el.style.background = ''; el.style.backgroundColor = `hsla(${h.toFixed(0)}, ${Math.round(Math.min(1, s) * 100)}%, 45%, ${s < 0.15 ? 0.12 : 0.28})`; }
+      // A light highlight becomes coloured text on a faint tint of the same hue: the meaning
+      // (green = stance change, yellow = odds moved, red = new scenario, blue = read) stays, the block goes.
+      if (l > 0.5) {
+        el.style.background = '';
+        if (s < 0.15) { el.style.backgroundColor = 'rgba(255,255,255,0.04)'; } else {
+          const hh = h.toFixed(0), ss = Math.round(Math.min(0.8, s) * 100);
+          el.style.backgroundColor = `hsla(${hh}, ${ss}%, 55%, 0.09)`;
+          if (!el.style.color) el.style.color = `hsl(${hh}, ${ss}%, 80%)`;
+          el.classList.add('hl');
+        }
+      }
     }
     const fg = el.style.color && rgbOf(el.style.color);
     if (fg) {
