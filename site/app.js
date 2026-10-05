@@ -117,8 +117,9 @@
     document.querySelectorAll('#tradeSeg button').forEach((b) => b.classList.toggle('active', b.dataset.sub === state.sub));
     $('#view-themes').hidden = state.tab !== 'themes';
     $('#view-trades').hidden = state.tab !== 'trades';
+    $('#view-scores').hidden = !SCORES[state.tab];
     $('#view-feed').hidden = !FEEDS[state.tab];
-    $('#modelSeg').hidden = !!FEEDS[state.tab];
+    $('#modelSeg').hidden = !!FEEDS[state.tab] || state.tab === 'voices' || state.tab === 'review';
     const bk = state.index?.book?.[state.model];
     $('#freshness').textContent = bk ? `book ${bk.updated || ''} · synced ${ago(bk.ingested_at)}` : '';
   }
@@ -126,7 +127,11 @@
   document.querySelectorAll('#modelSeg button').forEach((b) => (b.onclick = () => { state.model = b.dataset.model; store('model', state.model); state.date = null; state.open.clear(); syncChrome(); render(); }));
   document.querySelectorAll('#tradeSeg button').forEach((b) => (b.onclick = () => { state.sub = b.dataset.sub; store('sub', state.sub); state.open.clear(); syncChrome(); render(); }));
 
-  function render() { return FEEDS[state.tab] ? renderFeed(state.tab) : state.tab === 'themes' ? renderThemes() : renderTrades(); }
+  function render() {
+    if (FEEDS[state.tab]) return renderFeed(state.tab);
+    if (SCORES[state.tab]) return renderScores(state.tab);
+    return state.tab === 'themes' ? renderThemes() : renderTrades();
+  }
 
   // ---------- feed tabs (YouTube / Podcast / Grok / Substack) ----------
   const FEEDS = {
@@ -426,6 +431,214 @@
       if (e.target.closest('a')) return;
       const id = tr.dataset.id; state.open.has(id) ? state.open.delete(id) : state.open.add(id);
       state.sub === 'entered' ? renderEntered(state.trades[state.model]) : renderTested(state.trades[state.model]);
+    }));
+  }
+
+
+  // ---------- learning loop: Questions / Voices / Review ----------
+  const SCORES = { questions: 'dash_questions', voices: 'dash_voices', review: 'dash_review' };
+  const scoreCache = {};
+  const pct = (a, b) => (b ? `${Math.round((100 * a) / b)}%` : '—');
+  const zf = (v) => (n(v) == null ? '—' : `${n(v) >= 0 ? '+' : ''}${n(v).toFixed(2)}`);
+  const sgt = (ts) => (ts ? new Date(ts).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Singapore' }) + ' SGT' : '—');
+  const ARROW = { UU: '↑↑', U: '↑', N: '↔', D: '↓', DD: '↓↓' };
+  const arrowOf = (v) => ({ 2: '↑↑', 1: '↑', 0: '↔', '-1': '↓', '-2': '↓↓' }[String(v)] ?? '');
+  const verdictPill = (v) => (v ? `<span class="pill ${v === 'HIT' ? 'open' : v === 'MISS' ? 'missed' : 'closed'}">${esc(v)}</span>` : '<span class="muted">—</span>');
+  const statBox = (k, v, s, c = '') => `<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
+
+  async function renderScores(tab) {
+    const body = $('#scoresBody');
+    body.innerHTML = '<div class="muted">Loading…</div>';
+    const my = ++seq;
+    try { if (!scoreCache[tab]) scoreCache[tab] = await rpc(SCORES[tab]); }
+    catch (e) { if (my === seq) body.innerHTML = `<div class="card empty">Could not load: ${esc(e.message || e)}</div>`; return; }
+    if (my !== seq || state.tab !== tab) return;
+    const d = scoreCache[tab];
+    if (tab === 'questions') renderQuestions(d); else if (tab === 'voices') renderVoices(d); else renderReview(d);
+  }
+
+  // Questions: the odds engine's yes/no questions, scored three ways — as printed (sign of all arrows),
+  // on arrows written at least two days before the resolve date (late arrows often just watch the
+  // outcome arrive), and against an "always NO" baseline (most level questions resolve NO).
+  function renderQuestions(d) {
+    const qs = (d.questions || []).filter((q) => q.model === state.model);
+    const res = qs.filter((q) => q.status === 'resolved' && q.outcome);
+    const cnt = (arr, v, f = 'verdict') => arr.filter((q) => q[f] === v).length;
+    const hit = cnt(res, 'HIT'), miss = cnt(res, 'MISS'), flat = cnt(res, 'FLAT');
+    const noBase = res.filter((q) => q.outcome === 'NO').length;
+    const lead = res.filter((q) => q.verdict_lead2);
+    const lh = cnt(lead, 'HIT', 'verdict_lead2'), lm = cnt(lead, 'MISS', 'verdict_lead2');
+    const arrowsAll = res.reduce((a, q) => a + (q.arrows_all || 0), 0), arrowsLate = res.reduce((a, q) => a + (q.arrows_late || 0), 0);
+    const am = res.filter((q) => q.against_market), amh = am.filter((q) => q.verdict === 'HIT').length;
+    const sc = d.scorecards?.[state.model];
+    const read = res.length < 10 ? 'Too few resolved questions to read yet.'
+      : `The arrows called ${hit} of ${res.length}; always saying NO would have called ${noBase}. On arrows written at least two days before resolution: ${lh} hit, ${lm} miss of ${lead.length} with an early lean.`;
+    const open = qs.filter((q) => q.status === 'open' || q.status === 'awaiting').sort((a, b) => String(a.resolves).localeCompare(String(b.resolves)));
+    const done = qs.filter((q) => q.status !== 'open' && q.status !== 'awaiting').sort((a, b) => String(b.closed || '').localeCompare(String(a.closed || '')));
+    const qrow = (q, resolved) => {
+      const id = `q-${q.model}-${q.qid}`; const isOpen = state.open.has(id);
+      return `<tr class="click" data-id="${id}">
+        <td class="mono">${esc(q.qid)}</td>
+        <td>${esc(q.question || '')}<div class="muted small">${esc(q.bucket || '')}${q.rule ? ' · rule: ' + esc(q.rule).slice(0, 160) : ''}</div></td>
+        <td class="num">${esc(q.resolves || '—')}</td>
+        <td class="num ${cls(q.net_total)}">${q.net_total == null ? '—' : (q.net_total > 0 ? '+' : '') + q.net_total}</td>
+        ${resolved ? `<td>${q.status === 'resolved' ? `<b>${esc(q.outcome || '')}</b>` : `<span class="muted">${esc(q.status)}</span>`}</td><td>${verdictPill(q.verdict)}</td><td>${verdictPill(q.verdict_lead2)}</td>`
+                   : `<td class="small">${esc(q.last_implied || 'n/a')}</td><td class="num">${esc(q.last_move || q.first_arrow || '—')}</td>`}
+      </tr>${isOpen ? `<tr class="detail"><td colspan="7">${questionDetail(q)}</td></tr>` : ''}`;
+    };
+    const ev = (d.evidence || []).filter((e) => e.n >= 2);
+    $('#scoresBody').innerHTML = `
+      <div class="analytics">
+        ${statBox('Resolved', res.length, `${hit} hit · ${miss} miss · ${flat} flat`)}
+        ${statBox('Hit rate', pct(hit, res.length), `always-NO baseline ${pct(noBase, res.length)}`)}
+        ${statBox('Early lean (≥2 days out)', lead.length ? pct(lh, lead.length) : '—', `${lh} hit · ${lm} miss of ${lead.length}`)}
+        ${statBox('Arrows in the last 2 days', pct(arrowsLate, arrowsAll), 'share of all arrows on resolved questions')}
+        ${statBox('Against the market', am.length ? `${amh}/${am.length}` : '0', 'calls leaning away from the implied odds')}
+        ${statBox('Open', open.length, sc ? `routine scorecard: ${sc.hit}/${sc.resolved} hit` : '')}
+      </div>
+      <p class="note">${esc(read)} Every arrow is the routine's own, lifted from the digests and the brief-state file; nothing is re-judged here.</p>
+      <h2 class="sec" style="margin-top:16px">Open questions</h2>
+      <div class="tablewrap"><table class="grid"><thead><tr><th>Q</th><th>Question</th><th>Resolves</th><th>Net</th><th>Last implied</th><th>Last arrow</th></tr></thead>
+        <tbody>${open.map((q) => qrow(q, false)).join('') || '<tr><td colspan="6" class="muted">none</td></tr>'}</tbody></table></div>
+      <h2 class="sec" style="margin-top:18px">Resolved and retired</h2>
+      <div class="tablewrap"><table class="grid"><thead><tr><th>Q</th><th>Question</th><th>Resolves</th><th>Net</th><th>Outcome</th><th title="sign of all arrows vs the outcome">Verdict</th><th title="sign of arrows written at least two days before the resolve date">Early</th></tr></thead>
+        <tbody>${done.map((q) => qrow(q, true)).join('') || '<tr><td colspan="7" class="muted">none</td></tr>'}</tbody></table></div>
+      <h2 class="sec" style="margin-top:18px">Which evidence was right (both models, resolved questions)</h2>
+      <div class="tablewrap"><table class="grid"><thead><tr><th>Type</th><th>Access</th><th>Arrows</th><th>Right</th><th title="excluding arrows written in the last two days before resolution">Right, ≥2 days out</th></tr></thead>
+        <tbody>${ev.map((e) => `<tr><td>${esc(e.type)}</td><td>${esc(e.access)}</td><td class="num">${e.n}</td><td class="num">${pct(e.correct, e.n)}</td><td class="num">${e.n_early ? `${pct(e.correct_early, e.n_early)} <span class="muted">(${e.n_early})</span>` : '—'}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">no resolved arrows yet</td></tr>'}</tbody></table></div>
+      <h2 class="sec" style="margin-top:18px">New-scenario themes printed (red blocks)</h2>
+      <div class="tablewrap"><table class="grid"><thead><tr><th>T</th><th>Theme</th><th>First</th><th>Last</th><th>Printed</th><th>Indep. sources</th></tr></thead>
+        <tbody>${(d.themes || []).filter((t) => t.model === state.model).map((t) => `<tr><td class="mono">${esc(t.tid)}</td><td>${esc(t.label || '')}${t.becomes_if ? `<div class="muted small">becomes a question if: ${esc(t.becomes_if)}</div>` : ''}</td><td class="num">${esc(t.first)}</td><td class="num">${esc(t.last)}</td><td class="num">${t.printed}</td><td class="num">${t.indep ?? '—'}</td></tr>`).join('') || '<tr><td colspan="6" class="muted">none</td></tr>'}</tbody></table></div>`;
+    bindScoreRows();
+  }
+
+  function questionDetail(q) {
+    const days = (q.days || []).slice().reverse().map((x) => `<tr><td class="mono">${esc(x.d)}</td><td class="num"><b>${ARROW[x.net] || esc(x.net || '')}</b></td>
+      <td class="small">${esc(x.implied || '')}</td>
+      <td class="small">${(x.evidence || []).map((e) => `<div>${e.echo ? '<span class="muted">echo</span>' : `<b>${arrowOf(e.val)}</b>`} ${esc(e.text)} ${e.type ? `<span class="muted">(${esc(e.type)}${e.access ? ' · ' + esc(e.access) : ''})</span>` : ''} ${(e.links || []).slice(0, 2).map((l, i) => `<a href="${esc(l)}" target="_blank" rel="noopener">link${i ? i + 1 : ''}</a>`).join(' ')}</div>`).join('')}${x.priced ? `<div class="muted">priced: ${esc(x.priced)}</div>` : ''}</td></tr>`).join('');
+    const early = (q.state_days || []).map((x) => `${esc(x.d)} ${arrowOf(x.net_val)}`).join(' · ');
+    return `<div class="kv" style="margin-bottom:8px">
+        <div>Opened</div><div>${esc(q.opened || '—')}</div>
+        <div>Rule</div><div>${esc(q.rule || '—')}</div>
+        <div>Implied</div><div>${esc(q.open_implied || 'n/a')} at open → ${esc(q.last_implied || 'n/a')} last</div>
+        ${q.outcome ? `<div>Outcome</div><div>${esc(q.outcome)} — ${esc(q.outcome_source || '')}</div>` : ''}
+        ${q.retired_why ? `<div>Retired</div><div>${esc(q.retired_why)}</div>` : ''}
+        <div>Arrows</div><div>net ${q.net_total ?? '—'} · ${q.arrows_late || 0} of ${q.arrows_all || 0} in the last 2 days${early ? ` · from the brief-state file: ${early}` : ''}</div>
+      </div>
+      ${days ? `<table class="grid"><thead><tr><th>Day</th><th>Net</th><th>Implied</th><th>Evidence</th></tr></thead><tbody>${days}</tbody></table>` : '<div class="muted small">No tagged days in the ingested digests.</div>'}`;
+  }
+
+  // Voices: every stance-ledger view mapped to a directional call on a market series, graded at
+  // 10 and 42 sessions in units of that series' own daily volatility. Repeats of the same view
+  // within 14 days are one call. Shrunk hit = (hits + 5) / (n + 10), so small samples sit near 50%.
+  function renderVoices(d) {
+    const c = d.coverage || {};
+    const minN = Number(store('vmin') || 3);
+    const rows = (d.leaders || []).map((v) => ({ ...v, shr10: v.n10 ? (v.hit10 + 5) / (v.n10 + 10) : null }))
+      .filter((v) => v.n10 >= minN || (minN === 0 && v.calls > 0))
+      .sort((a, b) => (b.shr10 ?? -1) - (a.shr10 ?? -1) || b.calls - a.calls);
+    const vrow = (v) => {
+      const id = `v-${v.voice}`; const isOpen = state.open.has(id);
+      return `<tr class="click" data-id="${esc(id)}" data-voice="${esc(v.voice)}">
+        <td><b>${esc(v.name)}</b><div class="muted small">${esc(v.affiliation || '')}</div></td>
+        <td class="num">${v.calls}</td>
+        <td class="num">${v.n10}</td><td class="num">${pct(v.hit10, v.n10)}</td><td class="num"><b>${v.shr10 == null ? '—' : Math.round(v.shr10 * 100) + '%'}</b></td>
+        <td class="num ${cls(v.avg_z10)}">${zf(v.avg_z10)}</td><td class="num">${pct(v.trend_hit10, v.n10)}</td>
+        <td class="num">${v.n42}</td><td class="num">${pct(v.hit42, v.n42)}</td><td class="num ${cls(v.avg_z42)}">${zf(v.avg_z42)}</td>
+        <td class="num">${v.contra_n ? `${v.contra_hit}/${v.contra_n}` : '—'}</td>
+        <td class="num ${cls(v.live_z)}">${v.live ? `${v.live} · ${zf(v.live_z)}` : '—'}</td>
+      </tr>${isOpen ? `<tr class="detail"><td colspan="12" id="vd-${esc(v.voice)}"><span class="muted">Loading…</span></td></tr>` : ''}`;
+    };
+    const crowd = (d.crowd || []).filter((x) => x.voices30 > 0);
+    const spark = (path) => {
+      if (!path || !path.length) return '';
+      const w = 90, h = 22, vals = path.map((p) => p[1] - p[2]), mx = Math.max(1, ...vals.map(Math.abs));
+      const pts = vals.map((v, i) => `${((i / Math.max(1, vals.length - 1)) * w).toFixed(1)},${(h / 2 - (v / mx) * (h / 2 - 2)).toFixed(1)}`).join(' ');
+      return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" stroke="currentColor" opacity=".2"/><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>`;
+    };
+    const ext = d.extremes || [];
+    const extDone = ext.filter((x) => x.fwd10_z != null);
+    const paid = extDone.filter((x) => x.fwd10_z > 0).length;
+    $('#scoresBody').innerHTML = `
+      <div class="analytics">
+        ${statBox('Views read', `${c.classified ?? 0}/${c.entries ?? 0}`, `${c.with_calls ?? 0} hold a market call`)}
+        ${statBox('Calls', c.episodes ?? 0, `${c.scorable ?? 0} on a priced series`)}
+        ${statBox('Graded at 2 weeks', c.graded10 ?? 0, '10 sessions after the view')}
+        ${statBox('Graded at 2 months', c.graded42 ?? 0, '42 sessions after the view')}
+        ${statBox('Prices to', esc(c.last_bar || '—'), 'msd daily closes')}
+      </div>
+      <p class="note">A call is the speaker's own directional view, mapped to one market; the same view repeated within 14 days counts once. Moves are scored in the market's own daily volatility (z), from the first close after the view. "Trend" is how often simply following the prior 20-session trend would have been right on the same calls — the bar a voice has to clear. Contrarian = against that trend.</p>
+      <div class="toolbar" style="margin-top:12px"><h2 class="sec" style="margin:0">Scoreboard</h2>
+        <div class="seg" id="vminSeg">${[0, 3, 5, 10].map((k) => `<button data-k="${k}" class="${k === minN ? 'active' : ''}">${k ? `n ≥ ${k}` : 'all'}</button>`).join('')}</div></div>
+      <div class="tablewrap"><table class="grid"><thead><tr>
+        <th>Voice</th><th>Calls</th><th>2w n</th><th>2w hit</th><th title="(hits+5)/(n+10)">2w shrunk</th><th title="average move in the call's direction, in daily-vol units">2w avg z</th><th title="hit rate of following the 20-session trend on the same calls">Trend</th>
+        <th>2m n</th><th>2m hit</th><th>2m avg z</th><th>Contrarian hits</th><th title="calls still inside their first 10 sessions: count · z so far">Live</th>
+      </tr></thead><tbody>${rows.map(vrow).join('') || `<tr><td colspan="12" class="muted">No voice has ${minN} graded calls yet — the ledger starts mid-September, so two-week grades accrue from early October and two-month grades from mid-November.</td></tr>`}</tbody></table></div>
+      <h2 class="sec" style="margin-top:18px">Crowding — distinct voices per market, last 7 days</h2>
+      <p class="note">Each voice counts once per market, at its latest view inside the window. Participation is ranked against the market's own history (or all markets while history is short); EXTREME = 5+ voices, 80%+ on one side, top-decile participation.</p>
+      <div class="tablewrap"><table class="grid"><thead><tr><th>Market</th><th>Bulls</th><th>Bears</th><th>Voices 7d</th><th>Voices 30d</th><th>One-sided</th><th>Participation pct</th><th>Net, 30d</th><th></th></tr></thead>
+        <tbody>${crowd.map((x) => `<tr><td>${esc(x.name || x.series)}<div class="muted small mono">${esc(x.series)}</div></td><td class="num pos">${x.bulls}</td><td class="num neg">${x.bears}</td><td class="num">${x.voices}</td><td class="num">${x.voices30}</td><td class="num">${x.one_sided == null ? '—' : Math.round(x.one_sided * 100) + '%'}</td><td class="num">${x.pct == null ? '—' : Math.round(x.pct * 100)}</td><td>${spark(x.path)}</td><td>${x.extreme ? '<span class="pill missed">EXTREME</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="9" class="muted">No graded calls yet.</td></tr>'}</tbody></table></div>
+      <h2 class="sec" style="margin-top:18px">Extreme readings and what followed</h2>
+      <p class="note">${extDone.length ? `After ${extDone.length} extreme reading${extDone.length === 1 ? '' : 's'}, the crowd was paid ${paid} time${paid === 1 ? '' : 's'} over the next 10 sessions (avg ${zf(avg(extDone, (x) => n(x.fwd10_z)))} z in the crowd's direction).` : 'No extreme reading has 10 sessions of prices after it yet.'}</p>
+      <div class="tablewrap"><table class="grid"><thead><tr><th>Day</th><th>Market</th><th>Crowd</th><th>Participation pct</th><th title="next 10 sessions, in the crowd's direction, daily-vol units">Next 10 sessions</th></tr></thead>
+        <tbody>${ext.map((x) => `<tr><td class="mono">${esc(x.d)}</td><td class="mono">${esc(x.series)}</td><td>${x.bulls > x.bears ? `<span class="pos">${x.bulls} bulls</span> v ${x.bears}` : `<span class="neg">${x.bears} bears</span> v ${x.bulls}`}</td><td class="num">${x.pct == null ? '—' : Math.round(x.pct * 100)}</td><td class="num ${cls(x.fwd10_z)}">${x.fwd10_z == null ? 'pending' : zf(x.fwd10_z) + (x.fwd10_z > 0 ? ' paid' : ' washed')}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">none yet</td></tr>'}</tbody></table></div>
+      <h2 class="sec" style="margin-top:18px">Attention — distinct voices per topic per week</h2>
+      ${attentionTable(d.attention || [])}`;
+    document.querySelectorAll('#vminSeg button').forEach((b) => (b.onclick = () => { store('vmin', b.dataset.k); renderVoices(d); }));
+    bindScoreRows();
+    document.querySelectorAll('#scoresBody tr.click[data-voice]').forEach(async (tr) => {
+      if (!state.open.has(tr.dataset.id)) return;
+      const cell = document.getElementById(`vd-${tr.dataset.voice}`);
+      try { const calls = await rpc('dash_voice', { p_voice: tr.dataset.voice }); if (cell) cell.innerHTML = voiceDetail(calls); }
+      catch (e) { if (cell) cell.textContent = String(e.message || e); }
+    });
+  }
+
+  function attentionTable(rows) {
+    const wks = [...new Set(rows.map((r) => r.wk))].sort().slice(-8), topics = [...new Set(rows.map((r) => r.topic))].sort();
+    const get = (w, t) => rows.find((r) => r.wk === w && r.topic === t)?.voices ?? 0;
+    if (!wks.length) return '<div class="muted">No entries yet.</div>';
+    return `<div class="tablewrap"><table class="grid"><thead><tr><th>Topic</th>${wks.map((w) => `<th class="num">${esc(w.slice(5))}</th>`).join('')}</tr></thead>
+      <tbody>${topics.map((t) => `<tr><td>${esc(t)}</td>${wks.map((w) => `<td class="num">${get(w, t) || ''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function voiceDetail(calls) {
+    if (!calls?.length) return '<span class="muted">No graded calls.</span>';
+    return `<table class="grid"><thead><tr><th>Date</th><th>Call</th><th>View</th><th>2w z</th><th>2m z</th><th>So far</th></tr></thead><tbody>${calls.map((x) => `<tr>
+      <td class="mono">${esc(x.d)}</td>
+      <td><b class="${x.dir > 0 ? 'pos' : 'neg'}">${esc(x.instr || (x.dir > 0 ? 'up ' : 'down ') + (x.name || x.series))}</b><div class="muted small">${esc(x.name || x.series)}${x.conv ? ` · conviction ${x.conv}` : ''}${x.cond ? ' · conditional' : ''}${x.contrarian ? ' · contrarian' : ''}${x.start ? '' : ' · repeat'}</div></td>
+      <td class="small">${esc(x.stance || '')}</td>
+      <td class="num ${cls(x.z10)}">${zf(x.z10)}</td><td class="num ${cls(x.z42)}">${zf(x.z42)}</td>
+      <td class="num ${cls(x.z_now)}">${x.z_now == null ? '—' : `${zf(x.z_now)} <span class="muted">(${x.elapsed}d)</span>`}</td></tr>`).join('')}</tbody></table>`;
+  }
+
+  // Review: what the weekly review learned, and the rule changes it proposed. A proposal goes in
+  // force at its apply time unless it is opposed by email reply ("oppose Rnn").
+  function renderReview(d) {
+    const rules = d.rules || [], lessons = d.lessons || [];
+    const rpill = (s) => `<span class="pill ${s === 'in_force' ? 'open' : s === 'proposed' ? 'missed' : 'closed'}">${esc(s.replace('_', ' '))}</span>`;
+    const para = (t) => esc(t || '').split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+    $('#scoresBody').innerHTML = `
+      <h2 class="sec">Rule changes</h2>
+      <p class="note">Proposed by the weekly review (Saturday) and put in force on Sunday 20:00 SGT unless you reply "oppose Rnn" to the review email. Both pipelines read the rules in force at the start of every run.</p>
+      ${rules.map((r) => `<div class="card" style="margin-bottom:10px">
+          <div class="row"><b class="mono">${esc(r.rid)}</b> ${rpill(r.status)} <b>${esc(r.title)}</b>
+            <span class="muted small">${r.status === 'proposed' ? `applies ${esc(sgt(r.apply_after))}` : r.decided_at ? `${esc(r.status.replace('_', ' '))} ${esc(sgt(r.decided_at))}` : ''} · scope ${esc(r.scope)}</span></div>
+          <div class="rich">${para(r.body)}</div>
+          <details><summary>Why, evidence and revert condition</summary><div class="kv">
+            <div>Why</div><div>${esc(r.rationale || '—')}</div><div>Evidence</div><div>${esc(r.evidence || '—')}</div>
+            <div>Revert if</div><div>${esc(r.revert_if || '—')}</div>${r.decided_note ? `<div>Note</div><div>${esc(r.decided_note)}</div>` : ''}</div></details>
+        </div>`).join('') || '<div class="card empty">No rule changes yet.</div>'}
+      <h2 class="sec" style="margin-top:18px">Weekly lessons</h2>
+      ${lessons.map((l) => `<div class="card" style="margin-bottom:10px"><div class="row"><b>Week of ${esc(l.wk)}</b> <span class="muted">${esc(l.title || '')}</span></div><div class="rich">${para(l.body)}</div></div>`).join('') || '<div class="card empty">The first weekly review runs on Saturday.</div>'}`;
+  }
+
+  function bindScoreRows() {
+    document.querySelectorAll('#scoresBody tr.click').forEach((tr) => (tr.onclick = (e) => {
+      if (e.target.closest('a')) return;
+      const id = tr.dataset.id; state.open.has(id) ? state.open.delete(id) : state.open.add(id);
+      const d = scoreCache[state.tab];
+      if (state.tab === 'questions') renderQuestions(d); else if (state.tab === 'voices') renderVoices(d);
     }));
   }
 

@@ -4,6 +4,7 @@
 import postgres from 'npm:postgres@3.4.4';
 import { parseDigest, parseEmailTested, parseTradeBook, setPrivateTerms, type Tested } from '../_shared/parse.ts';
 import { parseFeed, privacyFilter, type Family, type FeedSection } from '../_shared/feeds.ts';
+import { extractQuestions, parseBriefState, type StateQuestion } from '../_shared/questions.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
 
@@ -22,6 +23,47 @@ async function upsertTested(rows: Tested[]) {
         verdict = excluded.verdict, fail_code = excluded.fail_code, covered_by = excluded.covered_by, rr = excluded.rr,
         p = excluded.p, p0 = excluded.p0, ev = excluded.ev, reason = excluded.reason, source = excluded.source`;
   }
+}
+
+// The odds engine as printed: today's moves, list changes and resolutions replace whatever an
+// earlier copy of the same digest left for that day.
+async function ingestQuestions(model: string, d: string, html: string): Promise<string> {
+  const q = extractQuestions(html, d);
+  await sql`delete from dash.q_moves where model = ${model} and d = ${d}`;
+  await sql`delete from dash.q_events where model = ${model} and d = ${d}`;
+  for (const m of q.moves) {
+    await sql`insert into dash.q_moves (model, d, qid, tag_n, net, net_val, question, resolves, resolves_text, implied, priced, evidence)
+      values (${model}, ${d}, ${m.qid}, ${m.tag_n}, ${m.net}, ${m.net_val}, ${m.question}, ${m.resolves}, ${m.resolves_text},
+        ${m.implied}, ${m.priced}, ${sql.json(m.evidence as unknown as Json)})`;
+  }
+  for (const e of q.events) {
+    await sql`insert into dash.q_events (model, d, kind, qid, body) values (${model}, ${d}, ${e.kind}, ${e.qid}, ${sql.json(e.body as Json)})
+      on conflict (model, d, kind, qid) do update set body = excluded.body`;
+  }
+  if (q.scorecard) {
+    await sql`insert into dash.q_scorecard (model, d, body) values (${model}, ${d}, ${sql.json(q.scorecard)})
+      on conflict (model, d) do update set body = excluded.body`;
+  }
+  return `${q.moves.length} odds moves, ${q.events.length} list events`;
+}
+
+// brief_state_current (Drive): one q_state row per question, dated by the doc's "Last updated".
+async function ingestBriefState(model: string, text: string): Promise<string[]> {
+  const bs = parseBriefState(text);
+  const asOf = bs.updated?.slice(0, 10);
+  if (!asOf) throw new Error('brief state: no "Last updated" line');
+  for (const q of bs.questions as StateQuestion[]) {
+    await sql`insert into dash.q_state (model, as_of, qid, question, rule, status, opened, resolves, closed, bucket, net_to_date,
+        last_moved, flagged, open_implied, last_implied, entries)
+      values (${model}, ${asOf}, ${q.qid}, ${q.question}, ${q.rule}, ${q.status}, ${q.opened}, ${q.resolves}, ${q.closed}, ${q.bucket},
+        ${q.net_to_date}, ${q.last_moved}, ${q.flagged}, ${q.open_implied}, ${q.last_implied},
+        ${sql.json(q.entries.map((e) => ({ d: e.d, net: e.net, implied: e.implied.slice(0, 300) })) as unknown as Json)})
+      on conflict (model, as_of, qid) do update set question = excluded.question, rule = excluded.rule, status = excluded.status,
+        opened = excluded.opened, resolves = excluded.resolves, closed = excluded.closed, bucket = excluded.bucket,
+        net_to_date = excluded.net_to_date, last_moved = excluded.last_moved, flagged = excluded.flagged,
+        open_implied = excluded.open_implied, last_implied = excluded.last_implied, entries = excluded.entries`;
+  }
+  return [`brief state ${model} ${asOf}: ${bs.questions.length} questions`];
 }
 
 async function ingestThread(data: Json): Promise<string[]> {
@@ -64,7 +106,10 @@ async function ingestThread(data: Json): Promise<string[]> {
       await sql`delete from dash.tested where model = ${dg.model} and d = ${dg.d} and source = 'email'`;
       await upsertTested(parseEmailTested(dg.trade_block, dg.model, dg.d));
     }
-    out.push(`digest ${dg.model} ${dg.d}: ${dg.themes.length} themes, ${dg.sixty.length} bullets`);
+    // A later copy of the same day's digest (a re-run) wins; an older one never overwrites it.
+    const [cur] = await sql`select gmail_id from dash.digests where model = ${dg.model} and d = ${dg.d}`;
+    const qs = cur?.gmail_id === msg.id ? await ingestQuestions(dg.model, dg.d, msg.htmlBody ?? '') : 'questions skipped (older copy)';
+    out.push(`digest ${dg.model} ${dg.d}: ${dg.themes.length} themes, ${dg.sixty.length} bullets, ${qs}`);
   }
   return out;
 }
@@ -148,11 +193,20 @@ Deno.serve(async (req) => {
       out = [`refiltered ${rows.length} feed rows`];
     } else if (body.kind === 'gmail_thread') out = await ingestThread(body.data);
     else if (body.kind === 'trade_book') out = await ingestBook(body.data, body.fileId);
+    else if (body.kind === 'brief_state') {
+      // {model, text} directly, or {raw_id} for a doc that dash.put_brief_state() stored in dash.raw.
+      const row = body.raw_id ? (await sql`select model, payload from dash.raw where id = ${body.raw_id} and kind = 'brief_state'`)[0] : null;
+      const model = row?.model ?? body.model;
+      const text = row?.payload?.text ?? body.text;
+      if (!['fable', 'opus'].includes(model) || typeof text !== 'string') return new Response('bad brief_state', { status: 400 });
+      out = await ingestBriefState(model, text);
+    }
     else if (body.kind === 'reparse') {
-      const rows = await sql`select kind, payload from dash.raw order by kind desc, received_at`;
+      const rows = await sql`select kind, model, payload from dash.raw order by kind desc, received_at`;
       for (const r of rows) {
         if (r.kind === 'gmail_thread') out.push(...await ingestThread(r.payload));
-        else out.push(...await ingestBook(r.payload.text, r.payload.fileId ?? undefined));
+        else if (r.kind === 'trade_book') out.push(...await ingestBook(r.payload.text, r.payload.fileId ?? undefined));
+        else if (r.kind === 'brief_state') out.push(...await ingestBriefState(r.model, r.payload.text));
       }
     } else return new Response('unknown kind', { status: 400 });
     return new Response(JSON.stringify({ ok: true, out }), { headers: { 'Content-Type': 'application/json' } });
