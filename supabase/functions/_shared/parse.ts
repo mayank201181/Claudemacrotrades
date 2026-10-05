@@ -9,10 +9,14 @@ const ENTITIES: Record<string, string> = {
   amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', '#39': "'",
 };
 
+function safeCodePoint(n: number, fallback: string): string {
+  return Number.isInteger(n) && n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : fallback;
+}
+
 export function decodeEntities(s: string): string {
   return s
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/&#(\d+);/g, (m, n) => safeCodePoint(Number(n), m))
+    .replace(/&#x([0-9a-f]+);/gi, (m, n) => safeCodePoint(parseInt(n, 16), m))
     .replace(/&([a-z0-9#]+);/gi, (m, n) => ENTITIES[n] ?? m);
 }
 
@@ -39,42 +43,79 @@ function unwrapGoogle(href: string): string {
   try { return decodeURIComponent(m[1]); } catch { return m[1]; }
 }
 
+const ALLOWED_TAGS = new Set(['a', 'b', 'strong', 'i', 'em', 'span', 'p', 'br', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'h3', 'h4', 'pre', 'code', 'sup', 'sub', 'u']);
+
+// Allow-list sanitiser: every tag is rebuilt from scratch (only href on <a> and a few
+// style properties survive); comments, unknown tags and all other attributes are dropped.
 export function sanitize(html: string): string {
-  let out = html
-    .replace(/<(script|style|head|img|meta|link)[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<(img|meta|link|hr)[^>]*\/?>/gi, '');
-  out = out.replace(/<([a-z0-9]+)((?:\s+[a-z-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*\/?>/gi, (_m, tag: string, attrs: string) => {
-    const t = tag.toLowerCase();
-    if (!['a', 'b', 'strong', 'i', 'em', 'span', 'p', 'br', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'h3', 'h4', 'pre', 'code', 'sup', 'sub', 'u'].includes(t)) return '';
-    const keep: string[] = [];
-    const re = /([a-z-]+)\s*=\s*("([^"]*)"|'([^']*)')/gi;
-    let a: RegExpExecArray | null;
-    while ((a = re.exec(attrs))) {
-      const name = a[1].toLowerCase();
-      const val = a[3] ?? a[4] ?? '';
-      if (t === 'a' && name === 'href') {
-        const u = unwrapGoogle(val);
-        if (/^https?:\/\//i.test(u)) keep.push(`href="${u.replace(/"/g, '%22')}" target="_blank" rel="noopener noreferrer"`);
-      } else if (name === 'style') {
-        const decls = val.split(';').map((d) => d.trim()).filter((d) => {
-          const k = d.split(':')[0]?.trim();
-          return k && KEEP_STYLE.test(k) && !/url\(|expression/i.test(d);
-        });
-        if (decls.length) keep.push(`style="${decls.join(';')}"`);
+  const out = html
+    .replace(/<(\/?)div\b/gi, '<$1p')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|head|title|iframe|object|embed|svg|math|template|noscript)\b[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<\/?([a-z][a-z0-9]*)\b([^>]*)>/gi, (m: string, tag: string, attrs: string) => {
+      const t = tag.toLowerCase();
+      if (!ALLOWED_TAGS.has(t)) return '';
+      if (m.startsWith('</')) return t === 'br' ? '' : `</${t}>`;
+      const keep: string[] = [];
+      const re = /([a-z][a-z0-9-]*)\s*=\s*("([^"]*)"|'([^']*)')/gi;
+      let a: RegExpExecArray | null;
+      while ((a = re.exec(attrs))) {
+        const name = a[1].toLowerCase();
+        const val = a[3] ?? a[4] ?? '';
+        if (t === 'a' && name === 'href') {
+          const u = unwrapGoogle(val);
+          if (/^https?:\/\/[^\s"'<>]+$/i.test(u)) keep.push(`href="${u.replace(/"/g, '%22')}" target="_blank" rel="noopener noreferrer"`);
+        } else if (name === 'style') {
+          const decls = val.split(';').map((d) => d.trim()).filter((d) => {
+            const k = d.split(':')[0]?.trim();
+            return k && KEEP_STYLE.test(k) && /^[\w\s#%(),.:+-]+$/.test(d) && !/url\(|expression|javascript/i.test(d);
+          });
+          if (decls.length) keep.push(`style="${decls.join(';')}"`);
+        }
       }
-    }
-    return `<${t}${keep.length ? ' ' + keep.join(' ') : ''}>`;
-  });
-  out = out.replace(/<\/([a-z0-9]+)>/gi, (m, tag: string) =>
-    ['a', 'b', 'strong', 'i', 'em', 'span', 'p', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'h3', 'h4', 'pre', 'code', 'sup', 'sub', 'u'].includes(tag.toLowerCase()) ? m.toLowerCase() : '');
+      return `<${t}${keep.length ? ' ' + keep.join(' ') : ''}>`;
+    })
+    // any '<' that is not the start of a rebuilt tag becomes text
+    .replace(/<(?!\/?(?:a|b|strong|i|em|span|p|br|ul|ol|li|table|tr|td|th|h3|h4|pre|code|sup|sub|u)\b[^<>]*>)/gi, '&lt;');
   return out.trim();
+}
+
+// Personal terms that sometimes leak outside ADMIN FLAGS (ledger, footer). Matching clauses are removed.
+// Only generic words live here (the repo is public); names, places and institutions are loaded at
+// runtime from dash.config.private_terms via setPrivateTerms, and ingest refuses to run without them.
+const GENERIC_SCRUB = String.raw`\bthe girls\b|(?<![a-z])e-vote|trusted[- ]device|\bcpf\b|\bkyc\b|parent portal|school (?:deposit|trip)`;
+const GENERIC_DROP = String.raw`the girls|daughter|school|personal relevance|bank, card|card alert|wallet charge|statement ready|insurer|\bkyc\b|\bcpf\b|subscription renews|renewal|\bcoc\b|e-vote|trusted[- ]device|password|upstash|vercel|deadline|due (today|tomorrow)`;
+export const privacy = { loaded: false, scrub: new RegExp(GENERIC_SCRUB, 'i'), drop: new RegExp(GENERIC_DROP, 'i') };
+export function setPrivateTerms(t: { scrub?: string; drop?: string } | null | undefined) {
+  if (!t?.scrub || !t?.drop) throw new Error('dash.config.private_terms is missing');
+  privacy.scrub = new RegExp(`${GENERIC_SCRUB}|${t.scrub}`, 'i');
+  privacy.drop = new RegExp(`${GENERIC_DROP}|${t.drop}`, 'i');
+  privacy.loaded = true;
+}
+const personal = (s: string) => privacy.scrub.test(s);
+
+export function scrubPersonal(html: string): string {
+  if (!personal(stripTags(html))) return html;
+  return html.replace(/<(p|li)\b[^>]*>[\s\S]*?<\/\1>/gi, (block) => {
+    if (!personal(stripTags(block))) return block;
+    const open = block.match(/^<[^>]+>/)![0];
+    const close = block.match(/<\/[a-z]+>$/i)![0];
+    const inner = block.slice(open.length, block.length - close.length);
+    // Clause level first (" · " lists); inside a long clause, drop only the offending sentences.
+    const kept = inner.split(/\s+·\s+/).map((c) => {
+      if (!personal(stripTags(c))) return c;
+      if (stripTags(c).length < 200) return '';
+      return c.split(/(?<=[.;!?])\s+(?=[A-Z<])/).filter((x) => !personal(stripTags(x))).join(' ');
+    }).filter((c) => stripTags(c).trim().length > 0);
+    return kept.length ? open + kept.join(' · ') + close : '';
+  });
 }
 
 // Personal admin items never reach the dashboard.
 function dropAdmin(html: string): string {
   return html
-    .replace(/<p[^>]*>\s*(<[^>]+>\s*)*Admin(?:\s+flags)?\s*:[\s\S]*?<\/p>/gi, '')
-    .replace(/<li[^>]*>\s*(<[^>]+>\s*)*Admin(?:\s+flags)?\s*:[\s\S]*?<\/li>/gi, '');
+    .replace(/<p[^>]*>\s*(<[^>]+>\s*)*Admin(?:\s+flags)?\s*(?:<[^>]+>\s*)*[:—–-][\s\S]*?<\/p>/gi, '')
+    .replace(/<li[^>]*>\s*(<[^>]+>\s*)*Admin(?:\s+flags)?\s*(?:<[^>]+>\s*)*[:—–-][\s\S]*?<\/li>/gi, '');
 }
 
 // ---------- digest email ----------
@@ -100,7 +141,7 @@ function sectionKey(title: string): string {
   const t = title.toUpperCase();
   if (t.includes('TRADE BOOK')) return 'trade_book';
   if (t.includes('60 SECONDS')) return 'sixty';
-  if (/^(THEME\s*\d|\d+\s*[·.])/.test(t)) return 'theme';
+  if (/^(THEME\s*\d|\d+\s*[·.:—–-]\s)/.test(t)) return 'theme';
   if (/^THEMES?\b/.test(t)) return 'themes';
   if (t.startsWith('TAPE')) return 'tape';
   if (t.startsWith('RADAR')) return 'radar';
@@ -134,30 +175,46 @@ function splitBy(html: string, tag: 'h2' | 'h3'): { title: string; body: string 
 function makeTheme(n: number, rawTitle: string, body: string): Theme {
   const title0 = rawTitle.replace(/^(THEME\s*)?\d+\s*[·.—:-]*\s*/i, '').trim();
   // "Title — 5 of 5 feeds, mostly echo"
-  const bm = title0.match(/^(.*?)\s*(?:[—–\-·]\s+|\(|\[)((?:\d+|all|five|four|three|two|one)\s+of\s+\d+\b[^)\]]*?feeds?[^)\]]*)[)\]]?\s*$/i);
-  const clean = dropAdmin(sanitize(body));
-  return { n, title: bm ? bm[1].trim() : title0, breadth: bm ? bm[2].trim() : null, html: clean, lean_html: extractLean(clean) };
+  const bm = title0.match(/^(.*?)\s*(?:[—–\-·]\s+|([(\[]))((?:\d+|all|five|four|three|two|one)\s+of\s+\d+\b.*?\bfeeds?\b.*?)\s*$/i);
+  let breadth = bm ? (bm[2] ? bm[3].replace(/[)\]]\s*$/, '') : bm[3]).trim() : null;
+  if (!breadth) {
+    const fp = body.match(/^\s*<p\b[^>]*>([\s\S]*?)<\/p>/i);
+    const t = fp ? stripTags(fp[1]) : '';
+    const m = t.match(/^(?:Breadth\s*:\s*)?((?:\d+|all|five|four|three|two|one)\s+of\s+\d+\b.*?\bfeeds?\b[\s\S]*)$/i);
+    if (m) { breadth = m[1].trim(); body = body.slice(fp!.index! + fp![0].length); }
+  }
+  const clean = dropAdmin(sanitize(body.replace(/<(\/?)div\b/gi, '<$1p')));
+  return { n, title: bm ? bm[1].trim() : title0, breadth, html: clean, lean_html: extractLean(clean) };
 }
 
 // The theme's own "My read & lean" block: from its label to the next labelled block.
 export function extractLean(html: string): string | null {
-  const at = html.search(/My read/i);
+  const lab = html.match(/<(?:b|strong|span)\b[^>]*>\s*(?:<[^>]+>\s*)*(?:My read\b|Lean\s*:)/i);
+  const at = lab ? lab.index! : html.search(/My read\b/i);
   if (at < 0) return null;
   const starts = [...html.slice(0, at).matchAll(/<(p|h3|h4|li)\b/gi)];
-  const start = starts.length ? starts[starts.length - 1].index! : at;
+  let start = starts.length ? starts[starts.length - 1].index! : at;
+  if (lab && stripTags(html.slice(start, at)).length > 0) start = at;
   const rest = html.slice(start + 4);
-  const endRel = rest.search(/<(h3|h4)\b|<p[^>]*>\s*(?:<[^>]+>\s*)*(Sources|EXTREME CHECK|NEW SCENARIO|\[\d+\s*·\s*NEW SCENARIO|CROWD EXTREME)/i);
+  const endRel = rest.search(/<(h3|h4)\b|<p[^>]*>\s*(?:<[^>]+>\s*)*(Sources|EXTREME CHECK|PARTNER NOTE|TAPE\s*@|NEW SCENARIO|\[\d+\]?\s*·?\s*NEW SCENARIO|CROWD EXTREME)/i);
   const block = endRel < 0 ? html.slice(start) : html.slice(start, start + 4 + endRel);
-  return block.length > 8000 ? block.slice(0, 8000) : block;
+  return block;
 }
+
+const FOOTER_START = /(?:<hr[^>]*>|<(?:p|div)\b[^>]*>)\s*(?:<[^>]+>\s*)*(?:Footer\b[.:]?\s*(?:<[^>]+>\s*)*(?:[—–-]\s*)?)?(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[a-z]*\s+\d{1,2}\s+[A-Z][a-z]{2}[a-z]*\s+\d{4}\s*·\s*built\b/i;
 
 export function parseDigest(msg: { id: string; subject: string; date: string; htmlBody?: string; html?: string }): Digest | null {
   const html = msg.htmlBody ?? msg.html ?? '';
   const model = modelFromText(msg.subject);
   const d = digestDate(msg.subject);
   if (!model || !d || !/^MACRO TAKEAWAYS/i.test(msg.subject)) return null;
-  const body = html.replace(/^[\s\S]*?<body[^>]*>/i, '').replace(/<\/body>[\s\S]*$/i, '');
-  const h2s = splitBy(body, 'h2');
+  const body = html.replace(/^[\s\S]*?<body[^>]*>/i, '').replace(/<\/body>[\s\S]*$/i, '')
+    .replace(/(?<!<\/h2>\s*)<p\b[^>]*>(?=\s*(?:<[^>]+>\s*)*TAPE\s*@)/gi, '<h2>TAPE</h2>$&');
+  const h2s = splitBy(body, 'h2').flatMap((p, i) => {
+    if (i === 0 || /^(FOOTER|ADMIN|REFERENCE HEADER|MACRO TAKEAWAYS)/i.test(p.title)) return [p];
+    const m = p.body.match(FOOTER_START);
+    return m ? [{ title: p.title, body: p.body.slice(0, m.index) }, { title: 'FOOTER', body: p.body.slice(m.index) }] : [p];
+  });
   const headerHtml = h2s[0]?.body ?? '';
   const hdrText = stripTags(headerHtml);
   const built = (hdrText.match(/built\s+(\d{1,2}:\d{2})\s*SGT/i) || [])[1] ?? null;
@@ -186,6 +243,8 @@ export function parseDigest(msg: { id: string; subject: string; date: string; ht
     }
     if (key === 'sixty') {
       const lis = part.body.match(/<li[^>]*>[\s\S]*?<\/li>/gi);
+      const pre = part.body.split(/<(?:ul|ol)\b/i)[0];
+      if (lis && lis.length && stripTags(pre)) sections.push({ key: 'sixty_intro', title: part.title, html: dropAdmin(sanitize(pre)) });
       if (lis && lis.length) for (const li of lis) sixty.push(sanitize(li.replace(/^<li[^>]*>|<\/li>$/gi, '')));
       else for (const p of part.body.match(/<p[^>]*>[\s\S]*?<\/p>/gi) ?? []) sixty.push(sanitize(p.replace(/^<p[^>]*>|<\/p>$/gi, '')));
       continue;
@@ -196,7 +255,10 @@ export function parseDigest(msg: { id: string; subject: string; date: string; ht
   if (!tradeBlock && /TRADE BOOK/i.test(hdrText)) tradeBlock = sanitize(headerHtml);
   return {
     model, d, subject: msg.subject, gmail_id: msg.id, sent_at: msg.date, built,
-    header: headerOut, sixty, themes, sections, trade_block: tradeBlock,
+    header: scrubPersonal(headerOut), sixty: sixty.map(scrubPersonal),
+    themes: themes.map((t) => ({ ...t, html: scrubPersonal(t.html), lean_html: t.lean_html && scrubPersonal(t.lean_html) })),
+    sections: sections.map((s) => ({ ...s, html: scrubPersonal(s.html) })),
+    trade_block: tradeBlock && scrubPersonal(tradeBlock),
   };
 }
 
@@ -210,15 +272,21 @@ export interface Tested {
 
 const num = (s: string | undefined | null): number | null => {
   if (s == null) return null;
-  const v = parseFloat(s.replace(/[−–]/g, '-').replace(/[^0-9.+-]/g, ''));
+  const m = s.replace(/[−–]/g, '-').replace(/,/g, '').match(/[+-]?\d+(?:\.\d+)?/);
+  const v = m ? parseFloat(m[0]) : NaN;
   return Number.isFinite(v) ? v : null;
 };
 
-export function ideaDirection(idea: string): number | null {
+const YIELD_PROXY = /^\^(TNX|TYX|FVX|IRX)$/i;
+
+export function ideaDirection(idea: string, proxy?: string | null): number | null {
   const s = idea.toLowerCase();
   const m = s.match(/\b(long|short|buy|sell|receive|pay|steepener|flattener|widener|tightener)\b/);
   if (!m) return null;
-  return ['long', 'buy', 'receive', 'steepener', 'widener'].includes(m[1]) ? 1 : -1;
+  let dir = ['long', 'buy', 'receive', 'steepener', 'widener'].includes(m[1]) ? 1 : -1;
+  // A bond position priced on a single yield index moves opposite to the yield.
+  if (proxy && YIELD_PROXY.test(proxy.trim()) && !/steepener|flattener|widener|tightener|yield/.test(s)) dir = -dir;
+  return dir;
 }
 
 function verdictParts(v: string): { verdict: string; fail_code: string | null; covered_by: string | null; reason: string | null } {
@@ -227,7 +295,7 @@ function verdictParts(v: string): { verdict: string; fail_code: string | null; c
   if (m) return { verdict: 'covered', fail_code: null, covered_by: m[1].toUpperCase(), reason: m[2] || null };
   m = s.match(/^not carded\s*\(([a-z])\)\s*:?\s*(.*)$/i);
   if (m) return { verdict: 'not carded', fail_code: m[1].toLowerCase(), covered_by: null, reason: m[2] || null };
-  m = s.match(/^carded(?:\s+as)?\s+(P\d+)\s*:?\s*(.*)$/i);
+  m = s.match(/^(?:carded(?:\s+as)?\s+)?(P\d+)\b\s*:?\s*(.*)$/i);
   if (m) return { verdict: 'carded', fail_code: null, covered_by: m[1].toUpperCase(), reason: m[2] || null };
   return { verdict: s.split(/[:(]/)[0].trim().toLowerCase(), fail_code: null, covered_by: null, reason: s };
 }
@@ -236,7 +304,9 @@ function verdictParts(v: string): { verdict: string; fail_code: string | null; c
 export function parseLedgerT(line: string, model: Model, seq: number): Tested | null {
   const m = line.match(/^-?\s*(\d{4}-\d{2}-\d{2})\s*·\s*T\s*·\s*(.*)$/);
   if (!m) return null;
-  const [idea, rest = ''] = m[2].split(/\s*→\s*/, 2);
+  const ai = m[2].indexOf('→');
+  const idea = ai < 0 ? m[2] : m[2].slice(0, ai);
+  const rest = ai < 0 ? '' : m[2].slice(ai + 1).trim();
   const f = rest.split(/\s+·\s+/);
   const kv: Record<string, string> = {};
   const free: string[] = [];
@@ -248,7 +318,7 @@ export function parseLedgerT(line: string, model: Model, seq: number): Tested | 
   const reason = [vp.reason, ...free].filter(Boolean).join(' · ') || null;
   const proxy = kv.proxy && kv.proxy !== 'none' && kv.proxy !== '-' ? kv.proxy : null;
   return {
-    model, d: m[1], seq, idea: idea.trim(), proxy, direction: ideaDirection(idea),
+    model, d: m[1], seq, idea: idea.trim(), proxy, direction: ideaDirection(idea, proxy),
     verdict: vp.verdict, fail_code: vp.fail_code, covered_by: vp.covered_by,
     rr: num(kv.rr), p: num(kv.p), p0: num(kv.p0), ev: num(kv.ev), reason, source: 'ledger',
   };
@@ -260,9 +330,12 @@ export function parseEmailTested(tradeBlockHtml: string, model: Model, d: string
   const out: Tested[] = [];
   let seq = 0;
   for (const raw of text.split('\n')) {
-    const line = raw.trim();
-    if (!line.includes('→') || /^P\d+\b/.test(line)) continue;
-    const [left, right] = line.split(/\s*→\s*/, 2);
+    const line = raw.trim().replace(/\s*(?:·\s*)?\+\s*\d+\s+more tested\b.*$/i, '');
+    if (!line.includes('→') || /^(P\d+|CLOSED|CHANGES|REVIEWS?)\b/i.test(line)) continue;
+    const vm = line.match(/^(.*?)\s*→\s*((?:covered by|not carded|carded|P\d+\b)[\s\S]*)$/i)
+      ?? (/\br\/r\b/i.test(line) ? line.match(/^(.*?)\s*→\s*([\s\S]*)$/) : null);
+    if (!vm) continue;
+    const left = vm[1].replace(/\s*·\s*$/, ''), right = vm[2];
     const f = left.split(/\s+·\s+/);
     const idea = f[0].trim();
     if (!idea || /^(TESTED|NEW)\b/i.test(idea)) continue;
@@ -276,7 +349,7 @@ export function parseEmailTested(tradeBlockHtml: string, model: Model, d: string
     }
     const vp = verdictParts(right ?? '');
     out.push({
-      model, d, seq: seq++, idea, proxy, direction: ideaDirection(idea), verdict: vp.verdict,
+      model, d, seq: seq++, idea, proxy, direction: ideaDirection(idea, proxy), verdict: vp.verdict,
       fail_code: vp.fail_code, covered_by: vp.covered_by, rr, p, p0, ev, reason: vp.reason, source: 'email',
     });
   }

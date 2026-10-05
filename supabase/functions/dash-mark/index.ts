@@ -35,7 +35,7 @@ async function yahoo(symbol: string, interval: '60m' | '1d', range: string): Pro
 }
 
 function combine(a: Bar[], b: Bar[], op: '-' | '/', daily: boolean): Bar[] {
-  const key = (t: number) => (daily ? new Date(t).toISOString().slice(0, 10) : String(Math.floor(t / 3600000)));
+  const key = (t: number) => (daily ? barDate(t) : String(Math.floor(t / HOUR)));
   const mb = new Map(b.map((x) => [key(x.ts), x]));
   const f = (x: number, y: number) => (op === '-' ? x - y : x / y);
   return a.filter((x) => mb.has(key(x.ts))).map((x) => {
@@ -46,7 +46,14 @@ function combine(a: Bar[], b: Bar[], op: '-' | '/', daily: boolean): Bar[] {
 }
 
 const SGT = 8 * 3600000;
+const HOUR = 3600000;
 const sgtDate = (t: number) => new Date(t + SGT).toISOString().slice(0, 10);
+// Yahoo stamps a daily bar at the exchange's local midnight; +12h lands inside the trading
+// day for every venue (NY, London/FX, Asia), so this is the bar's own session date.
+const barDate = (t: number) => new Date(t + 12 * HOUR).toISOString().slice(0, 10);
+// A daily bar is final once its session is over: about 22h after its stamp (17:00 ET for NY).
+const barClosed = (t: number, now: number) => now - t > 22 * HOUR;
+const barCloseTime = (t: number) => t + 21 * HOUR;
 
 function parseFill(s: string | null): number | null {
   if (!s) return null;
@@ -74,7 +81,11 @@ Deno.serve(async (req) => {
     if (body?.token !== value) return new Response('forbidden', { status: 403 });
 
     const trades = await sql`select model, pid, status, proxy, direction, entry, stop, target, filled from dash.trades
-      where proxy is not null and status in ('open','pending')`;
+      where proxy is not null and status = 'open'`;
+    // Live marks only ever describe open trades.
+    await sql`delete from dash.live_marks v where not exists (select 1 from dash.trades t where t.model = v.model and t.pid = v.pid and t.status = 'open')`;
+    // References computed by the current method (ref_v = 2) are frozen; older ones are recomputed once.
+    const known = new Map((await sql`select model, d::text d, idea, ref, ref_d::text ref_d from dash.idea_outcomes where ref_v = 2`).map((r) => [`${r.model}|${r.d}|${r.idea}`, r]));
     const ideas = await sql`select model, d::text d, idea, proxy, direction from dash.tested
       where proxy is not null and direction is not null and d >= current_date - 120`;
     const proxies = new Set<string>([...trades.map((t) => t.proxy), ...ideas.map((i) => i.proxy)]);
@@ -98,13 +109,12 @@ Deno.serve(async (req) => {
       return combine(src.get(ls[0]) ?? [], src.get(ls[1]) ?? [], op, daily_);
     };
     const now = Date.now();
-    const todaySgt = sgtDate(now);
-    const completeDaily = (bars: Bar[]) => bars.filter((b) => new Date(b.ts).toISOString().slice(0, 10) < todaySgt && new Date(b.ts).getUTCDay() % 6 !== 0);
+    const completeDaily = (bars: Bar[]) => bars.filter((b) => barClosed(b.ts, now) && new Date(b.ts + 12 * HOUR).getUTCDay() % 6 !== 0);
 
     let nLive = 0;
     for (const t of trades) {
-      if (t.entry == null || t.stop == null) continue;
-      const dir = Number(t.direction ?? 1), entry = Number(t.entry), stop = Number(t.stop), target = t.target == null ? null : Number(t.target);
+      if (t.entry == null || t.stop == null || t.direction == null) continue;
+      const dir = Number(t.direction), entry = Number(t.entry), stop = Number(t.stop), target = t.target == null ? null : Number(t.target);
       const oneR = Math.abs(entry - stop);
       const h = series(t.proxy, false);
       if (!h.length || !oneR) continue;
@@ -116,14 +126,14 @@ Deno.serve(async (req) => {
       const stopTouched = since.length ? (dir > 0 ? lo! <= stop : hi! >= stop) : null;
       const targetTouched = since.length && target != null ? (dir > 0 ? hi! >= target : lo! <= target) : null;
       const d = completeDaily(series(t.proxy, true));
-      const dSince = fillTs ? d.filter((b) => b.ts + 86400000 > fillTs) : [];
+      const dSince = fillTs ? d.filter((b) => barCloseTime(b.ts) > fillTs) : [];
       const dl = d[d.length - 1];
       const stopClosed = dSince.length ? dSince.some((b) => (dir > 0 ? b.c <= stop : b.c >= stop)) : null;
       const targetClosed = dSince.length && target != null ? dSince.some((b) => (dir > 0 ? b.c >= target : b.c <= target)) : null;
       const row = {
         model: t.model, pid: t.pid, as_of: new Date(last.ts), price: last.c, r: (dir * (last.c - entry)) / oneR,
         hi_since_fill: hi, lo_since_fill: lo, stop_touched: stopTouched, target_touched: targetTouched,
-        daily_close: dl?.c ?? null, daily_close_d: dl ? new Date(dl.ts).toISOString().slice(0, 10) : null,
+        daily_close: dl?.c ?? null, daily_close_d: dl ? barDate(dl.ts) : null,
         daily_r: dl ? (dir * (dl.c - entry)) / oneR : null, stop_closed: stopClosed, target_closed: targetClosed,
       };
       await sql`insert into dash.live_marks ${sql(row)} on conflict (model, pid) do update set
@@ -140,10 +150,13 @@ Deno.serve(async (req) => {
       const d = completeDaily(series(i.proxy, true));
       const h = series(i.proxy, false);
       const cut = Date.parse(i.d + 'T00:00:00Z'); // 08:00 SGT on the idea's date
-      const hRef = h.filter((b) => b.ts <= cut).pop();
-      const before = d.filter((b) => new Date(b.ts).toISOString().slice(0, 10) < i.d);
-      const after = d.filter((b) => new Date(b.ts).toISOString().slice(0, 10) >= i.d);
-      const ref = hRef?.c ?? before[before.length - 1]?.c;
+      // Hourly bars are stamped at their start: the last bar that finished by 08:00 SGT is the reference.
+      const hRef = h.filter((b) => b.ts + HOUR <= cut).pop();
+      const before = d.filter((b) => barDate(b.ts) < i.d);
+      const after = d.filter((b) => barDate(b.ts) >= i.d);
+      // Once set, the reference never moves (hourly history only reaches back a month).
+      const prev = known.get(`${i.model}|${i.d}|${i.idea}`);
+      const ref = prev?.ref != null ? Number(prev.ref) : hRef?.c ?? before[before.length - 1]?.c;
       const atr = atr20(before, spread);
       if (ref == null || !atr) continue;
       const dir = Number(i.direction);
@@ -151,15 +164,15 @@ Deno.serve(async (req) => {
       const lastB = after[after.length - 1];
       const row = {
         model: i.model, d: i.d, idea: i.idea, proxy: i.proxy, direction: dir,
-        ref_d: hRef ? sgtDate(hRef.ts) : new Date(before[before.length - 1].ts).toISOString().slice(0, 10),
+        ref_d: prev?.ref_d ?? (hRef ? sgtDate(hRef.ts) : barDate(before[before.length - 1].ts)),
         ref, atr20: atr, ret1: ret(1), ret5: ret(5), ret10: ret(10), ret20: ret(20),
-        last_d: lastB ? new Date(lastB.ts).toISOString().slice(0, 10) : null,
-        ret_last: lastB ? (dir * (lastB.c - ref)) / atr : null, updated_at: new Date(),
+        last_d: lastB ? barDate(lastB.ts) : null,
+        ret_last: lastB ? (dir * (lastB.c - ref)) / atr : null, updated_at: new Date(), ref_v: 2,
       };
       await sql`insert into dash.idea_outcomes ${sql(row)} on conflict (model, d, idea) do update set
         proxy = excluded.proxy, direction = excluded.direction, ref_d = excluded.ref_d, ref = excluded.ref, atr20 = excluded.atr20,
         ret1 = excluded.ret1, ret5 = excluded.ret5, ret10 = excluded.ret10, ret20 = excluded.ret20,
-        last_d = excluded.last_d, ret_last = excluded.ret_last, updated_at = excluded.updated_at`;
+        last_d = excluded.last_d, ret_last = excluded.ret_last, updated_at = excluded.updated_at, ref_v = excluded.ref_v`;
       nOut++;
     }
     return new Response(JSON.stringify({ ok: true, symbols: symbols.size, live: nLive, outcomes: nOut,

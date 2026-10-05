@@ -2,11 +2,18 @@
 // Drive docs, stores them verbatim in dash.raw, and parses them into the dash tables.
 // Auth: body.token must equal dash.config.ingest_token. {kind:'reparse'} replays dash.raw.
 import postgres from 'npm:postgres@3.4.4';
-import { parseDigest, parseEmailTested, parseTradeBook, type Tested } from '../_shared/parse.ts';
+import { parseDigest, parseEmailTested, parseTradeBook, setPrivateTerms, type Tested } from '../_shared/parse.ts';
+import { parseFeed } from '../_shared/feeds.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
 
 type Json = Record<string, unknown>;
+
+// Raw copies keep only what re-parsing needs: no plain-text body, no ADMIN FLAGS section.
+function rawCopy(m: Json): Json {
+  const html = String(m.htmlBody ?? m.html ?? '').replace(/<h2[^>]*>\s*(?:<[^>]+>\s*)*ADMIN FLAGS[\s\S]*?(?=<h2\b|$)/i, '');
+  return { id: m.id, subject: m.subject, date: m.date, htmlBody: html };
+}
 
 async function upsertTested(rows: Tested[]) {
   for (const t of rows) {
@@ -23,16 +30,34 @@ async function ingestThread(data: Json): Promise<string[]> {
   for (const m of msgs) {
     const msg = m as { id: string; subject: string; date: string; htmlBody?: string };
     const dg = parseDigest(msg);
-    if (!dg) continue;
+    if (!dg) {
+      const fd = parseFeed(msg);
+      if (!fd) continue;
+      // The Email Digest is mostly personal: only its parsed newsletter sections are kept, never the raw email.
+      if (fd.family !== 'substack') {
+        await sql`insert into dash.raw (kind, model, d, source_id, payload)
+          values ('gmail_thread', ${fd.source}, ${fd.d}, ${msg.id}, ${sql.json(rawCopy(m as Json))})
+          on conflict (kind, source_id) do update set payload = excluded.payload, received_at = now()`;
+      }
+      await sql`insert into dash.feeds (gmail_id, family, source, d, subject, sent_at, intro, sections, stances, parsed_at)
+        values (${fd.gmail_id}, ${fd.family}, ${fd.source}, ${fd.d}, ${fd.subject}, ${fd.sent_at}, ${fd.intro},
+          ${sql.json(fd.sections as unknown as Json)}, ${fd.stances}, now())
+        on conflict (gmail_id) do update set family = excluded.family, source = excluded.source, d = excluded.d,
+          subject = excluded.subject, sent_at = excluded.sent_at, intro = excluded.intro, sections = excluded.sections,
+          stances = excluded.stances, parsed_at = now()`;
+      out.push(`feed ${fd.family}/${fd.source} ${fd.d}: ${fd.sections.length} sections`);
+      continue;
+    }
     await sql`insert into dash.raw (kind, model, d, source_id, payload)
-      values ('gmail_thread', ${dg.model}, ${dg.d}, ${msg.id}, ${sql.json(m as Json)})
+      values ('gmail_thread', ${dg.model}, ${dg.d}, ${msg.id}, ${sql.json(rawCopy(m as Json))})
       on conflict (kind, source_id) do update set payload = excluded.payload, received_at = now()`;
     await sql`insert into dash.digests (model, d, subject, gmail_id, sent_at, built, header, sixty, themes, sections, trade_block, parsed_at)
       values (${dg.model}, ${dg.d}, ${dg.subject}, ${dg.gmail_id}, ${dg.sent_at}, ${dg.built}, ${dg.header},
         ${sql.json(dg.sixty)}, ${sql.json(dg.themes as unknown as Json)}, ${sql.json(dg.sections as unknown as Json)}, ${dg.trade_block}, now())
       on conflict (model, d) do update set subject = excluded.subject, gmail_id = excluded.gmail_id, sent_at = excluded.sent_at,
         built = excluded.built, header = excluded.header, sixty = excluded.sixty, themes = excluded.themes,
-        sections = excluded.sections, trade_block = excluded.trade_block, parsed_at = now()`;
+        sections = excluded.sections, trade_block = excluded.trade_block, parsed_at = now()
+      where excluded.sent_at >= dash.digests.sent_at or dash.digests.gmail_id = excluded.gmail_id`;
     // The email prints the top tested lines; the ledger has all of them and wins when present.
     const [{ n }] = await sql`select count(*)::int n from dash.tested where model = ${dg.model} and d = ${dg.d} and source = 'ledger'`;
     if (n === 0 && dg.trade_block) {
@@ -84,7 +109,8 @@ async function ingestBook(data: Json | string, fileId?: string): Promise<string[
     await sql`insert into dash.trade_log (model, d, ref, text) values (${l.model}, ${l.d}, ${l.ref}, ${l.text}) on conflict do nothing`;
   }
   const days = [...new Set(tb.tested.map((t) => t.d))];
-  for (const d of days) await sql`delete from dash.tested where model = ${tb.model} and d = ${d} and source = 'email'`;
+  // The ledger's list for a day is complete: it replaces whatever was stored for that day.
+  for (const d of days) await sql`delete from dash.tested where model = ${tb.model} and d = ${d}`;
   await upsertTested(tb.tested);
   return [`book ${tb.model} (${tb.updated}): ${tb.trades.length} trades, ${tb.marks.length} marks, ${tb.tested.length} tested over ${days.length} days`];
 }
@@ -95,7 +121,24 @@ Deno.serve(async (req) => {
     const [{ value }] = await sql`select value from dash.config where key = 'ingest_token'`;
     if (!body?.token || body.token !== value) return new Response('forbidden', { status: 403 });
     let out: string[] = [];
-    if (body.kind === 'gmail_thread') out = await ingestThread(body.data);
+    // Names and institutions for the personal scrub live only in the database (the repo is public).
+    const [pt] = await sql`select value from dash.config where key = 'private_terms'`;
+    setPrivateTerms(pt?.value);
+    if (body.kind === 'config') {
+      const rows = await sql`select key, value from dash.config where key in ('feeds', 'backfill_since')`;
+      const cfg = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+      return new Response(JSON.stringify({ ok: true, feeds: cfg.feeds ?? [], backfill_since: cfg.backfill_since ?? null }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    if (body.kind === 'purge_test') {
+      // One-off removal of the rows created while testing the pipeline on 5 Oct (owner-approved).
+      await sql`delete from dash.trades where pid = 'P99'`;
+      await sql`delete from dash.trade_marks where pid = 'P99'`;
+      await sql`delete from dash.live_marks where pid = 'P99'`;
+      await sql`delete from dash.tested where idea = 'long test idea'`;
+      await sql`delete from dash.idea_outcomes where idea = 'long test idea'`;
+      await sql`delete from dash.raw where source_id = 'test|TEST'`;
+      out = ['test rows purged'];
+    } else if (body.kind === 'gmail_thread') out = await ingestThread(body.data);
     else if (body.kind === 'trade_book') out = await ingestBook(body.data, body.fileId);
     else if (body.kind === 'reparse') {
       const rows = await sql`select kind, payload from dash.raw order by kind desc, received_at`;

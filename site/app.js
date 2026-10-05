@@ -14,7 +14,10 @@
   const fmt = (v, d = 2) => (n(v) == null || Number.isNaN(n(v)) ? '—' : n(v).toFixed(d));
   const fmtR = (v) => (n(v) == null ? '—' : `${n(v) >= 0 ? '+' : ''}${n(v).toFixed(2)}R`);
   const cls = (v) => (n(v) == null ? '' : n(v) > 0 ? 'pos' : n(v) < 0 ? 'neg' : '');
-  const lvl = (v) => { const x = n(v); if (x == null) return '—'; const a = Math.abs(x); return a >= 1000 ? x.toFixed(1) : a >= 10 ? x.toFixed(2) : a >= 1 ? x.toFixed(3) : x.toFixed(4); };
+  // Carded levels print exactly as written; only computed prices (live marks) are rounded.
+  const lvl = (v) => { const x = n(v); if (x == null) return '—'; return String(+x.toPrecision(10)); };
+  const px = (v) => { const x = n(v); if (x == null) return '—'; const a = Math.abs(x); return a >= 1000 ? x.toFixed(1) : a >= 10 ? x.toFixed(2) : a >= 1 ? x.toFixed(3) : x.toFixed(4); };
+  let seq = 0; // guards against a slow response overwriting a newer view
   const dirTxt = (d) => (d == null ? '—' : Number(d) > 0 ? 'Long' : 'Short');
   const dayLabel = (d) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
   const ago = (ts) => { if (!ts) return ''; const m = Math.round((Date.now() - new Date(ts).getTime()) / 60000); return m < 60 ? `${m}m ago` : m < 2880 ? `${Math.round(m / 60)}h ago` : `${Math.round(m / 1440)}d ago`; };
@@ -63,6 +66,8 @@
     document.querySelectorAll('#tradeSeg button').forEach((b) => b.classList.toggle('active', b.dataset.sub === state.sub));
     $('#view-themes').hidden = state.tab !== 'themes';
     $('#view-trades').hidden = state.tab !== 'trades';
+    $('#view-feed').hidden = !FEEDS[state.tab];
+    $('#modelSeg').hidden = !!FEEDS[state.tab];
     const bk = state.index?.book?.[state.model];
     $('#freshness').textContent = bk ? `book ${bk.updated || ''} · synced ${ago(bk.ingested_at)}` : '';
   }
@@ -70,7 +75,63 @@
   document.querySelectorAll('#modelSeg button').forEach((b) => (b.onclick = () => { state.model = b.dataset.model; store('model', state.model); state.date = null; state.open.clear(); syncChrome(); render(); }));
   document.querySelectorAll('#tradeSeg button').forEach((b) => (b.onclick = () => { state.sub = b.dataset.sub; store('sub', state.sub); state.open.clear(); syncChrome(); render(); }));
 
-  function render() { return state.tab === 'themes' ? renderThemes() : renderTrades(); }
+  function render() { return FEEDS[state.tab] ? renderFeed(state.tab) : state.tab === 'themes' ? renderThemes() : renderTrades(); }
+
+  // ---------- feed tabs (YouTube / Podcast / Grok / Substack) ----------
+  const FEEDS = {
+    youtube: { name: 'YouTube Digest', open: /take|overview/i },
+    podcast: { name: 'Podcast Digest', open: /take|overview|synthesis/i },
+    grok: { name: 'Grok Full Consolidated', open: /network pulse a|markets intel/i },
+    substack: { name: 'Newsletters (from the Email Digest)', open: /market/i },
+  };
+  const SOURCE_NAME = { fable: 'Fable 5.1', opus: 'Opus 5.5', chatgpt: 'ChatGPT', claude: 'Claude' };
+  const feedState = {};
+
+  async function renderFeed(family) {
+    const fs = (feedState[family] ||= { index: null, date: null, source: null, rows: {} });
+    // An empty index is not cached: the first backfill may land while the page is open.
+    try {
+      if (!fs.index?.length) fs.index = await rpc('dash_feed_index', { p_family: family });
+    } catch (e) {
+      $('#feedBody').innerHTML = `<div class="card empty">Could not load ${esc(FEEDS[family].name)}: ${esc(e.message || e)}</div>`;
+      return;
+    }
+    if (state.tab !== family) return;
+    const ds = fs.index.map((x) => x.d);
+    if (!ds.length) { $('#feedBody').innerHTML = `<div class="card empty">No ${esc(FEEDS[family].name)} emails ingested yet.</div>`; $('#feedDate').innerHTML = ''; $('#sourceSeg').innerHTML = ''; return; }
+    if (!fs.date || !ds.includes(fs.date)) fs.date = ds[0];
+    $('#feedDate').innerHTML = ds.map((d) => `<option value="${d}" ${d === fs.date ? 'selected' : ''}>${dayLabel(d)}${d === ds[0] ? ' · latest' : ''}</option>`).join('');
+    $('#feedDate').onchange = (e) => { fs.date = e.target.value; renderFeed(family); };
+    $('#feedPrev').onclick = () => { const i = ds.indexOf(fs.date); if (i + 1 < ds.length) { fs.date = ds[i + 1]; renderFeed(family); } };
+    $('#feedNext').onclick = () => { const i = ds.indexOf(fs.date); if (i > 0) { fs.date = ds[i - 1]; renderFeed(family); } };
+    $('#feedBody').innerHTML = '<div class="muted">Loading…</div>';
+    const key = fs.date;
+    const my = ++seq;
+    try {
+      if (!fs.rows[key]) fs.rows[key] = await rpc('dash_feed', { p_family: family, p_d: key });
+    } catch (e) {
+      if (my === seq) $('#feedBody').innerHTML = `<div class="card empty">Could not load this date: ${esc(e.message || e)}</div>`;
+      return;
+    }
+    if (my !== seq || state.tab !== family) return;
+    const rows = fs.rows[key] || [];
+    const sources = [...new Set(rows.map((r) => r.source))];
+    const pref = [fs.source, state.model, 'opus', 'fable', 'chatgpt', 'claude'];
+    const src = pref.find((s) => s && sources.includes(s)) || sources[0];
+    fs.source = src;
+    $('#sourceSeg').innerHTML = sources.length > 1 ? sources.map((s) => `<button data-src="${s}" class="${s === src ? 'active' : ''}">${esc(SOURCE_NAME[s] || s)}</button>`).join('') : '';
+    $('#sourceSeg').hidden = sources.length < 2;
+    document.querySelectorAll('#sourceSeg button').forEach((b) => (b.onclick = () => { fs.source = b.dataset.src; renderFeed(family); }));
+    const parts = rows.filter((r) => r.source === src);
+    $('#feedMeta').textContent = `${SOURCE_NAME[src] || src} · ${parts.length > 1 ? parts.length + ' emails' : (parts[0]?.subject || '').replace(/^.*?—\s*/, '').slice(0, 80)}`;
+    const openRe = FEEDS[family].open;
+    $('#feedBody').innerHTML = parts.map((r) => `
+      ${parts.length > 1 ? `<h2 class="sec">${esc(r.subject)}</h2>` : ''}
+      ${r.intro ? `<div class="card rich small" style="margin-bottom:12px">${r.intro}</div>` : ''}
+      ${(r.sections || []).map((s, i) => `<div class="card" style="margin-bottom:10px"><details ${openRe.test(s.title) || (i === 0 && !r.sections.some((x) => openRe.test(x.title))) ? 'open' : ''}>
+        <summary><b>${esc(s.title || 'Digest')}</b></summary><div class="rich">${s.html}</div></details></div>`).join('')}
+    `).join('') || '<div class="card empty">Nothing for this date.</div>';
+  }
 
   // ---------- themes ----------
   const datesFor = (m) => (state.index?.digests || []).filter((x) => x.model === m).map((x) => x.d);
@@ -85,7 +146,9 @@
     if (!state.date || !ds.includes(state.date)) state.date = ds[0];
     $('#dateSel').innerHTML = ds.map((d) => `<option value="${d}" ${d === state.date ? 'selected' : ''}>${dayLabel(d)}${d === ds[0] ? ' · latest' : ''}</option>`).join('');
     $('#themesBody').innerHTML = '<div class="muted">Loading…</div>';
+    const my = ++seq;
     const g = await rpc('dash_digest', { p_model: state.model, p_d: state.date });
+    if (my !== seq) return;
     if (!g) { $('#themesBody').innerHTML = '<div class="card empty">Not found.</div>'; return; }
     $('#digestMeta').textContent = `built ${g.built || '—'} SGT`;
     const sub = (g.subject || '').split('|').slice(1).join('|').trim();
@@ -93,7 +156,7 @@
     const nameOf = { radar: 'Radar', tape: 'Tape', ledger: 'Ledger', synthesis: 'Cross-theme synthesis & caveats', stances: 'Stance shifts' };
     $('#themesBody').innerHTML = `
       ${sub ? `<div class="subject">Odds moved: ${esc(sub)}</div>` : ''}
-      <div class="card sixty"><h2 class="sec">The last 24h in 60 seconds</h2><ol class="rich">${(g.sixty || []).map((li) => `<li>${li}</li>`).join('')}</ol></div>
+      <div class="card sixty"><h2 class="sec">The last 24h in 60 seconds</h2>${(g.sections || []).filter((s) => s.key === 'sixty_intro').map((s) => `<div class="rich small">${s.html}</div>`).join('')}<ol class="rich">${(g.sixty || []).map((li) => `<li>${li}</li>`).join('')}</ol></div>
       <h2 class="sec">Themes</h2>
       ${(g.themes || []).map((t) => `
         <article class="card theme">
@@ -112,13 +175,20 @@
 
   async function renderTrades() {
     $('#tradesBody').innerHTML = '<div class="muted">Loading…</div>';
+    const my = ++seq;
     const data = await loadTrades(state.model);
+    if (my !== seq || state.tab !== 'trades') return;
     renderAnalytics(data);
     if (state.sub === 'entered') renderEntered(data); else renderTested(data);
   }
 
   const isClosed = (t) => /^closed/.test(t.status || '');
-  const curR = (t) => (isClosed(t) ? n(t.result_r) : t.live?.r != null ? n(t.live.r) : t.marks?.length ? n(t.marks[t.marks.length - 1].r) : null);
+  const curR = (t) => {
+    if (isClosed(t)) return n(t.result_r);
+    if (t.status !== 'open') return null; // pending, missed, void, vetoed carry no R
+    if (t.live?.r != null) return n(t.live.r);
+    return t.marks?.length ? n(t.marks[t.marks.length - 1].r) : null;
+  };
 
   function renderAnalytics(data) {
     const trades = data.trades || [], tested = data.tested || [];
@@ -131,8 +201,9 @@
     const priced = notCarded.filter((x) => x.outcome && n(x.outcome.ret5) != null);
     const avg = (arr, f) => (arr.length ? arr.reduce((a, x) => a + f(x), 0) / arr.length : null);
     const near = priced.filter((x) => n(x.ev) != null && n(x.ev) >= 0.15), far = priced.filter((x) => n(x.ev) != null && n(x.ev) < 0.15);
-    const ideaDays = new Set(tested.map((x) => x.d)).size;
-    const proposed = trades.filter((t) => t.opened).length;
+    const dayset = new Set(tested.map((x) => x.d));
+    const ideaDays = dayset.size;
+    const proposed = trades.filter((t) => t.opened && dayset.has(String(t.opened).slice(0, 10))).length;
     const passRate = proposed + notCarded.length ? (100 * proposed) / (proposed + notCarded.length) : null;
     const stat = (k, v, s, c = '') => `<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
     $('#analytics').innerHTML = [
@@ -147,7 +218,7 @@
     $('#tradeMeta').textContent = bk?.scorecard ? `Book scorecard: ${bk.scorecard}` : '';
   }
 
-  function statusPill(t) { const s = t.status || ''; const c = s === 'open' || s === 'pending' ? 'open' : /missed|void|vetoed/.test(s) ? s.split('-')[0] : 'closed'; return `<span class="pill ${c}">${esc(s || '—')}</span>`; }
+  function statusPill(t) { const s = t.status || ''; const c = s === 'open' || s === 'pending' ? 'open' : /missed|void|vetoed/.test(s) ? 'missed' : 'closed'; return `<span class="pill ${c}">${esc(s || '—')}</span>`; }
 
   function renderEntered(data) {
     const trades = data.trades || [];
@@ -164,7 +235,7 @@
           <td class="num">${lvl(t.entry)}</td><td class="num">${lvl(t.stop)}</td><td class="num">${lvl(t.target)}</td>
           <td class="num hide-sm">${fmt(t.rr)}</td>
           <td class="num hide-sm">${t.p != null ? `${fmt(t.p, 0)}%` : '—'} / ${fmtR(t.ev)}</td>
-          <td class="num">${t.status === 'open' && lv ? lvl(lv.price) : isClosed(t) ? 'closed' : '—'}<div class="muted small">${t.status === 'open' && lv ? ago(lv.as_of) : esc((t.closed || '').slice(0, 10))}</div></td>
+          <td class="num">${t.status === 'open' && lv ? px(lv.price) : isClosed(t) ? 'closed' : '—'}<div class="muted small">${t.status === 'open' && lv ? ago(lv.as_of) : esc((t.closed || '').slice(0, 10))}</div></td>
           <td class="num ${cls(r)}"><b>${fmtR(r)}</b></td>
         </tr>${isOpen ? `<tr class="detail"><td colspan="11">${tradeDetail(t)}</td></tr>` : ''}`;
     }).join('');
@@ -191,8 +262,8 @@
         <div>Factor</div><div>${esc(meta.factor || '—')}</div><div>Crowd / priced</div><div>${esc(meta.crowd || '—')} / ${esc(meta.priced || '—')}</div>
         <div>Review</div><div>${esc(t.review || '—')}</div><div>Linked</div><div>${esc(meta.linked || '—')}</div>
         ${isClosed(t) ? `<div>Exit</div><div>${esc(t.exit_reason || '—')} · ${fmtR(t.result_r)}</div>` : ''}
-        ${lv ? `<div>Live</div><div class="mono">${lvl(lv.price)} (${ago(lv.as_of)}) · daily ${lvl(lv.daily_close)} on ${esc(lv.daily_close_d || '')} = ${fmtR(lv.daily_r)}</div>
-        <div>Since fill</div><div class="mono">hi ${lvl(lv.hi_since_fill)} · lo ${lvl(lv.lo_since_fill)}</div>` : ''}
+        ${lv ? `<div>Live</div><div class="mono">${px(lv.price)} (${ago(lv.as_of)}) · daily ${px(lv.daily_close)} on ${esc(lv.daily_close_d || '')} = ${fmtR(lv.daily_r)}</div>
+        <div>Since fill</div><div class="mono">hi ${px(lv.hi_since_fill)} · lo ${px(lv.lo_since_fill)}</div>` : ''}
       </div></div>
       <div><h4>Marks (book)</h4>${marks ? `<table class="grid"><tbody>${marks}</tbody></table>` : '<div class="muted">—</div>'}
         ${log ? `<h4 style="margin-top:10px">Log</h4><ul class="small" style="margin:0;padding-left:16px">${log}</ul>` : ''}</div>
@@ -231,7 +302,7 @@
     return `<div class="kv">
       <div>Reason</div><div>${esc(x.reason || '—')}</div>
       <div>Source</div><div>${x.source === 'ledger' ? 'trade_book_current ledger (complete list)' : 'digest email (printed lines)'}</div>
-      ${o ? `<div>Reference</div><div class="mono">${lvl(o.ref)} on ${esc(o.ref_d)} · ATR20 ${lvl(o.atr20)}</div>
+      ${o ? `<div>Reference</div><div class="mono">${px(o.ref)} on ${esc(o.ref_d)} · ATR20 ${px(o.atr20)}</div>
       <div>Forward (ATR)</div><div class="mono">+1d ${fmt(o.ret1)} · +5d ${fmt(o.ret5)} · +10d ${fmt(o.ret10)} · +20d ${fmt(o.ret20)} · to ${esc(o.last_d || '—')} ${fmt(o.ret_last)}</div>` : '<div>Outcome</div><div class="muted">not priced (no proxy or direction)</div>'}
     </div>`;
   }

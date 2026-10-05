@@ -31,6 +31,10 @@
     <nav class="tabs" id="mainTabs">
       <button data-tab="themes" class="active">Themes</button>
       <button data-tab="trades">Trades</button>
+      <button data-tab="youtube">YouTube</button>
+      <button data-tab="podcast">Podcast</button>
+      <button data-tab="grok">Grok</button>
+      <button data-tab="substack">Substack</button>
     </nav>
     <div class="seg" id="modelSeg">
       <button data-model="fable" class="active">Fable 5.1</button>
@@ -51,6 +55,17 @@
         <span id="digestMeta" class="muted small"></span>
       </div>
       <div id="themesBody"></div>
+    </section>
+
+    <section id="view-feed" hidden>
+      <div class="toolbar">
+        <button id="feedPrev" class="ghost">‹</button>
+        <select id="feedDate"></select>
+        <button id="feedNext" class="ghost">›</button>
+        <div class="seg" id="sourceSeg"></div>
+        <span id="feedMeta" class="muted small"></span>
+      </div>
+      <div id="feedBody"></div>
     </section>
 
     <section id="view-trades" hidden>
