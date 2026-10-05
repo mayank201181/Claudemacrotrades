@@ -16,7 +16,7 @@ function post_(url, body) {
     method: 'post', contentType: 'application/json', muteHttpExceptions: true,
     payload: JSON.stringify(Object.assign({ token: TOKEN }, body)),
   });
-  return { code: r.getResponseCode(), text: r.getContentText().slice(0, 300) };
+  return { code: r.getResponseCode(), text: r.getContentText() };
 }
 
 function syncMacroDesk() {
@@ -34,12 +34,14 @@ function syncMacroDesk() {
     if (props.getProperty('book_' + model) === stamp) return;
     const text = DocumentApp.openById(best.getId()).getBody().getText();
     const res = post_(ENDPOINT, { kind: 'trade_book', fileId: best.getId(), data: { fileContent: text } });
-    console.log('book ' + model + ' → ' + res.code + ' ' + res.text);
+    console.log('book ' + model + ' → ' + res.code + ' ' + res.text.slice(0, 200));
     if (res.code === 200) { props.setProperty('book_' + model, stamp); changed = true; }
   });
 
   // 2. Emails: the list of searches comes from the dashboard.
-  const cfg = JSON.parse(post_(ENDPOINT, { kind: 'config' }).text || '{}');
+  const cr = post_(ENDPOINT, { kind: 'config' });
+  let cfg = {};
+  try { cfg = JSON.parse(cr.text); } catch (e) { console.log('config → ' + cr.code + ' ' + cr.text.slice(0, 200)); }
   const since = cfg.backfill_since || '2026/09/23';
   let outOfTime = false;
   (cfg.feeds || []).forEach(function (spec) {
@@ -70,7 +72,7 @@ function syncMacroDesk() {
     if (k.indexOf('s:') === 0 && Date.now() - Number(all[k]) > 10 * 86400000) props.deleteProperty(k);
   });
 
-  if (changed) console.log('marks → ' + post_(MARK, {}).text);
+  if (changed) console.log('marks → ' + post_(MARK, {}).text.slice(0, 200));
   if (outOfTime) console.log('Time budget reached — the next run continues where this one stopped.');
 }
 
