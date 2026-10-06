@@ -17,6 +17,19 @@ proposed and in force, weekly lessons).
 - `supabase/functions/dash-ingest` — stores raw payloads in `dash.raw` and parses them into the `dash` tables.
 - `supabase/functions/dash-mark` — hourly (pg_cron `dash-mark-hourly`): Yahoo bars, live R per open trade,
   forward outcomes of every tested idea in ATR(20) units.
+- `supabase/functions/_shared/trend.ts` + `supabase/functions/dash-trend` — the Trend Monitor (monitor-v2, parameters
+  TM1), daily at 00:30 UTC Tue–Sat (pg_cron `dash-trend-daily`, 08:30 SGT): fetches 8 years of daily closes for the
+  38-asset universe (Yahoo one symbol at a time, 1 s apart, 3 retries; FRED, ECB and MOF yields), computes trend states
+  (MA / momentum / Donchian ensembles), state age, realised vol and its 3-year percentile, stretch from the 200-session
+  average, 52-week breaks, the day's events and the FX one-touch barrier board, and stores the run by its Singapore
+  date in `dash.trend_run` / `trend_state` / `trend_event` / `trend_barrier` (a rerun replaces the day's rows) and the
+  closes in `dash.trend_px` (`supabase/migrations/010_trend.sql`). Parameters (hit rates per class and state, touch
+  vol multipliers) live in `dash.config.trend_params`, alternative Yahoo symbols in `dash.config.trend_symbols`
+  (CSI300 on the 510300.SS ETF; USDCNH built from CNH=X hourly bars, `@1h`, since Yahoo serves one daily bar for it —
+  `011_trend_symbols.sql`, `012_trend_cnh_hourly.sql`). POST `{token, dry: true}` returns the text report without
+  writing; `run_utc` replays a past run time; `only: [...]` tests a few assets (always dry), optionally with a
+  `symbols` override. Deployed without JWT verification, like the other cron-called functions; the Trend tab reads it
+  through `public.dash_trend(p_run_date)`.
 - `supabase/migrations/006_scores.sql` — question scoring views, the stance-call tables, and the rules/lessons store
   behind the weekly review: proposals go in force at the next Sunday 20:00 SGT window unless the owner opposes them,
   and the pipelines read them through `dash.rules_in_force()`.
