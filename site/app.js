@@ -117,9 +117,9 @@
     document.querySelectorAll('#tradeSeg button').forEach((b) => b.classList.toggle('active', b.dataset.sub === state.sub));
     $('#view-themes').hidden = state.tab !== 'themes';
     $('#view-trades').hidden = state.tab !== 'trades';
-    $('#view-scores').hidden = !SCORES[state.tab];
+    $('#view-scores').hidden = !SCORES[state.tab] && state.tab !== 'positioning';
     $('#view-feed').hidden = !FEEDS[state.tab];
-    $('#modelSeg').hidden = !!FEEDS[state.tab] || state.tab === 'voices' || state.tab === 'review';
+    $('#modelSeg').hidden = !!FEEDS[state.tab] || ['voices', 'review', 'positioning'].includes(state.tab);
     const bk = state.index?.book?.[state.model];
     $('#freshness').textContent = bk ? `book ${bk.updated || ''} · synced ${ago(bk.ingested_at)}` : '';
   }
@@ -130,6 +130,8 @@
   function render() {
     if (FEEDS[state.tab]) return renderFeed(state.tab);
     if (SCORES[state.tab]) return renderScores(state.tab);
+    // Positioning lives in positioning.js and draws into the scores panel.
+    if (state.tab === 'positioning') return window.MacroDeskPositioning.render($('#scoresBody'), { rpc, esc, store, active: () => state.tab === 'positioning' });
     return state.tab === 'themes' ? renderThemes() : renderTrades();
   }
 
@@ -662,7 +664,7 @@
     const vrow = (v) => {
       const id = `v-${v.voice}`; const isOpen = state.open.has(id);
       return `<tr class="click" data-id="${esc(id)}" data-voice="${esc(v.voice)}">
-        <td><b>${esc(v.name)}</b><div class="muted small">${esc(v.affiliation || '')}${v.retro ? ` · ${v.retro} backfilled` : ''}</div></td>
+        <td><b>${esc(v.name)}</b><div class="muted small">${esc(v.affiliation || '')}${v.retro ? ` · ${v.retro} backfilled call${v.retro === 1 ? '' : 's'}` : ''}</div></td>
         <td class="num">${v.calls}${v.ungradable ? ` <span class="muted small" title="short price history: the market cannot be scaled yet">(${v.ungradable} n/a)</span>` : ''}</td>
         <td class="num">${v.n10}${v.n10 ? ` <span class="muted small" title="independent clusters: distinct market group and week">(${v.clusters10})</span>` : ''}</td>
         <td class="num">${pct(v.hit10, v.n10)}</td><td class="num"><b>${v.shr10 == null ? '—' : Math.round(v.shr10 * 100) + '%'}</b></td>
@@ -696,16 +698,16 @@
     $('#scoresBody').innerHTML = `
       <div class="analytics">
         ${statBox('Views read', `${c.classified ?? 0}/${c.entries ?? 0}`, `${c.with_calls ?? 0} hold a market view`)}
-        ${statBox('Market calls', c.episodes ?? 0, `from ${c.market ?? 0} priced market mentions · ${c.f_episodes ?? 0} forecasts kept apart`)}
-        ${statBox('Graded at 2 weeks', c.graded10 ?? 0, `10 sessions after the view · ${c.clusters10 ?? 0} independent market-weeks${c.ungradable ? ` · ${c.ungradable} n/a: short price history` : ''}`)}
+        ${statBox('Market calls', c.episodes ?? 0, `from ${c.market ?? 0} priced market mentions · ${c.f_episodes ?? 0} forecasts kept apart${c.ungradable ? ` · ${c.ungradable} n/a: short price history` : ''}`)}
+        ${statBox('Graded at 2 weeks', c.graded10 ?? 0, `10 sessions after the view · ${c.clusters10 ?? 0} independent market-weeks`)}
         ${statBox('Graded at 2 months', c.graded42 ?? 0, '42 sessions after the view')}
         ${statBox('Prices to', esc(c.last_bar || '—'), feeds ? esc(feeds) : 'msd daily closes')}
       </div>
       <p class="note"><b>${esc(regime)}</b></p>
-      <p class="note">A call is the speaker's own directional view on one market, or on a group of markets that are the same bet (yields along one curve with the Fed-funds strip; one market's equity indices, with the VIX counted the other way; the oil benchmarks; gold with silver): restating it on any of them continues the same call, and a day that holds both directions inside a group (a curve or relative-value view) is followed market by market. A call is graded at 2 weeks when it is first seen, when its direction changes, and again only once 15 days have passed since its last 2-week grade; at 2 months the same way, once 60 days have passed. Days/weeks views are graded at 2 weeks only, months/long views at 2 months only, unstated views at both, and one view on several markets of a group the same day counts once. z = move ÷ (daily vol × √sessions) from the first close after the view: |z| ≈ 1 is a one-sigma move over that horizon; a market with fewer than 20 daily moves before the view cannot be scaled yet (n/a). "Trend" = how often following the market's prior 20-session trend (up to the day before the view) would have been right on the same calls. The ranking shrinks each 2-week hit rate toward 50% by its independent clusters (distinct market group and week), and the filter counts clusters. Forecasts (conviction 1: a central-bank action scored on the 2y yield, or a move implied by a stated mechanism), conditional views (${c.conditional ?? 0}) and two-sided views, both directions on one market the same day on overlapping horizons (${c.conflicted ?? 0}), are not ranked${c.unrated ? `; nor are ${c.unrated} views with no conviction recorded` : ''}.</p>
+      <p class="note">A call is the speaker's own directional view on one market, or on a group of markets that are the same bet (yields along one curve with the Fed-funds strip; one market's equity indices, with the VIX counted the other way; the oil benchmarks; gold with silver; offshore with onshore yuan): restating it on any of them continues the same call. A call is graded at 2 weeks when it is first seen, when its direction changes, and again only once 15 days have passed since its last 2-week grade in that direction; at 2 months the same way, once 60 days have passed. A day that holds both directions inside a group (a curve or relative-value view) keeps those clocks: a direction the speaker also held the time before continues its call, and a direction they did not hold starts one. Days/weeks views are graded at 2 weeks only, months/long views at 2 months only, unstated views at both, and one view on several markets of a group the same day counts once, on a market that has a price and enough history when one does. z = move ÷ (daily vol × √sessions) from the first close after the view: |z| ≈ 1 is a one-sigma move over that horizon; a market with fewer than 20 daily moves before the view cannot be scaled yet (n/a). "Trend" = how often following the market's prior 20-session trend (up to the day before the view) would have been right on the same calls. The ranking shrinks each 2-week hit rate toward 50% by its independent clusters (distinct market group and week), and the filter counts clusters. Forecasts (conviction 1: a central-bank action scored on the 2y yield, or a move implied by a stated mechanism), conditional views (${c.conditional ?? 0}) and two-sided views, both directions on one market the same day on overlapping horizons (${c.conflicted ?? 0}), are not ranked${c.unrated ? `; nor are ${c.unrated} views with no conviction recorded` : ''}.</p>
       <div class="toolbar" style="margin-top:12px"><h2 class="sec" style="margin:0">Scoreboard — market calls</h2>
         <div class="seg" id="vminSeg" title="minimum independent clusters graded at 2 weeks">${[0, 3, 5, 10].map((k) => `<button data-k="${k}" class="${k === minN ? 'active' : ''}">${k ? `${k}+ clusters` : 'all'}</button>`).join('')}</div>
-        <div class="seg" id="vscopeSeg"><button data-s="all" class="${scope === 'all' ? 'active' : ''}" title="every entry">all entries</button><button data-s="live" class="${scope === 'live' ? 'active' : ''}" title="only entries logged within 3 days of the view: ${c.retro ?? 0} backfilled calls from ${c.retro_entries ?? 0} entries left out of every figure except attention">logged live</button></div></div>
+        <div class="seg" id="vscopeSeg"><button data-s="all" class="${scope === 'all' ? 'active' : ''}" title="every entry">all entries</button><button data-s="live" class="${scope === 'live' ? 'active' : ''}" title="only entries from 16 Sep 2026 on that were logged within 3 days of the view (entries carried over in the 28 Sep migration count as live): ${c.retro ?? 0} backfilled mentions from ${c.retro_entries ?? 0} entries left out of every figure except attention">logged live</button></div></div>
       <div class="tablewrap"><table class="grid"><thead><tr>
         <th>Voice</th><th title="market calls: a view counts again only on a change of direction or 15+ days after it was last counted">Calls</th><th title="graded at 2 weeks (independent clusters: distinct market group and week)">2w n</th><th>2w hit</th><th title="hit rate shrunk toward 50% by the independent clusters k: (hit rate × k + 5) / (k + 10)">2w shrunk</th><th title="average z at 2 weeks, in 10-session sigmas">2w avg z</th><th title="hit rate of following the prior 20-session trend on the same calls">Trend</th>
         <th title="graded at 2 months (independent clusters)">2m n</th><th>2m hit</th><th title="average z at 2 months, in 42-session sigmas">2m avg z</th><th title="calls against the prior trend: hits / graded">Contrarian</th><th title="conviction-1 forecasts graded at 2 weeks: right / graded (not ranked)">Forecasts</th><th title="2-week calls still inside their first 10 sessions: count · z so far">Live</th>
@@ -744,13 +746,19 @@
   function voiceDetail(calls, scope) {
     if (!calls?.length) return '<span class="muted">No priced calls.</span>';
     const live = scope === 'live';
-    const graded = (x) => [x.counted10 ? '2 weeks' : '', x.counted42 ? '2 months' : ''].filter(Boolean).join(' and ');
+    // A horizon the leaderboard counts is "graded" once its z exists; until then it counts but waits for prices.
+    const countedAt = (x) => [x.counted10 && ['2 weeks', x.z10], x.counted42 && ['2 months', x.z42]].filter(Boolean);
+    const gradeTag = (x) => {
+      const cs = countedAt(x), done = cs.filter((h) => h[1] != null).map((h) => h[0]), wait = cs.filter((h) => h[1] == null).map((h) => h[0]);
+      if (!cs.length) return !x.cond && !x.conflicted && !(live && x.retro) && x.first ? 'not graded: an earlier grade still covers it' : '';
+      return [done.length ? `graded at ${done.join(' and ')}` : '',
+        wait.length ? `counts at ${wait.join(' and ')} (${x.short_hist ? 'n/a: short price history' : 'grade pending'})` : ''].filter(Boolean).join(' · ');
+    };
     const tags = (x) => [x.tier === 'forecast' ? 'forecast (not ranked)' : x.tier === 'unrated' ? 'no conviction recorded (not ranked)' : `conviction ${x.conv}`,
       x.cond ? 'conditional (not graded)' : '', x.conflicted ? 'two-sided that day on an overlapping horizon (not graded)' : '',
       x.retro ? (live ? 'backfilled (outside this scope)' : 'backfilled') : '', x.hz && x.hz !== 'unstated' ? `horizon ${x.hz}` : '', x.contrarian ? 'against the prior trend' : '',
       !x.cond && !x.conflicted && !(live && x.retro) && !x.first ? 'restated (part of an earlier call)' : '',
-      graded(x) ? `graded at ${graded(x)}` : !x.cond && !x.conflicted && !(live && x.retro) && x.first ? 'not graded: an earlier grade still covers it' : '',
-      x.short_hist ? 'n/a: short price history' : ''].filter(Boolean).join(' · ');
+      gradeTag(x), x.short_hist && !countedAt(x).length ? 'n/a: short price history' : ''].filter(Boolean).join(' · ');
     // A z is coloured only where the leaderboard counts it; any other z is muted, and '—' means the horizon does not apply.
     const zc = (x, h) => {
       const counted = h === 10 ? x.counted10 : x.counted42, g = h === 10 ? x.grade10 : x.grade42, z = h === 10 ? x.z10 : x.z42;

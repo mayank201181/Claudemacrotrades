@@ -22,11 +22,11 @@ proposed and in force, weekly lessons).
   and the pipelines read them through `dash.rules_in_force()`.
 - `supabase/migrations/007_scores_v2.sql` — Voices scoring as the site shows it (`dash.refresh_scores()`, daily
   pg_cron `dash-scores-daily`): one voice per person (curated aliases, near-matches listed for review), market calls
-  apart from conviction-1 forecasts, a view followed per market group (2y/10y yields, S&P/Nasdaq/VIX) and graded
-  at 2 weeks at most once per 15 days and at 2 months at most once per 60 days, each on its own clock and only for
-  the horizons it was stated for; a "logged live" scope rebuilt without backfilled entries; crowding per scope with
-  ONE-SIDED (5+ voices, 80%+ on one side) and EXTREME (also top-decile participation); and the rules and
-  weekly-review inputs that read the same figures.
+  apart from conviction-1 forecasts, a view followed per market group (2y/10y yields, S&P/Nasdaq/VIX) and direction,
+  graded at 2 weeks when first seen, on a change of direction, or 15+ days after the last 2-week grade (60 days for
+  2 months), each on its own clock and only for the horizons it was stated for; a "logged live" scope rebuilt
+  without backfilled entries; crowding per scope with ONE-SIDED (5+ voices, 80%+ on one side) and EXTREME (also
+  top-decile participation); and the rules and weekly-review inputs that read the same figures.
 - `supabase/migrations/` — the `dash` schema (in `macro-state-db`; never touches the routines' own tables).
 - `scripts/apps_script/Code.gs` — feeder that runs in the owner's Google account every 10 minutes and posts new
   emails and trade books to `dash-ingest`. The Gmail searches come from `dash.config.feeds`, so a new tab is a
