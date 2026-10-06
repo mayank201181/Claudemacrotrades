@@ -646,26 +646,29 @@
       ${days ? `<table class="grid"><thead><tr><th>Day</th><th>Net</th><th>Implied</th><th>Evidence</th></tr></thead><tbody>${days}</tbody></table>` : '<div class="muted small">No tagged days in the ingested digests.</div>'}`;
   }
 
-  // Voices: each speaker's own directional views, mapped to one market and graded 10 and 42 sessions
-  // after the view as z = move / (daily vol x sqrt(sessions)). Market calls (conviction 2-3) are ranked;
-  // forecasts (a central-bank action scored on the 2y yield, or a move implied by a mechanism) are shown
-  // apart. Conditional and same-day two-sided views are kept for reference but never graded or counted.
+  // Voices: each speaker's own directional views, mapped to one market (or to a group of markets that are the
+  // same bet) and graded 10 and 42 sessions after the view as z = move / (daily vol x sqrt(sessions)). Market
+  // calls (conviction 2-3) are ranked; forecasts (a central-bank action scored on the 2y yield, or a move implied
+  // by a mechanism) are shown apart. Conditional and two-sided views are kept for reference but never graded or
+  // counted. Ranking and the minimum-sample filter use independent clusters (market group x week), not raw n.
   function renderVoices(d) {
     const c = d.coverage || {};
     const minN = Number(store('vmin') || 3);
     const scope = d.scope === 'live' ? 'live' : 'all';
-    const rows = (d.leaders || []).map((v) => ({ ...v, shr10: v.n10 ? (v.hit10 + 5) / (v.n10 + 10) : null }))
-      .filter((v) => v.n10 >= minN || (minN === 0 && (v.calls > 0 || v.f_n10 > 0)))
+    // the 2-week hit rate shrunk toward 50%, weighted by independent clusters rather than by graded calls
+    const rows = (d.leaders || []).map((v) => ({ ...v, shr10: v.clusters10 ? ((v.hit10 * v.clusters10) / v.n10 + 5) / (v.clusters10 + 10) : null }))
+      .filter((v) => (v.clusters10 || 0) >= minN || (minN === 0 && (v.calls > 0 || v.f_n10 > 0)))
       .sort((a, b) => (b.shr10 ?? -1) - (a.shr10 ?? -1) || b.calls - a.calls);
     const vrow = (v) => {
       const id = `v-${v.voice}`; const isOpen = state.open.has(id);
       return `<tr class="click" data-id="${esc(id)}" data-voice="${esc(v.voice)}">
         <td><b>${esc(v.name)}</b><div class="muted small">${esc(v.affiliation || '')}${v.retro ? ` · ${v.retro} backfilled` : ''}</div></td>
-        <td class="num">${v.calls}</td>
+        <td class="num">${v.calls}${v.ungradable ? ` <span class="muted small" title="short price history: the market cannot be scaled yet">(${v.ungradable} n/a)</span>` : ''}</td>
         <td class="num">${v.n10}${v.n10 ? ` <span class="muted small" title="independent clusters: distinct market group and week">(${v.clusters10})</span>` : ''}</td>
         <td class="num">${pct(v.hit10, v.n10)}</td><td class="num"><b>${v.shr10 == null ? '—' : Math.round(v.shr10 * 100) + '%'}</b></td>
         <td class="num ${cls(v.avg_z10)}">${zf(v.avg_z10)}</td><td class="num">${pct(v.trend_hit10, v.trend_n10)}</td>
-        <td class="num">${v.n42}</td><td class="num">${pct(v.hit42, v.n42)}</td><td class="num ${cls(v.avg_z42)}">${zf(v.avg_z42)}</td>
+        <td class="num">${v.n42}${v.n42 ? ` <span class="muted small" title="independent clusters: distinct market group and week">(${v.clusters42})</span>` : ''}</td>
+        <td class="num">${pct(v.hit42, v.n42)}</td><td class="num ${cls(v.avg_z42)}">${zf(v.avg_z42)}</td>
         <td class="num">${v.contra_n ? `${v.contra_hit}/${v.contra_n}` : '—'}</td>
         <td class="num">${v.f_n10 ? `${v.f_hit10}/${v.f_n10}` : '—'}</td>
         <td class="num ${cls(v.live_z)}">${v.live ? `${v.live} · ${zf(v.live_z)}` : '—'}</td>
@@ -679,36 +682,44 @@
       return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><title>net up minus down, last 30 days · scale ±${mx}</title><line x1="0" y1="${h / 2}" x2="${w}" y2="${h / 2}" stroke="currentColor" opacity=".2"/><polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.4"/></svg><span class="muted small"> ±${mx}</span>`;
     };
     const side = (x) => (x.bulls > x.bears ? `${x.bulls} ${esc(x.up_lbl || 'up')} v ${x.bears}` : `${x.bears} ${esc(x.dn_lbl || 'down')} v ${x.bulls}`);
+    // a percentile needs a share (20+ active voices that week) and then 60 days of shares
+    const pctCell = (x) => (x.voices === 0 || x.share == null
+      ? `<span class="muted small" title="${x.voices === 0 ? 'no voices this week' : 'fewer than 20 voices active this week'}">—</span>`
+      : x.pct == null ? '<span class="muted small">history &lt; 60d</span>' : Math.round(x.pct * 100));
     const flags = d.flags || [];
     const done = flags.filter((x) => x.fwd10_z != null);
     const paid = done.filter((x) => x.fwd10_z > 0).length;
-    const regime = c.graded10 ? `Market calls were right ${pct(Math.round(c.hit10 * c.graded10), c.graded10)} of the time at 2 weeks (${c.graded10} graded); simply following each market's prior 20-session trend on the same calls would have been right ${c.trend_hit10 == null ? '—' : Math.round(c.trend_hit10 * 100) + '%'}. Forecasts, ranked nowhere: ${c.f_graded10 ? `${Math.round(c.f_hit10 * 100)}% of ${c.f_graded10}` : 'none graded yet'}.` : 'No market call has reached its 2-week grade yet.';
+    const few = (c.clusters10 ?? 0) < 30;
+    const regime = c.graded10 ? `Market calls were right ${pct(Math.round(c.hit10 * c.graded10), c.graded10)} of the time at 2 weeks (${c.graded10} graded, ${c.clusters10 ?? 0} independent market-weeks); simply following each market's prior 20-session trend on the same calls would have been right ${c.trend_hit10 == null ? '—' : Math.round(c.trend_hit10 * 100) + '%'}${few ? ' — too few independent market-weeks yet to tell skill from trend' : ''}. Forecasts, ranked nowhere: ${c.f_graded10 ? `${Math.round(c.f_hit10 * 100)}% of ${c.f_graded10}` : 'none graded yet'}.` : 'No market call has reached its 2-week grade yet.';
+    const ids = (a) => a.map((s) => String(s).replace(/\.CLOSE$/, '')).join(', ');
+    const feeds = [(c.stale || []).length ? `stale feed: ${ids(c.stale)}` : '', (c.short_hist || []).length ? `short price history: ${ids(c.short_hist)}` : ''].filter(Boolean).join(' · ');
     $('#scoresBody').innerHTML = `
       <div class="analytics">
         ${statBox('Views read', `${c.classified ?? 0}/${c.entries ?? 0}`, `${c.with_calls ?? 0} hold a market view`)}
-        ${statBox('Market calls', c.episodes ?? 0, `from ${c.market ?? 0} priced market mentions · ${c.forecasts ?? 0} forecasts kept apart`)}
-        ${statBox('Graded at 2 weeks', c.graded10 ?? 0, '10 sessions after the view')}
+        ${statBox('Market calls', c.episodes ?? 0, `from ${c.market ?? 0} priced market mentions · ${c.f_episodes ?? 0} forecasts kept apart`)}
+        ${statBox('Graded at 2 weeks', c.graded10 ?? 0, `10 sessions after the view · ${c.clusters10 ?? 0} independent market-weeks${c.ungradable ? ` · ${c.ungradable} n/a: short price history` : ''}`)}
         ${statBox('Graded at 2 months', c.graded42 ?? 0, '42 sessions after the view')}
-        ${statBox('Prices to', esc(c.last_bar || '—'), (c.stale || []).length ? `stale feed: ${esc(c.stale.join(', '))}` : 'msd daily closes')}
+        ${statBox('Prices to', esc(c.last_bar || '—'), feeds ? esc(feeds) : 'msd daily closes')}
       </div>
       <p class="note"><b>${esc(regime)}</b></p>
-      <p class="note">A call is the speaker's own directional view on one market; the same view held and restated is graded at most once per 15 days (2-week grade) and once per 60 days (2-month grade), and a view on several related markets the same day (2y and 10y yields, S&amp;P and Nasdaq) counts once. Days/weeks views are graded at 2 weeks, months/long views at 2 months. z = move ÷ (daily vol × √sessions) from the first close after the view: |z| ≈ 1 is a one-sigma move over that horizon. "Trend" = how often following the market's prior 20-session trend (up to the day before the view) would have been right on the same calls. Forecasts (conviction 1: a central-bank action scored on the 2y yield, or a move implied by a stated mechanism), conditional views (${c.conditional ?? 0}) and same-day two-sided views (${c.conflicted ?? 0}) are not ranked.</p>
+      <p class="note">A call is the speaker's own directional view on one market, or on a group of markets that are the same bet (yields along one curve with the Fed-funds strip; one market's equity indices, with the VIX counted the other way; the oil benchmarks; gold with silver): restating it on any of them continues the same call, and a day that holds both directions inside a group (a curve or relative-value view) is followed market by market. A call is graded at 2 weeks when it is first seen, when its direction changes, and again only once 15 days have passed since its last 2-week grade; at 2 months the same way, once 60 days have passed. Days/weeks views are graded at 2 weeks only, months/long views at 2 months only, unstated views at both, and one view on several markets of a group the same day counts once. z = move ÷ (daily vol × √sessions) from the first close after the view: |z| ≈ 1 is a one-sigma move over that horizon; a market with fewer than 20 daily moves before the view cannot be scaled yet (n/a). "Trend" = how often following the market's prior 20-session trend (up to the day before the view) would have been right on the same calls. The ranking shrinks each 2-week hit rate toward 50% by its independent clusters (distinct market group and week), and the filter counts clusters. Forecasts (conviction 1: a central-bank action scored on the 2y yield, or a move implied by a stated mechanism), conditional views (${c.conditional ?? 0}) and two-sided views, both directions on one market the same day on overlapping horizons (${c.conflicted ?? 0}), are not ranked${c.unrated ? `; nor are ${c.unrated} views with no conviction recorded` : ''}.</p>
       <div class="toolbar" style="margin-top:12px"><h2 class="sec" style="margin:0">Scoreboard — market calls</h2>
-        <div class="seg" id="vminSeg">${[0, 3, 5, 10].map((k) => `<button data-k="${k}" class="${k === minN ? 'active' : ''}">${k ? `n ≥ ${k}` : 'all'}</button>`).join('')}</div>
-        <div class="seg" id="vscopeSeg"><button data-s="all" class="${scope === 'all' ? 'active' : ''}" title="every entry">all entries</button><button data-s="live" class="${scope === 'live' ? 'active' : ''}" title="only entries logged within 3 days of the view (${c.retro ?? 0} backfilled entries excluded)">logged live</button></div></div>
+        <div class="seg" id="vminSeg" title="minimum independent clusters graded at 2 weeks">${[0, 3, 5, 10].map((k) => `<button data-k="${k}" class="${k === minN ? 'active' : ''}">${k ? `${k}+ clusters` : 'all'}</button>`).join('')}</div>
+        <div class="seg" id="vscopeSeg"><button data-s="all" class="${scope === 'all' ? 'active' : ''}" title="every entry">all entries</button><button data-s="live" class="${scope === 'live' ? 'active' : ''}" title="only entries logged within 3 days of the view: ${c.retro ?? 0} backfilled calls from ${c.retro_entries ?? 0} entries left out of every figure except attention">logged live</button></div></div>
       <div class="tablewrap"><table class="grid"><thead><tr>
-        <th>Voice</th><th title="market calls (episodes)">Calls</th><th title="graded at 2 weeks (independent clusters)">2w n</th><th>2w hit</th><th title="(hits+5)/(n+10)">2w shrunk</th><th title="average z at 2 weeks, in 10-session sigmas">2w avg z</th><th title="hit rate of following the prior 20-session trend on the same calls">Trend</th>
-        <th>2m n</th><th>2m hit</th><th title="average z at 2 months, in 42-session sigmas">2m avg z</th><th title="calls against the prior trend: hits / graded">Contrarian</th><th title="conviction-1 forecasts graded at 2 weeks: right / graded (not ranked)">Forecasts</th><th title="calls still inside their first 10 sessions: count · z so far">Live</th>
-      </tr></thead><tbody>${rows.map(vrow).join('') || `<tr><td colspan="13" class="muted">No voice has ${minN} graded market calls yet. Grades accrue as views reach 10 and 42 sessions; the live ledger began on 16 Sep 2026.</td></tr>`}</tbody></table></div>
+        <th>Voice</th><th title="market calls: a view counts again only on a change of direction or 15+ days after it was last counted">Calls</th><th title="graded at 2 weeks (independent clusters: distinct market group and week)">2w n</th><th>2w hit</th><th title="hit rate shrunk toward 50% by the independent clusters k: (hit rate × k + 5) / (k + 10)">2w shrunk</th><th title="average z at 2 weeks, in 10-session sigmas">2w avg z</th><th title="hit rate of following the prior 20-session trend on the same calls">Trend</th>
+        <th title="graded at 2 months (independent clusters)">2m n</th><th>2m hit</th><th title="average z at 2 months, in 42-session sigmas">2m avg z</th><th title="calls against the prior trend: hits / graded">Contrarian</th><th title="conviction-1 forecasts graded at 2 weeks: right / graded (not ranked)">Forecasts</th><th title="2-week calls still inside their first 10 sessions: count · z so far">Live</th>
+      </tr></thead><tbody>${rows.map(vrow).join('') || `<tr><td colspan="13" class="muted">No voice has ${minN} independent graded market calls yet. Grades accrue as views reach 10 and 42 sessions; the live ledger began on 16 Sep 2026.</td></tr>`}</tbody></table></div>
       <h2 class="sec" style="margin-top:18px">Crowding — distinct voices per market, last 7 days</h2>
-      <p class="note">Market calls only. Each voice counts once per market, on its latest view inside the window. Up/Down is the direction of the quoted number: for yields Up means higher yields (bond-bearish); for USDJPY Up means a stronger dollar. Participation is this market's share of all voices active that week, ranked against its own trailing year once it has 60 such days; until then a crowd of 5+ voices that is 80%+ on one side is shown as ONE-SIDED, and EXTREME needs top-decile participation as well.</p>
-      <div class="tablewrap"><table class="grid"><thead><tr><th>Market</th><th>Up</th><th>Down</th><th>Voices 7d</th><th>Voices 30d</th><th>One-sided</th><th title="this market's share of all voices active this week">Share</th><th title="percentile of the share against this market's own past (needs 60 days)">Participation pct</th><th>Net, 30d</th><th></th></tr></thead>
-        <tbody>${crowd.map((x) => `<tr><td>${esc(x.name || x.series)}<div class="muted small mono">${esc(x.series)}</div></td><td class="num">${x.bulls} <span class="muted small">${esc(x.up_lbl || 'up')}</span></td><td class="num">${x.bears} <span class="muted small">${esc(x.dn_lbl || 'down')}</span></td><td class="num">${x.voices}</td><td class="num">${x.voices30}</td><td class="num">${x.one_sided == null ? '—' : Math.round(x.one_sided * 100) + '%'}</td><td class="num">${x.share == null ? '—' : Math.round(x.share * 100) + '%'}</td><td class="num">${x.pct == null ? '<span class="muted small">history &lt; 60d</span>' : Math.round(x.pct * 100)}</td><td>${spark(x.path)}</td><td>${x.extreme ? '<span class="pill missed">EXTREME</span>' : x.one_sided_flag ? '<span class="pill closed">ONE-SIDED</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">No market calls yet.</td></tr>'}</tbody></table></div>
+      <p class="note">Market calls only, ${scope === 'live' ? 'from entries logged live' : 'from every entry'}. Each voice counts once per market, on its latest view inside the window; a latest day that holds both directions (two-sided, or a short-horizon and a long-horizon view that disagree) counts on neither side. Up/Down is the direction of the quoted number: for yields Up means higher yields (bond-bearish); for USDJPY Up means a stronger dollar. Majority share is the larger side's share of the voices: a crowd of 5+ voices with a majority share of 80%+ is ONE-SIDED, whatever its history. Share is this market's share of all voices active that week (it needs 20+ of them); EXTREME is a one-sided crowd whose share is in the top decile of this market's own trailing year, which needs 60 days with a share.</p>
+      <div class="tablewrap"><table class="grid"><thead><tr><th>Market</th><th>Up</th><th>Down</th><th>Voices 7d</th><th>Voices 30d</th><th title="share of voices on the larger side">Majority share</th><th title="this market's share of all voices active this week (20+ needed)">Share</th><th title="percentile of the share against this market's own past year (needs 60 days with a share)">Participation pct</th><th>Net, 30d</th><th></th></tr></thead>
+        <tbody>${crowd.map((x) => `<tr><td>${esc(x.name || x.series)}<div class="muted small mono">${esc(x.series)}</div></td><td class="num">${x.bulls} <span class="muted small">${esc(x.up_lbl || 'up')}</span></td><td class="num">${x.bears} <span class="muted small">${esc(x.dn_lbl || 'down')}</span></td><td class="num">${x.voices}</td><td class="num">${x.voices30}</td><td class="num">${x.one_sided == null ? '—' : Math.round(x.one_sided * 100) + '%'}</td><td class="num">${x.share == null ? '—' : Math.round(x.share * 100) + '%'}</td><td class="num">${pctCell(x)}</td><td>${spark(x.path)}</td><td>${x.extreme ? '<span class="pill missed">EXTREME</span>' : x.one_sided_flag ? '<span class="pill closed">ONE-SIDED</span>' : ''}</td></tr>`).join('') || '<tr><td colspan="10" class="muted">No market calls yet.</td></tr>'}</tbody></table></div>
       <h2 class="sec" style="margin-top:18px">One-sided crowds and what followed</h2>
-      <p class="note">${done.length ? `After ${done.length} one-sided reading${done.length === 1 ? '' : 's'} with 10 sessions of prices since, the crowd was paid ${paid} time${paid === 1 ? '' : 's'} (average ${zf(avg(done, (x) => n(x.fwd10_z)))} in 10-session sigmas, in the crowd's direction).` : 'No one-sided reading has 10 sessions of prices after it yet.'}</p>
+      <p class="note">${done.length ? `After ${done.length} one-sided episode${done.length === 1 ? '' : 's'} with 10 sessions of prices since, the crowd was paid ${paid} time${paid === 1 ? '' : 's'} (average ${zf(avg(done, (x) => n(x.fwd10_z)))} in 10-session sigmas, in the crowd's direction).` : 'No one-sided episode has 10 sessions of prices after it yet.'} An episode starts on the first one-sided day after 14 days without one in the same direction.</p>
       <div class="tablewrap"><table class="grid"><thead><tr><th>Day</th><th>Market</th><th>Crowd</th><th title="top-decile participation against the market's own history">Extreme</th><th title="next 10 sessions, in the crowd's direction, in 10-session sigmas">Next 10 sessions</th></tr></thead>
-        <tbody>${flags.map((x) => `<tr><td class="mono">${esc(x.d)}</td><td>${esc(x.name || x.series)}</td><td>${side(x)}</td><td>${x.extreme ? '<span class="pill missed">yes</span>' : x.pct == null ? '<span class="muted small">history &lt; 60d</span>' : 'no'}</td><td class="num ${cls(x.fwd10_z)}">${x.fwd10_z != null ? zf(x.fwd10_z) + (x.fwd10_z > 0 ? ' paid' : ' washed') : x.fwd_na ? '<span class="muted" title="too little price history to scale the move">n/a</span>' : 'pending'}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">none yet</td></tr>'}</tbody></table></div>
+        <tbody>${flags.map((x) => `<tr><td class="mono">${esc(x.d)}</td><td>${esc(x.name || x.series)}</td><td>${side(x)}</td><td>${x.extreme ? '<span class="pill missed">yes</span>' : x.share == null ? '<span class="muted small" title="fewer than 20 voices active that week">n/a (&lt;20 voices)</span>' : x.pct == null ? '<span class="muted small">history &lt; 60d</span>' : 'no'}</td><td class="num ${cls(x.fwd10_z)}">${x.fwd10_z != null ? zf(x.fwd10_z) + (x.fwd10_z > 0 ? ' paid' : ' washed') : x.fwd_na ? '<span class="muted" title="too little price history to scale the move">n/a</span>' : 'pending'}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">none yet</td></tr>'}</tbody></table></div>
       <h2 class="sec" style="margin-top:18px">Attention — distinct voices per topic per week</h2>
+      <p class="note">Every entry, in both scopes. Weeks start on Monday (SGT); the last column is the week to date.</p>
       ${attentionTable(d.attention || [])}`;
     document.querySelectorAll('#vminSeg button').forEach((b) => (b.onclick = () => { store('vmin', b.dataset.k); renderVoices(d); }));
     document.querySelectorAll('#vscopeSeg button').forEach((b) => (b.onclick = () => { store('vscope', b.dataset.s); state.open.clear(); renderScores('voices'); }));
@@ -716,36 +727,49 @@
     document.querySelectorAll('#scoresBody tr.click[data-voice]').forEach(async (tr) => {
       if (!state.open.has(tr.dataset.id)) return;
       const cell = document.getElementById(`vd-${tr.dataset.voice}`);
-      try { const calls = await rpc('dash_voice', { p_voice: tr.dataset.voice }); if (cell) cell.innerHTML = voiceDetail(calls); }
+      try { const calls = await rpc('dash_voice', { p_voice: tr.dataset.voice, p_scope: scope }); if (cell) cell.innerHTML = voiceDetail(calls, scope); }
       catch (e) { if (cell) cell.textContent = String(e.message || e); }
     });
   }
 
+  // The SQL sends eight Monday weeks (SGT), oldest first, every topic in each; the current week is marked partial.
   function attentionTable(rows) {
-    const wks = [...new Set(rows.map((r) => r.wk))].sort().slice(-8), topics = [...new Set(rows.map((r) => r.topic))].sort();
+    const wks = [...new Map(rows.map((r) => [r.wk, r])).values()], topics = [...new Set(rows.map((r) => r.topic))].sort();
+    if (!wks.length || !topics.length) return '<div class="muted">No entries yet.</div>';
     const get = (w, t) => rows.find((r) => r.wk === w && r.topic === t)?.voices ?? 0;
-    if (!wks.length) return '<div class="muted">No entries yet.</div>';
-    return `<div class="tablewrap"><table class="grid"><thead><tr><th>Topic</th>${wks.map((w) => `<th class="num">${esc(w.slice(5))}</th>`).join('')}</tr></thead>
-      <tbody>${topics.map((t) => `<tr><td>${esc(t)}</td>${wks.map((w) => `<td class="num">${get(w, t) || ''}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+    return `<div class="tablewrap"><table class="grid"><thead><tr><th>Topic</th>${wks.map((w) => `<th class="num${w.partial ? ' muted' : ''}"${w.partial ? ` title="week to date: ${w.days} of 7 days"` : ''}>${esc(String(w.wk).slice(5))}${w.partial ? ` <span class="small">(to date, ${w.days}d)</span>` : ''}</th>`).join('')}</tr></thead>
+      <tbody>${topics.map((t) => `<tr><td>${esc(t)}</td>${wks.map((w) => { const v = get(w.wk, t); return `<td class="num${v ? '' : ' muted'}">${v}</td>`; }).join('')}</tr>`).join('')}</tbody></table></div>`;
   }
 
-  function voiceDetail(calls) {
+  function voiceDetail(calls, scope) {
     if (!calls?.length) return '<span class="muted">No priced calls.</span>';
-    const tags = (x) => [x.tier === 'forecast' ? 'forecast (not ranked)' : `conviction ${x.conv}`, x.cond ? 'conditional (not graded)' : '', x.conflicted ? 'two-sided that day (not graded)' : '',
-      x.retro ? 'backfilled' : '', x.hz && x.hz !== 'unstated' ? `horizon ${x.hz}` : '', x.contrarian ? 'against the prior trend' : '',
-      !x.cond && !x.conflicted && !x.start ? 'restated (graded with its first mention)' : ''].filter(Boolean).join(' · ');
-    return `<table class="grid"><thead><tr><th>Date</th><th>Call</th><th>View</th><th title="10-session sigmas">2w z</th><th title="42-session sigmas">2m z</th><th title="z to the latest close · sessions since the reference close">So far</th></tr></thead><tbody>${calls.map((x) => `<tr>
+    const live = scope === 'live';
+    const graded = (x) => [x.counted10 ? '2 weeks' : '', x.counted42 ? '2 months' : ''].filter(Boolean).join(' and ');
+    const tags = (x) => [x.tier === 'forecast' ? 'forecast (not ranked)' : x.tier === 'unrated' ? 'no conviction recorded (not ranked)' : `conviction ${x.conv}`,
+      x.cond ? 'conditional (not graded)' : '', x.conflicted ? 'two-sided that day on an overlapping horizon (not graded)' : '',
+      x.retro ? (live ? 'backfilled (outside this scope)' : 'backfilled') : '', x.hz && x.hz !== 'unstated' ? `horizon ${x.hz}` : '', x.contrarian ? 'against the prior trend' : '',
+      !x.cond && !x.conflicted && !(live && x.retro) && !x.first ? 'restated (part of an earlier call)' : '',
+      graded(x) ? `graded at ${graded(x)}` : !x.cond && !x.conflicted && !(live && x.retro) && x.first ? 'not graded: an earlier grade still covers it' : '',
+      x.short_hist ? 'n/a: short price history' : ''].filter(Boolean).join(' · ');
+    // A z is coloured only where the leaderboard counts it; any other z is muted, and '—' means the horizon does not apply.
+    const zc = (x, h) => {
+      const counted = h === 10 ? x.counted10 : x.counted42, g = h === 10 ? x.grade10 : x.grade42, z = h === 10 ? x.z10 : x.z42;
+      if (counted) return `<td class="num ${cls(z)}">${x.short_hist ? '<span class="muted small" title="short price history">n/a</span>' : zf(z)}</td>`;
+      if (!g || z == null) return '<td class="num"><span class="muted small">—</span></td>';
+      return `<td class="num"><span class="muted small" title="not counted">(${zf(z)})</span></td>`;
+    };
+    return `<table class="grid"><thead><tr><th>Date</th><th>Call</th><th>View</th><th title="10-session sigmas; muted in brackets when not counted">2w z</th><th title="42-session sigmas; muted in brackets when not counted">2m z</th><th title="z to the latest close · sessions since the reference close">So far</th></tr></thead><tbody>${calls.map((x) => `<tr>
       <td class="mono">${esc(x.d)}</td>
       <td><b>${esc(x.instr || (x.dir > 0 ? x.up_lbl : x.dn_lbl) + ' ' + (x.name || x.series))}</b><div class="muted small">${esc(x.name || x.series)}: ${esc(x.dir > 0 ? x.up_lbl : x.dn_lbl)} · ${esc(tags(x))}</div></td>
       <td class="small">${esc(x.stance || '')}</td>
-      <td class="num ${x.grade10 ? cls(x.z10) : ''}">${x.grade10 ? zf(x.z10) : '<span class="muted small">—</span>'}</td><td class="num ${x.grade42 ? cls(x.z42) : ''}">${x.grade42 ? zf(x.z42) : '<span class="muted small">—</span>'}</td>
-      <td class="num ${cls(x.z_now)}">${x.z_now == null ? '—' : `${zf(x.z_now)} <span class="muted">(${x.elapsed} sess${x.stale ? ', stale feed' : ''})</span>`}</td></tr>`).join('')}</tbody></table>`;
+      ${zc(x, 10)}${zc(x, 42)}
+      <td class="num ${cls(x.z_now)}">${x.z_now == null ? (x.short_hist ? '<span class="muted small" title="short price history">n/a</span>' : '—') : `${zf(x.z_now)} <span class="muted">(${x.elapsed} sess${x.stale ? ', stale feed' : ''})</span>`}</td></tr>`).join('')}</tbody></table>`;
   }
 
   // Review: what the weekly review learned, and the rule changes it proposed. A proposal goes in
   // force at its apply time unless it is opposed by email reply ("oppose Rnn").
   function renderReview(d) {
-    const rules = d.rules || [], lessons = d.lessons || [];
+    const rules = d.rules || [], lessons = d.lessons || [], cands = d.alias_candidates || [];
     const rpill = (s) => `<span class="pill ${s === 'in_force' ? 'open' : s === 'proposed' ? 'missed' : 'closed'}">${esc(s.replace('_', ' '))}</span>`;
     const para = (t) => esc(t || '').split(/\n{2,}/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
     $('#scoresBody').innerHTML = `
@@ -759,6 +783,11 @@
             <div>Why</div><div>${esc(r.rationale || '—')}</div><div>Evidence</div><div>${esc(r.evidence || '—')}</div>
             <div>Revert if</div><div>${esc(r.revert_if || '—')}</div>${r.decided_note ? `<div>Note</div><div>${esc(r.decided_note)}</div>` : ''}</div></details>
         </div>`).join('') || '<div class="card empty">No rule changes yet.</div>'}
+      ${cands.length ? `<h2 class="sec" style="margin-top:18px">Possible duplicate voices</h2>
+      <p class="note">Speakers of the two pipelines that look like one person (same affiliation and surname, or one name inside the other) but are not joined. Each needs a decision: a row in dash.voice_alias if it is the same voice, in dash.voice_alias_reject if not.</p>
+      <div class="tablewrap"><table class="grid"><thead><tr><th>Speaker</th><th>Looks like</th></tr></thead><tbody>${cands.map((a) => `<tr>
+        <td>${esc(a.name_a)}<div class="muted small">${esc(a.affiliation_a || '—')} · #${esc(a.speaker_a)}</div></td>
+        <td>${esc(a.name_b)}<div class="muted small">${esc(a.affiliation_b || '—')} · #${esc(a.speaker_b)}</div></td></tr>`).join('')}</tbody></table></div>` : ''}
       <h2 class="sec" style="margin-top:18px">Weekly lessons</h2>
       ${lessons.map((l) => `<div class="card" style="margin-bottom:10px"><div class="row"><b>Week of ${esc(l.wk)}</b> <span class="muted">${esc(l.title || '')}</span></div><div class="rich">${para(l.body)}</div></div>`).join('') || '<div class="card empty">The first weekly review runs on Saturday.</div>'}`;
   }
