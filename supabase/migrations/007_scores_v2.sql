@@ -10,14 +10,16 @@
 --   - conditional calls ("if X, then Y") and two-sided views (both directions on one market the same day, on
 --     horizons that overlap) are kept for display but never start an episode, never reach the leaderboard and
 --     never count in the crowd's sides;
---   - episodes follow a view per voice, tier and market group: correlated series share a group, and a series that
---     moves against the group (VIX against equities) carries sign -1, so the view's direction is dir x sign.
---     Restating the view on any series of the group continues it; a grade is taken on the series of the mention
---     that starts it. Starts are chosen greedily in (date, entry, seq) order, each grade on its own clock and only
---     among the mentions whose horizon it grades: a 2-week grade when the view is first seen, when its direction changes,
---     or 15+ days after the last 2-week start; a 2-month grade the same way, 60+ days after the last 2-month
---     start (a shorter silence does not restart it). A horizon-free clock (15 days) counts the calls. On a day a
---     voice holds both directions inside one group (a curve or relative-value view) each series is followed alone;
+--   - episodes follow a view per voice, tier, market group and direction: correlated series share a group, and a
+--     series that moves against the group (VIX against equities) carries sign -1, so the view's direction is
+--     dir x sign. Restating the view on any series of the group continues it; a grade is taken on the series of
+--     the mention that starts it, one with a reference close and a scale when that day offers one. Starts are
+--     chosen greedily in date order, each grade on its own clock and only among the mentions whose horizon it
+--     grades: a 2-week grade when the view is first seen, when its direction changes, or 15+ days after the last
+--     2-week start in that direction; a 2-month grade the same way, 60+ days after the last 2-month start (a
+--     shorter silence does not restart it). A horizon-free clock (15 days) counts the calls. A day on which a voice
+--     holds both directions inside one group (a curve or relative-value view) keeps the same clocks: a direction
+--     the voice also held on its previous day continues, and only a direction it did not hold starts a call;
 --   - "logged live" runs the same episode pass again over the entries that were not backfilled, so a backfilled
 --     first mention never hides a live restatement; the crowd is built for both scopes too;
 --   - trend baseline and contrarian flag use only prices known before the view;
@@ -30,10 +32,12 @@
 --     all active voices (20+ needed), ranked against the market's own trailing year once 60 such days exist;
 --     EXTREME is a one-sided crowd whose participation is in that year's top decile;
 --   - entries logged more than 3 days after the view (or before the live ledger began on 16 Sep 2026) are
---     "backfilled"; every Voices figure except attention can include or exclude them;
+--     "backfilled", except that the 28 Sep 2026 migration from Drive counts as live; every Voices figure except
+--     attention can include or exclude them;
 --   - the leaderboard and the headline count from the same sets, in which one view on several series of a group
 --     the same day counts once; independent clusters (market group x week of the reference close) are shown
---     next to n and drive the site's minimum-sample filter and shrinkage. Every tie is broken by (date, entry, seq);
+--     next to n and drive the site's minimum-sample filter and shrinkage. Within a day a gradable series comes
+--     first, and every other tie is broken by (date, entry, seq);
 --   - rules: a proposal replaced before it went in force is withdrawn, never superseded, so reverting its
 --     successor restores only a rule that was in force;
 --   - the weekly review reads the same voices and crowd figures, and trade aggregates split linear from convexity.
@@ -245,9 +249,8 @@ create table dash.stance_grades (
   entry_id bigint not null, seq smallint not null,
   pipeline text, voice text, name text, affiliation text, topic text, stance text, stance_date date,
   series_id text,
-  grp text,                       -- market group (the series itself when ungrouped)
+  grp text,                       -- market group (the series itself when ungrouped): what the episode follows
   gdir smallint,                  -- direction in the group's terms: dir x series_meta.sign
-  ekey text,                      -- what the episode follows: the group, or the series on a day split inside the group
   dir smallint, conv smallint, tier text, cond boolean, hz text, instr text,
   retro boolean, conflicted boolean,
   episode_first boolean,          -- starts a call (15-day clock, any horizon): counts calls, marks restatements
@@ -267,7 +270,7 @@ alter table dash.stance_grades enable row level security;
 
 drop table if exists dash.crowd_daily;
 create table dash.crowd_daily (
-  scope text not null check (scope in ('all', 'live')),   -- live: entries logged within 3 days of the view
+  scope text not null check (scope in ('all', 'live')),   -- live: entries that are not backfilled (see refresh_scores)
   series_id text not null, d date not null,
   bulls int not null, bears int not null, voices int not null,
   one_sided numeric,              -- majority share: the larger side's share of the voices
@@ -282,8 +285,8 @@ alter table dash.crowd_daily enable row level security;
 create or replace function dash.refresh_scores() returns jsonb
 language plpgsql security definer set search_path = dash, public as $$
 declare n_g int; n_c int; v_from date; v_today date := (now() at time zone 'Asia/Singapore')::date;
-        rw record; j int; el boolean; pv text; pe text; pt text;
-        ld date[]; lr smallint[]; st boolean[]; n_ep int := 0; n_epl int := 0;
+        rw record; j int; k int; di int; el boolean; pv text; pg text; pt text;
+        ld date[]; hp boolean[]; cd boolean[]; dd date[]; st boolean[]; ep int[]; epl int[]; n_ep int := 0; n_epl int := 0;
         a_e bigint[] := '{}'; a_s smallint[] := '{}'; a_ep int[] := '{}'; a_epl int[] := '{}';
         a_1 boolean[] := '{}'; a_2 boolean[] := '{}'; a_3 boolean[] := '{}'; a_4 boolean[] := '{}'; a_5 boolean[] := '{}'; a_6 boolean[] := '{}';
 begin
@@ -310,7 +313,7 @@ begin
 
   delete from dash.stance_grades;
   insert into dash.stance_grades (entry_id, seq, pipeline, voice, name, affiliation, topic, stance, stance_date,
-         series_id, grp, gdir, ekey, dir, conv, tier, cond, hz, instr, retro, conflicted,
+         series_id, grp, gdir, dir, conv, tier, cond, hz, instr, retro, conflicted,
          episode_first, episode_start, episode_start42, repeats,
          episode_first_live, episode_start_live, episode_start42_live, repeats_live,
          grade10, grade42, ref_d, ref_v, ref_lag, sigma, kind, trend20, contrarian, z10, z42, elapsed, z_now, last_d, stale)
@@ -329,25 +332,23 @@ begin
     left join dash.voice_alias va on va.speaker_id = s.speaker_id
     left join dash.series_meta sm on sm.series_id = c.series_id
     where c.series_id is not null),
-  dedup as (   -- the same view logged by both pipelines (or twice in one entry) on the same day is one call
+  -- the same view logged by both pipelines (or twice in one entry) on the same day is one call: an unconditional
+  -- mention is kept over a conditional one, then one logged live over a backfilled one (so the live scope keeps
+  -- it), then the highest conviction
+  dedup as (
     select distinct on (voice, series_id, dir, stance_date) *,
            hz in ('days', 'weeks', 'unstated') g10, hz in ('months', 'long', 'unstated') g42
     from calls
-    order by voice, series_id, dir, stance_date, cond, conv desc nulls last, entry_id, seq),
+    order by voice, series_id, dir, stance_date, cond, retro, conv desc nulls last, entry_id, seq),
   -- two-sided: the same voice, market and day in the other direction, on a horizon that overlaps
   conflict as (
     select distinct a.entry_id, a.seq from dedup a
     join dedup b on b.voice = a.voice and b.series_id = a.series_id and b.stance_date = a.stance_date and b.dir <> a.dir
     where not a.cond and not b.cond and ((a.g10 and b.g10) or (a.g42 and b.g42))),
   tagged as (
-    select d.*, (k.entry_id is not null) conflicted from dedup d left join conflict k using (entry_id, seq)),
-  -- a day on which the voice holds both directions inside one group: a curve or relative-value view, followed per series
-  split as (
-    select voice, grp, tier, stance_date from tagged where not cond and not conflicted
-    group by 1, 2, 3, 4 having count(distinct gdir) > 1)
+    select d.*, (k.entry_id is not null) conflicted from dedup d left join conflict k using (entry_id, seq))
   select g.entry_id, g.seq, g.pipeline, g.voice, g.name, g.affiliation, g.topic, g.stance, g.stance_date,
-         g.series_id, g.grp, g.gdir, case when sp.voice is not null then g.series_id else g.grp end,
-         g.dir, g.conv, g.tier, g.cond, g.hz, g.instr, g.retro, g.conflicted,
+         g.series_id, g.grp, g.gdir, g.dir, g.conv, g.tier, g.cond, g.hz, g.instr, g.retro, g.conflicted,
          false, false, false, 1, false, false, false, case when not g.retro then 1 end,
          g.g10, g.g42,
          r.d, r.v, r.d - g.stance_date, sg.sigma, r.kind, tr.t20::smallint, (tr.t20 <> 0 and tr.t20 <> g.dir),
@@ -357,7 +358,6 @@ begin
          case when sg.sigma > 0 and lt.rn > r.rn then g.dir * (case r.kind when 'diff' then lt.v - r.v else ln(lt.v / r.v) end) / (sg.sigma * sqrt(lt.rn - r.rn)) end,
          lt.d, lt.d < v_today - 6
   from tagged g
-  left join split sp on not g.cond and not g.conflicted and sp.voice = g.voice and sp.grp = g.grp and sp.tier = g.tier and sp.stance_date = g.stance_date
   -- reference: the first close after the view, if it comes within 14 days (longer means a feed gap)
   left join lateral (select * from _obs o where o.series_id = g.series_id and o.d > g.stance_date and o.d <= g.stance_date + 14
                      order by o.d limit 1) r on true
@@ -371,31 +371,44 @@ begin
   left join lateral (select rn, v, d from _obs o where o.series_id = g.series_id order by rn desc limit 1) lt on true;
   get diagnostics n_g = row_count;
 
-  -- Episodes, chosen greedily per voice, episode key and tier in (date, entry, seq) order. Six clocks, each with
-  -- its last start and direction: the call (15 days, any horizon), the 2-week grade (15 days, days/weeks/unstated)
-  -- and the 2-month grade (60 days, months/long/unstated), over every entry and again over the entries logged live.
-  -- A clock starts on its first eligible mention, on a change of direction, or once its gap has passed.
-  for rw in select g.entry_id, g.seq, g.voice, g.ekey, g.tier, g.gdir, g.stance_date d, g.grade10, g.grade42, g.retro
+  -- Episodes, chosen greedily per voice, group and tier in date order. Six clocks: the call (15 days, any
+  -- horizon), the 2-week grade (15 days, days/weeks/unstated) and the 2-month grade (60 days, months/long/unstated),
+  -- over every entry and again over the entries logged live. Each clock keeps, per direction, its last start and
+  -- whether the voice held that direction on its previous day with a mention the clock sees. A direction starts on
+  -- its first mention, when the voice did not hold it on that previous day (a change of direction), or once the
+  -- gap has passed; it starts at most once a day, on the first mention in (gradable, entry, seq) order, so a
+  -- series with a reference close and a scale takes the grade over a sibling without them.
+  for rw in select g.entry_id, g.seq, g.voice, g.grp, g.tier, g.gdir, g.stance_date d, g.grade10, g.grade42, g.retro
            from dash.stance_grades g where not g.cond and not g.conflicted
-           order by g.voice, g.ekey, g.tier, g.stance_date, g.entry_id, g.seq loop
-    if (rw.voice, rw.ekey, rw.tier) is distinct from (pv, pe, pt) then
-      pv := rw.voice; pe := rw.ekey; pt := rw.tier;
-      ld := array_fill(null::date, array[6]); lr := array_fill(null::smallint, array[6]);
+           order by g.voice, g.grp, g.tier, g.stance_date, (g.ref_d is null or g.sigma is null), g.entry_id, g.seq loop
+    if (rw.voice, rw.grp, rw.tier) is distinct from (pv, pg, pt) then
+      pv := rw.voice; pg := rw.grp; pt := rw.tier;
+      -- per clock j and direction (up, down): index 2j-1 and 2j
+      ld := array_fill(null::date, array[12]); hp := array_fill(false, array[12]); cd := array_fill(false, array[12]);
+      dd := array_fill(null::date, array[6]); ep := array[null, null]::int[]; epl := array[null, null]::int[];
     end if;
+    di := case when rw.gdir > 0 then 1 else 2 end;
     st := array_fill(false, array[6]);
     for j in 1..6 loop
       el := (case (j - 1) % 3 when 0 then true when 1 then rw.grade10 else rw.grade42 end) and (j <= 3 or not rw.retro);
       if el then
-        st[j] := ld[j] is null or lr[j] <> rw.gdir or rw.d - ld[j] >= case (j - 1) % 3 when 2 then 60 else 15 end;
-        if st[j] then ld[j] := rw.d; end if;
-        lr[j] := rw.gdir;
+        if dd[j] is distinct from rw.d then   -- this clock's first mention of the day: today's directions become the previous day's
+          hp[2 * j - 1] := cd[2 * j - 1]; hp[2 * j] := cd[2 * j];
+          cd[2 * j - 1] := false; cd[2 * j] := false; dd[j] := rw.d;
+        end if;
+        k := 2 * j - 2 + di;
+        if not cd[k] then
+          st[j] := ld[k] is null or not hp[k] or rw.d - ld[k] >= case (j - 1) % 3 when 2 then 60 else 15 end;
+          if st[j] then ld[k] := rw.d; end if;
+          cd[k] := true;
+        end if;
       end if;
     end loop;
-    if st[1] then n_ep := n_ep + 1; end if;
-    if st[4] then n_epl := n_epl + 1; end if;
+    if st[1] then n_ep := n_ep + 1; ep[di] := n_ep; end if;
+    if st[4] then n_epl := n_epl + 1; epl[di] := n_epl; end if;
     a_e := a_e || rw.entry_id; a_s := a_s || rw.seq;
     a_1 := a_1 || st[1]; a_2 := a_2 || st[2]; a_3 := a_3 || st[3]; a_4 := a_4 || st[4]; a_5 := a_5 || st[5]; a_6 := a_6 || st[6];
-    a_ep := a_ep || n_ep; a_epl := a_epl || case when rw.retro then null else n_epl end;
+    a_ep := a_ep || ep[di]; a_epl := a_epl || case when rw.retro then null else epl[di] end;
   end loop;
   update dash.stance_grades g set episode_first = x.f1, episode_start = x.f2, episode_start42 = x.f3,
          episode_first_live = x.f4, episode_start_live = x.f5, episode_start42_live = x.f6, repeats = x.rep, repeats_live = x.repl
