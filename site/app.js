@@ -246,10 +246,76 @@
     return t.marks?.length ? n(t.marks[t.marks.length - 1].r) : null;
   };
 
+  // ---------- convexity cards (rule R01): 1R = the premium, R = the model value; never summed with linear R ----------
+  const isConvex = (t) => t.tclass === 'convexity';
+  const isActive = (t) => t.status === 'open' || t.status === 'pending';
+  const cmeta = (t) => t.meta || {};
+  const isSpreadCard = (t) => /^(cs|ps)$/.test(cmeta(t).struct || '');
+  const shareOf = (s) => { const x = n(String(s ?? '').replace(/[^\d.+-]/g, '')); return x == null || Number.isNaN(x) ? null : x / 100; };
+  const p0fillOf = (t) => shareOf(cmeta(t).p0fill) ?? (n(t.p0) == null ? null : n(t.p0) / 100);
+  // The cut's session date ("2026-11-13 23:00 SGT" is NY 10:00 on 13 Nov; a 05:00 SGT cut is the prior NY close).
+  const cutDate = (t) => {
+    const m = (cmeta(t).cut || '').match(/(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    const ms = Date.parse(m[1] + 'T00:00:00Z') - 8 * 3600000 + (Number(m[2]) * 60 + Number(m[3])) * 60000;
+    return new Date(ms - 5 * 3600000).toISOString().slice(0, 10);
+  };
+  const dMon = (d) => (d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '—');
+  const sgtTime = (ts) => (ts ? new Date(new Date(ts).getTime() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' SGT' : '');
+  const strikeNear = (t) => { const k = (cmeta(t).strike || '').replace(/[−–]/g, '-').match(/-?\d+(?:\.\d+)?/); return k ? Number(k[0]) : null; };
+  const YIELD = /^\^(IRX|FVX|TNX|TYX)$/i;
+  // An "A-B" difference, split as dash-mark splits a synthetic proxy; null for anything else.
+  const diffLegs = (t) => {
+    const m = (t.proxy || '').match(/^([^\s\/]+?)([\-\/])([\^A-Z][^\s\/]*)$/);
+    return m && m[2] === '-' && (m[1].startsWith('^') || /[.=]/.test(m[1])) ? [m[1], m[3]] : null;
+  };
+  // Distance to the strike in the card's model units: bp for a yield or a yield difference, proxy units for
+  // any other "A-B" difference (both normal-model), per cent otherwise.
+  const awayTxt = (t, price) => {
+    const k = strikeNear(t), p = n(price);
+    if (k == null || p == null || !p) return '';
+    const dl = diffLegs(t);
+    if (YIELD.test(t.proxy || '') || (dl && dl.every((l) => YIELD.test(l)))) return `${Math.round(Math.abs(k - p) * 100)} bp away`;
+    if (dl) return `${+Math.abs(k - p).toPrecision(3)} away`;
+    return `${(Math.abs(k / p - 1) * 100).toFixed(1)}% away`;
+  };
+  // Share of the maximum payout received (R01 item 8): the settlement share dash-mark recorded at the touch or
+  // the cut when it has one; else 1 or 0 for a binary closed on a touch or at expiry; else (result + 1) × p0fill
+  // (f for a spread, V less cost on a view close), which inherits the 2-dp rounding of the booked result
+  // (at most 0.005 × p0fill, about 0.15 point).
+  const paidOf = (t) => {
+    const r = n(t.result_r), p0f = p0fillOf(t);
+    if (t.live?.paid != null) return n(t.live.paid);
+    if (r == null) return null;
+    if (!isSpreadCard(t) && /^closed-(touch|expiry)$/.test(t.status || '')) return r > 0 ? 1 : 0;
+    return p0f == null ? null : Math.min(1, Math.max(0, (r + 1) * p0f));
+  };
+  function convexityStat(trades) {
+    const cx = trades.filter(isConvex);
+    if (!cx.length) return null;
+    const settled = cx.filter(isClosed), open = cx.filter((t) => t.status === 'open'), pending = cx.filter((t) => t.status === 'pending');
+    const cum = settled.reduce((a, t) => a + (n(t.result_r) || 0), 0);
+    const scored = settled.filter((t) => t.status !== 'closed-reader'); // reader closes leave says, paid and price
+    const says = avg(scored.filter((t) => n(t.p) != null), (t) => n(t.p) / 100);
+    const paidL = scored.map(paidOf).filter((x) => x != null);
+    const paid = paidL.length ? paidL.reduce((a, x) => a + x, 0) / paidL.length : null;
+    const price = avg(scored.filter((t) => p0fillOf(t) != null), p0fillOf);
+    const atGate = settled.filter((t) => cmeta(t).pgate === 'yes').length;
+    const openR = open.reduce((a, t) => a + (curR(t) || 0), 0);
+    const pc = (x) => (x == null ? '—' : `${(x * 100).toFixed(1)}%`);
+    return {
+      cum, html: `settled ${settled.length} · says ${pc(says)} · paid ${pc(paid)} · price ${pc(price)} · at gate ${atGate}`
+        + ` · ${open.length} open${pending.length ? ` +${pending.length}p` : ''}${open.length ? `, model ${fmtR(openR)}` : ''}`,
+    };
+  }
+
   function renderAnalytics(data) {
-    const trades = data.trades || [], tested = data.tested || [];
+    const all = data.trades || [], tested = data.tested || [];
+    // Every linear figure leaves convexity out (R01 item 8); it gets its own stat below.
+    const trades = all.filter((t) => !isConvex(t));
     const closed = trades.filter(isClosed), open = trades.filter((t) => t.status === 'open'), pending = trades.filter((t) => t.status === 'pending');
     const missed = trades.filter((t) => /missed|void|vetoed/.test(t.status || ''));
+    const cx = convexityStat(all);
     const wins = closed.filter((t) => n(t.result_r) > 0).length;
     const cum = closed.reduce((a, t) => a + (n(t.result_r) || 0), 0);
     const openR = open.reduce((a, t) => a + (curR(t) || 0), 0);
@@ -258,13 +324,14 @@
     const near = priced.filter((x) => n(x.ev) != null && n(x.ev) >= 0.15), far = priced.filter((x) => n(x.ev) != null && n(x.ev) < 0.15);
     const dayset = new Set(tested.map((x) => x.d));
     const ideaDays = dayset.size;
-    const proposed = trades.filter((t) => t.opened && dayset.has(String(t.opened).slice(0, 10))).length;
+    const proposed = all.filter((t) => t.opened && dayset.has(String(t.opened).slice(0, 10))).length;
     const passRate = proposed + notCarded.length ? (100 * proposed) / (proposed + notCarded.length) : null;
     const stat = (k, v, s, c = '') => `<div class="stat"><div class="k">${k}</div><div class="v ${c}">${v}</div><div class="s">${s}</div></div>`;
     $('#analytics').innerHTML = [
       stat('Closed', `${closed.length}`, `${wins} win${wins === 1 ? '' : 's'} · ${missed.length} missed`),
-      stat('Realised', fmtR(cum), 'sum of closed trades, 1R each', cls(cum)),
+      stat('Realised', fmtR(cum), `sum of closed ${cx ? 'linear ' : ''}trades, 1R each`, cls(cum)),
       stat('Open', `${open.length}${pending.length ? ` +${pending.length}p` : ''}`, `marked ${fmtR(openR)} now`, cls(openR)),
+      cx ? stat('Convexity', fmtR(cx.cum), `${cx.html} · 1R = premium, never summed with linear R`, cls(cx.cum)) : '',
       stat('Gate pass rate', passRate == null ? '—' : `${passRate.toFixed(0)}%`, `${proposed} carded vs ${notCarded.length} rejected (${ideaDays} days)`),
       stat('Rejected ideas, +5d', avg(priced, (x) => n(x.outcome.ret5)) == null ? '—' : `${fmt(avg(priced, (x) => n(x.outcome.ret5)))} ATR`, `n=${priced.length} · ${priced.filter((x) => n(x.outcome.ret5) > 0).length} moved their way`),
       stat('Near-misses (EV ≥ +0.15R)', avg(near, (x) => n(x.outcome.ret5)) == null ? '—' : `${fmt(avg(near, (x) => n(x.outcome.ret5)))} ATR`, `n=${near.length} vs rest ${avg(far, (x) => n(x.outcome.ret5)) == null ? '—' : fmt(avg(far, (x) => n(x.outcome.ret5)))} ATR (n=${far.length})`),
@@ -278,7 +345,13 @@
   function renderEntered(data) {
     const trades = data.trades || [];
     if (!trades.length) { $('#tradesBody').innerHTML = '<div class="card empty">No trades in the book yet.</div>'; return; }
-    const rows = trades.map((t) => {
+    // OPEN AND PENDING (R01 item 7): convexity rows come after the linear rows; a book without one keeps its order.
+    const anyCx = trades.some(isConvex);
+    const ordered = trades.some((t) => isConvex(t) && isActive(t))
+      ? [...trades.filter((t) => isActive(t) && !isConvex(t)), ...trades.filter((t) => isActive(t) && isConvex(t)), ...trades.filter((t) => !isActive(t))]
+      : trades;
+    const rows = ordered.map((t) => {
+      if (isConvex(t)) return convexRow(t);
       const r = curR(t); const lv = t.live;
       const flags = lv && t.status === 'open' ? [lv.stop_closed ? '<span class="neg">stop closed</span>' : lv.stop_touched ? '<span class="warn">stop touched intraday</span>' : '', lv.target_closed ? '<span class="pos">target closed</span>' : lv.target_touched ? '<span class="pos">target touched intraday</span>' : ''].filter(Boolean).join(' · ') : '';
       const id = `${t.model}-${t.pid}`; const isOpen = state.open.has(id);
@@ -297,8 +370,38 @@
     $('#tradesBody').innerHTML = `<div class="tablewrap"><table class="grid"><thead><tr>
       <th>P</th><th>Trade</th><th>Status</th><th class="hide-sm">Opened</th><th>Entry</th><th>Stop</th><th>Target</th><th class="hide-sm">R:R</th><th class="hide-sm">p / EV</th><th>Mark</th><th>R</th>
       </tr></thead><tbody>${rows}</tbody></table></div>
-      <p class="note">Levels are exactly as carded and never edited except by a logged roll. R on open trades is the latest hourly mark; the book's official exits use daily closes (trade_book_spec), so an intraday touch is flagged, not booked.</p>`;
+      <p class="note">Levels are exactly as carded and never edited except by a logged roll. R on open trades is the latest hourly mark; the book's official exits use daily closes (trade_book_spec), so an intraday touch is flagged, not booked.${anyCx ? ' · convexity: 1R = premium, R = model value' : ''}</p>`;
     bindRows();
+  }
+
+  // A convexity row: Stop —, Target = strike or barrier and its distance, R = the model mark, next = cut · left n.
+  function convexRow(t) {
+    const r = curR(t); const lv = t.live; const g = cmeta(t);
+    const live = lv && t.status === 'open';
+    const mark = live ? n(lv.price) : null;
+    const st = g.struct || '';
+    const beyond = live && lv.settled_px == null && lv.touched_at == null && strikeNear(t) != null && mark != null
+      && (/^(dig-up|cs)$/.test(st) ? mark > strikeNear(t) : /^(dig-dn|ps)$/.test(st) ? mark < strikeNear(t) : false);
+    const flags = live ? [
+      lv.touched_at ? `<span class="${lv.target_touched ? 'pos' : 'neg'}">touched ${esc(sgtTime(lv.touched_at))} at ${px(lv.touched_px)}</span>` : '',
+      lv.settled_px != null ? `<span class="${n(lv.paid) > 0 ? 'pos' : 'neg'}">settled ${px(lv.settled_px)}</span>` : '',
+      beyond ? '<span class="pos">beyond strike</span>' : '',
+    ].filter(Boolean).join(' · ') : '';
+    const left = live && lv.left_n != null && lv.settled_px == null && lv.touched_at == null ? ` · left ${Math.floor(n(lv.left_n))}` : '';
+    const pTxt = t.p == null ? '—' : `${fmt(t.p, isSpreadCard(t) ? 1 : 0)}%`;
+    const id = `${t.model}-${t.pid}`; const isOpen = state.open.has(id);
+    return `<tr class="click" data-id="${id}">
+        <td class="mono">${esc(t.pid)}</td>
+        <td><b>${esc(t.title)}</b><div class="muted small">C · ${esc(g.factor || '—')}${flags ? ' · ' + flags : ''}</div></td>
+        <td>${statusPill(t)}<div class="muted small">cut ${esc(dMon(cutDate(t)))}${left}</div></td>
+        <td class="num hide-sm">${esc((t.opened || '').slice(0, 10))}</td>
+        <td class="num">${lvl(t.entry)}</td><td class="num">—</td>
+        <td class="num">${esc(g.strike || '—')}${mark != null ? `<div class="muted small">(${esc(awayTxt(t, mark))})</div>` : ''}</td>
+        <td class="num hide-sm">${fmt(t.rr)}</td>
+        <td class="num hide-sm">${pTxt} / ${fmtR(t.ev)}</td>
+        <td class="num">${live ? px(lv.price) : isClosed(t) ? 'closed' : '—'}<div class="muted small">${live ? `${ago(lv.as_of)}${lv.v != null ? ` · V ${(n(lv.v) * 100).toFixed(1)}%` : ''}` : esc((t.closed || '').slice(0, 10))}</div></td>
+        <td class="num ${cls(r)}"><b>${fmtR(r)}</b></td>
+      </tr>${isOpen ? `<tr class="detail"><td colspan="11">${tradeDetail(t)}</td></tr>` : ''}`;
   }
 
   function tradeDetail(t) {
@@ -313,16 +416,29 @@
       <div><h4>Card</h4><div class="kv">
         <div>Direction</div><div>${dirTxt(t.direction)}</div><div>Proxy</div><div class="mono">${esc(t.proxy || '—')}</div>
         <div>Ref / entry</div><div class="mono">${lvl(t.ref)} / ${lvl(t.entry)}</div><div>Filled</div><div>${esc(t.filled || '—')}</div>
-        <div>p vs p0</div><div>${t.p != null ? fmt(t.p, 0) + '%' : '—'} vs ${t.p0 != null ? fmt(t.p0, 0) + '%' : '—'}</div>
+        <div>p vs p0</div><div>${t.p != null ? fmt(t.p, isConvex(t) && isSpreadCard(t) ? 1 : 0) + '%' : '—'} vs ${t.p0 != null ? fmt(t.p0, isConvex(t) ? 1 : 0) + '%' : '—'}</div>
+        ${isConvex(t) ? convexDetail(t) : ''}
         <div>Factor</div><div>${esc(meta.factor || '—')}</div><div>Crowd / priced</div><div>${esc(meta.crowd || '—')} / ${esc(meta.priced || '—')}</div>
         <div>Review</div><div>${esc(t.review || '—')}</div><div>Linked</div><div>${esc(meta.linked || '—')}</div>
         ${isClosed(t) ? `<div>Exit</div><div>${esc(t.exit_reason || '—')} · ${fmtR(t.result_r)}</div>` : ''}
-        ${lv ? `<div>Live</div><div class="mono">${px(lv.price)} (${ago(lv.as_of)}) · daily ${px(lv.daily_close)} on ${esc(lv.daily_close_d || '')} = ${fmtR(lv.daily_r)}</div>
+        ${lv && isConvex(t) ? `<div>${t.status === 'open' ? 'Live' : 'Final mark'}</div><div class="mono">${px(lv.price)} (${ago(lv.as_of)}) · V ${lv.v != null ? (n(lv.v) * 100).toFixed(1) + '%' : '—'} = ${fmtR(lv.r)} · daily ${px(lv.daily_close)} on ${esc(lv.daily_close_d || '')} · V ${lv.daily_v != null ? (n(lv.daily_v) * 100).toFixed(1) + '%' : '—'} = ${fmtR(lv.daily_r)}</div>
+        ${lv.touched_at ? `<div>Touched</div><div class="mono">${esc(sgtTime(lv.touched_at))} at ${px(lv.touched_px)} · frozen at ${fmtR(lv.r)}</div>` : ''}
+        ${lv.settled_px != null ? `<div>Settled</div><div class="mono">${px(lv.settled_px)} · paid ${(n(lv.paid) * 100).toFixed(1)}% = ${fmtR(lv.r)}</div>` : ''}
+        <div>Since fill</div><div class="mono">hi ${px(lv.hi_since_fill)} · lo ${px(lv.lo_since_fill)} (live bars)</div>` : ''}
+        ${lv && !isConvex(t) ? `<div>Live</div><div class="mono">${px(lv.price)} (${ago(lv.as_of)}) · daily ${px(lv.daily_close)} on ${esc(lv.daily_close_d || '')} = ${fmtR(lv.daily_r)}</div>
         <div>Since fill</div><div class="mono">hi ${px(lv.hi_since_fill)} · lo ${px(lv.lo_since_fill)}</div>` : ''}
       </div></div>
       <div><h4>Marks (book)</h4>${marks ? `<table class="grid"><tbody>${marks}</tbody></table>` : '<div class="muted">—</div>'}
         ${log ? `<h4 style="margin-top:10px">Log</h4><ul class="small" style="margin:0;padding-left:16px">${log}</ul>` : ''}</div>
     </div>`;
+  }
+
+  // The card's fixed terms (R01 item 1 and META): never edited after proposal.
+  function convexDetail(t) {
+    const g = cmeta(t), p0f = p0fillOf(t);
+    return `<div>Convexity</div><div class="mono">${esc(g.struct || '—')} ${esc(g.strike || '')} · cut ${esc(g.cut || '—')} · pay ${esc(g.pay || '—')}</div>
+      <div>Vol / carry</div><div class="mono">${esc(g.vol || '—')}/session · ${esc(g.carry || '0')} (terms − base)</div>
+      <div>Premium</div><div class="mono">p0 ${t.p0 != null ? fmt(t.p0, 1) + '%' : '—'} · paid ${p0f != null ? (p0f * 100).toFixed(1) + '%' : '—'} · pays ${p0f ? fmt(1 / p0f - 1, 2) : '—'}R net</div>`;
   }
 
   // THE TRADE TEST (trade_book_spec): an idea that is not carded names the first letter it failed.
