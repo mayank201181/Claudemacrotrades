@@ -2,12 +2,15 @@
 // proxy, writes dash.bars, then computes
 //   - dash.live_marks: latest hourly mark of each open trade in R, intraday touches since fill,
 //     and the latest complete daily close (the book's official exit basis) with close-breaches;
+//   - convexity cards (rule R01): the model value V as a share of the payout, R = V / p0fill − 1,
+//     touches on live hourly bars after the fill (which freeze the card) and settlement at the cut;
 //   - dash.idea_outcomes: forward move of every tested idea in its own direction, in ATR(20) units,
 //     at 1/5/10/20 sessions after the idea's date, from the first price a reader could deal at
 //     after the 08:00 SGT digest (see ideaRef: a gap over a market closure is not credited).
 // Invoked by pg_cron with the ingest token; read-only towards trades.
 import postgres from 'npm:postgres@3.4.4';
 import { type Bar, HOUR, ideaRef, markLive } from '../_shared/marks.ts';
+import { cardFromMeta, fxBase, liveSinceFill, markConvexity } from '../_shared/convexity.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
 
@@ -80,10 +83,12 @@ Deno.serve(async (req) => {
     const [{ value }] = await sql`select value from dash.config where key = 'ingest_token'`;
     if (body?.token !== value) return new Response('forbidden', { status: 403 });
 
-    const trades = await sql`select model, pid, status, proxy, direction, entry, stop, target, filled from dash.trades
+    const trades = await sql`select model, pid, status, tclass, proxy, direction, ref, entry, stop, target, filled, meta from dash.trades
       where proxy is not null and status = 'open'`;
-    // Live marks only ever describe open trades.
-    await sql`delete from dash.live_marks v where not exists (select 1 from dash.trades t where t.model = v.model and t.pid = v.pid and t.status = 'open')`;
+    // Live marks only ever describe open trades, except a convexity card's touch or settlement (paid set),
+    // which is kept once the card closes so the scorecard's paid uses the settlement share.
+    await sql`delete from dash.live_marks v where not exists (select 1 from dash.trades t where t.model = v.model and t.pid = v.pid
+      and (t.status = 'open' or (t.tclass = 'convexity' and v.paid is not null)))`;
     // References computed by the current method (ref_v = 4) are frozen; older ones are recomputed once.
     const known = new Map((await sql`select model, d::text d, idea, ref, ref_d::text ref_d from dash.idea_outcomes where ref_v = 4`).map((r) => [`${r.model}|${r.d}|${r.idea}`, r]));
     const ideas = await sql`select model, d::text d, idea, proxy, direction from dash.tested
@@ -92,9 +97,16 @@ Deno.serve(async (req) => {
     const symbols = new Set<string>();
     for (const p of proxies) for (const l of legs(p).legs) symbols.add(l);
 
-    const hourly = new Map<string, Bar[]>(), daily = new Map<string, Bar[]>();
+    // A convexity card lives up to 65 sessions and its touches run from the fill, so its legs also fetch 6 months
+    // of hourly bars (Yahoo serves 60m bars for up to 730 days). Linear marks, idea references and dash.bars
+    // keep Yahoo's own 1-month series, exactly as before.
+    const longHourly = new Set<string>();
+    for (const t of trades) if (t.tclass === 'convexity') for (const l of legs(t.proxy).legs) longHourly.add(l);
+    const hourly = new Map<string, Bar[]>(), daily = new Map<string, Bar[]>(), hourlyRaw = new Map<string, Bar[]>();
     for (const s of symbols) {
-      const [h, d] = await Promise.all([yahoo(s, '60m', '1mo'), yahoo(s, '1d', '1y')]);
+      const long = longHourly.has(s);
+      const [h, d, h6] = await Promise.all([yahoo(s, '60m', '1mo'), yahoo(s, '1d', '1y'), long ? yahoo(s, '60m', '6mo') : Promise.resolve([])]);
+      if (long) hourlyRaw.set(s, h6);
       hourly.set(s, markLive(h)); daily.set(s, d);
       const rows = [
         ...h.slice(-200).map((b) => ({ symbol: s, interval: '60m', ts: new Date(b.ts), o: b.o, h: b.h, l: b.l, c: b.c })),
@@ -111,8 +123,41 @@ Deno.serve(async (req) => {
     const now = Date.now();
     const completeDaily = (bars: Bar[]) => bars.filter((b) => barClosed(b.ts, now) && new Date(b.ts + 12 * HOUR).getUTCDay() % 6 !== 0);
 
-    let nLive = 0;
+    // Convexity: liveness is judged against the 20 sessions before the fill (R01 item 5), then legs combine.
+    const convexSkipped: string[] = [];
+    const markConvex = async (t: (typeof trades)[number]) => {
+      const { legs: ls, op } = legs(t.proxy);
+      const card = cardFromMeta(t.proxy, t.meta ?? {}, op, ls);
+      const fillTs = parseFill(t.filled);
+      if (typeof card === 'string' || fillTs == null) { convexSkipped.push(`${t.model} ${t.pid}: ${typeof card === 'string' ? card : 'no fill'}`); return false; }
+      const lb = ls.map((s) => liveSinceFill(hourlyRaw.get(s) ?? [], fillTs, fxBase(s) != null));
+      const h = op ? combine(lb[0], lb[1], op, false) : lb[0];
+      const m = markConvexity(card, h, completeDaily(series(t.proxy, true)), fillTs, now);
+      if (!m) { convexSkipped.push(`${t.model} ${t.pid}: no live hourly bars`); return false; }
+      const row = {
+        model: t.model, pid: t.pid, as_of: new Date(m.as_of), price: m.price, r: m.r,
+        hi_since_fill: m.hi_since_fill, lo_since_fill: m.lo_since_fill, stop_touched: m.stop_touched, target_touched: m.target_touched,
+        daily_close: m.daily_close, daily_close_d: m.daily_close_d, daily_r: m.daily_r, stop_closed: m.stop_closed, target_closed: m.target_closed,
+        v: m.v, daily_v: m.daily_v, left_n: m.left_n, touched_at: m.touched_at == null ? null : new Date(m.touched_at),
+        touched_px: m.touched_px, settled_px: m.settled_px, paid: m.paid,
+      };
+      await sql`insert into dash.live_marks ${sql(row)} on conflict (model, pid) do update set
+        as_of = excluded.as_of, price = excluded.price, r = excluded.r, hi_since_fill = excluded.hi_since_fill,
+        lo_since_fill = excluded.lo_since_fill, stop_touched = excluded.stop_touched, target_touched = excluded.target_touched,
+        daily_close = excluded.daily_close, daily_close_d = excluded.daily_close_d, daily_r = excluded.daily_r,
+        stop_closed = excluded.stop_closed, target_closed = excluded.target_closed, v = excluded.v, daily_v = excluded.daily_v,
+        left_n = excluded.left_n, touched_at = excluded.touched_at, touched_px = excluded.touched_px,
+        settled_px = excluded.settled_px, paid = excluded.paid`;
+      return true;
+    };
+
+    let nLive = 0, nConvex = 0;
     for (const t of trades) {
+      // A convexity card has no stop or target ('stop -'); it must never reach the linear R below.
+      if (t.tclass === 'convexity') {
+        try { if (await markConvex(t)) nConvex++; } catch (e) { convexSkipped.push(`${t.model} ${t.pid}: ${String(e)}`); }
+        continue;
+      }
       if (t.entry == null || t.stop == null || t.direction == null) continue;
       const dir = Number(t.direction), entry = Number(t.entry), stop = Number(t.stop), target = t.target == null ? null : Number(t.target);
       const oneR = Math.abs(entry - stop);
@@ -178,7 +223,7 @@ Deno.serve(async (req) => {
         last_d = excluded.last_d, ret_last = excluded.ret_last, updated_at = excluded.updated_at, ref_v = excluded.ref_v`;
       nOut++;
     }
-    return new Response(JSON.stringify({ ok: true, symbols: symbols.size, live: nLive, outcomes: nOut,
+    return new Response(JSON.stringify({ ok: true, symbols: symbols.size, live: nLive, convexity: nConvex, convexity_skipped: convexSkipped, outcomes: nOut,
       empty: [...symbols].filter((s) => !(daily.get(s)?.length)) }), { headers: { 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500 });

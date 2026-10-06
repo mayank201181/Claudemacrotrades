@@ -377,7 +377,9 @@ export function unescapeDoc(s: string): string {
   return s.replace(/\\([\\`*_{}\[\]()#+\-.!&<>|~=])/g, '$1').replace(/\r/g, '');
 }
 
-const META_KEYS = new Set(['opened', 'filled', 'closed', 'class', 'boundary', 'proxy', 'expires', 'ref', 'entry', 'stop', 'target', 'horizon', 'review', 'rr', 'p', 'p0', 'ev', 'pgate', 'factor', 'linked', 'conviction', 'crowd', 'priced', 'result', 'exit']);
+const META_KEYS = new Set(['opened', 'filled', 'closed', 'class', 'boundary', 'proxy', 'expires', 'ref', 'entry', 'stop', 'target', 'horizon', 'review', 'rr', 'p', 'p0', 'ev', 'pgate', 'factor', 'linked', 'conviction', 'crowd', 'priced', 'result', 'exit',
+  // R01 convexity cards, appended after exit
+  'struct', 'strike', 'cut', 'pay', 'vol', 'carry', 'p0fill']);
 
 function dateOnly(s: string | undefined): string | null {
   const m = (s ?? '').match(/\d{4}-\d{2}-\d{2}/);
