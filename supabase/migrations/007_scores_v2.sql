@@ -630,25 +630,20 @@ begin
 end $$;
 
 -- ---------- shared builders (internal: the site RPCs and the weekly review both read them) ----------
--- The graded sets for one scope: h 0 = calls, 10 = 2-week grades, 42 = 2-month grades. One view on several
--- series of a group the same day counts once (the series with a grade is kept, else the first by entry and seq).
+-- The graded sets for one scope: h 0 = calls, 10 = 2-week grades, 42 = 2-month grades. refresh_scores starts
+-- each at most once per voice, tier, group, direction and day, so one view on several series of a group the same
+-- day counts once (on a series with a reference close and a scale if there is one, else the first by entry and seq).
 create or replace function dash.voice_sets(p_live boolean)
 returns table (h int, entry_id bigint, seq smallint)
 language sql stable set search_path = dash, public as $$
-  select 0, a.entry_id, a.seq from (
-    select distinct on (g.voice, g.tier, g.grp, g.gdir, g.stance_date) g.entry_id, g.seq from dash.stance_grades g
-    where case when p_live then g.episode_first_live else g.episode_first end
-    order by g.voice, g.tier, g.grp, g.gdir, g.stance_date, g.entry_id, g.seq) a
+  select 0, g.entry_id, g.seq from dash.stance_grades g
+  where case when p_live then g.episode_first_live else g.episode_first end
   union all
-  select 10, b.entry_id, b.seq from (
-    select distinct on (g.voice, g.tier, g.grp, g.gdir, g.stance_date) g.entry_id, g.seq from dash.stance_grades g
-    where case when p_live then g.episode_start_live else g.episode_start end
-    order by g.voice, g.tier, g.grp, g.gdir, g.stance_date, (g.z10 is null), g.entry_id, g.seq) b
+  select 10, g.entry_id, g.seq from dash.stance_grades g
+  where case when p_live then g.episode_start_live else g.episode_start end
   union all
-  select 42, c.entry_id, c.seq from (
-    select distinct on (g.voice, g.tier, g.grp, g.gdir, g.stance_date) g.entry_id, g.seq from dash.stance_grades g
-    where case when p_live then g.episode_start42_live else g.episode_start42 end
-    order by g.voice, g.tier, g.grp, g.gdir, g.stance_date, (g.z42 is null), g.entry_id, g.seq) c
+  select 42, g.entry_id, g.seq from dash.stance_grades g
+  where case when p_live then g.episode_start42_live else g.episode_start42 end
 $$;
 
 -- Mention counts, then the call and grade counts of the same sets the leaderboard uses. clusters10 = distinct
@@ -690,7 +685,8 @@ language sql stable set search_path = dash, public as $$
 $$;
 
 -- One row per voice. calls = market calls; n10/n42 = graded market calls with clusters beside them;
--- f_* = forecasts (never ranked); live = 2-week calls still inside their first 10 sessions.
+-- f_* = forecasts (never ranked); live = 2-week calls still inside their first 10 sessions; retro = market calls
+-- from backfilled entries.
 create or replace function dash.voice_leaders(p_live boolean) returns jsonb
 language sql stable set search_path = dash, public as $$
   select coalesce(jsonb_agg(v order by v->>'voice'), '[]') from (
@@ -713,7 +709,7 @@ language sql stable set search_path = dash, public as $$
       'contra_hit', count(*) filter (where u.h = 10 and g.tier = 'market' and g.contrarian and g.z10 > 0),
       'f_n10', count(*) filter (where u.h = 10 and g.tier = 'forecast' and g.z10 is not null),
       'f_hit10', count(*) filter (where u.h = 10 and g.tier = 'forecast' and g.z10 > 0),
-      'retro', count(*) filter (where u.h = 0 and g.retro),
+      'retro', count(*) filter (where u.h = 0 and g.tier = 'market' and g.retro),
       'last', max(g.stance_date)) v
     from dash.voice_sets(p_live) u join dash.stance_grades g using (entry_id, seq)
     group by g.voice) l
@@ -736,8 +732,9 @@ language sql stable set search_path = dash, public as $$
 $$;
 
 -- ---------- site RPCs ----------
--- p_scope: 'all' (default) or 'live' (only entries logged within 3 days of the view): every count, grade,
--- crowd and flag follows it; attention always counts every entry.
+-- p_scope: 'all' (default) or 'live' (only entries from 16 Sep 2026 on that were logged within 3 days of the
+-- view; the 28 Sep 2026 migration from Drive counts as live): every count, grade, crowd and flag follows it;
+-- attention always counts every entry.
 -- The 006 version took no argument; drop it so the site's no-argument call is not ambiguous.
 drop function if exists public.dash_voices();
 create or replace function public.dash_voices(p_scope text default 'all') returns jsonb
@@ -898,7 +895,7 @@ begin
         from dash.v_q_evidence group by 1, 2 having count(*) >= 3) e),
     'questions_open', (select coalesce(jsonb_agg(jsonb_build_object('model', model, 'qid', qid, 'question', question, 'resolves', resolves,
           'net', net_total, 'implied', last_implied) order by model, qid), '[]') from dash.v_questions where status in ('open', 'awaiting')),
-    'voices_scope', 'all entries, backfilled ones included: retro per voice and in the headline says how many calls were backfilled',
+    'voices_scope', 'all entries, backfilled ones included: retro per voice counts its backfilled market calls, retro in the headline every backfilled mention',
     'voices_headline', dash.voice_coverage(false),
     -- market calls ranked as on the Voices tab (n10 = graded at 2 weeks, clusters10 = independent market-weeks);
     -- f_n10 / f_hit10 are conviction-1 forecasts, reported apart and never ranked; voices with 3+ graded either way
