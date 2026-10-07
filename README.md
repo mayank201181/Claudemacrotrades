@@ -19,7 +19,8 @@ proposed and in force, weekly lessons).
   forward outcomes of every tested idea in ATR(20) units.
 - `supabase/functions/_shared/trend.ts` + `supabase/functions/dash-trend` — the Trend Monitor (monitor-v2, parameters
   TM1), daily at 00:30 UTC Tue–Sat (pg_cron `dash-trend-daily`, 08:30 SGT): fetches 8 years of daily closes for the
-  38-asset universe (Yahoo one symbol at a time, 1 s apart, 3 retries; FRED, ECB and MOF yields), computes trend states
+  38-asset universe (Yahoo one symbol at a time, 1 s apart, 3 retries; FRED, ECB and MOF yields, MOF's intermittent
+  404s retried and its history file replaced by the stored closes when it still fails), computes trend states
   (MA / momentum / Donchian ensembles), state age, realised vol and its 3-year percentile, stretch from the 200-session
   average, 52-week breaks, the day's events and the FX one-touch barrier board, and stores the run by its Singapore
   date in `dash.trend_run` / `trend_state` / `trend_event` / `trend_barrier` (a rerun replaces the day's rows) and the

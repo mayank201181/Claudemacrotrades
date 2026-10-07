@@ -46,13 +46,15 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 class HttpError extends Error { status: number; constructor(status: number, msg: string) { super(msg); this.status = status; } }
 
 // One download with up to 3 retries (2 s, 4 s, 8 s; 5 s, 10 s, 20 s after a rate limit), never past the budget.
-async function retry<T>(fn: () => Promise<T>, deadline: number): Promise<T> {
+// any4xx retries every 4xx too, for a host whose 404s come and go (MOF, 2026-10-07: of five fetches
+// from this function, the history file 404'd on four and the current-month file on two).
+async function retry<T>(fn: () => Promise<T>, deadline: number, any4xx = false): Promise<T> {
   let last: unknown;
   for (let i = 0; i <= RETRIES; i++) {
     try { return await fn(); } catch (e) {
       last = e;
       // A 4xx other than a rate limit (an unknown symbol) will not get better on a retry.
-      if (e instanceof HttpError && e.status >= 400 && e.status < 500 && e.status !== 429) break;
+      if (!any4xx && e instanceof HttpError && e.status >= 400 && e.status < 500 && e.status !== 429) break;
       const wait = (e instanceof HttpError && e.status === 429 ? 5000 : 2000) * 2 ** i;
       if (i === RETRIES || Date.now() + wait > deadline) break;
       await sleep(wait);
@@ -324,14 +326,15 @@ async function fetchOther(a: AssetDef, start: string, deadline: number): Promise
     const url = `https://data-api.ecb.europa.eu/service/data/${a.symbol}?format=csvdata&startPeriod=${start}`;
     return { bars: await retry(async () => parseEcb(await (await get(url)).text()), deadline), symbol: a.symbol };
   }
-  // MOF: the full history file, then the current month's file. The current file is required (without
-  // it the series ends last month), so its failing fails the download. The history file has gone
-  // missing (404 from 2026-10-07); without it, the closes that earlier runs stored from the same
-  // files in dash.trend_px stand in for it, with a note.
+  // MOF: the full history file, then the current month's file. MOF's server answers either with a 404
+  // now and then (from 2026-10-07), so a 404 is retried like a network error. The current file is
+  // required (without it the series ends last month), so its failing fails the download. When the
+  // history file still fails, the closes that earlier runs stored from the same files in
+  // dash.trend_px stand in for it, with a note.
   const base = 'https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate';
   const symbol = `${a.symbol} (jgbcme)`;
   const [all, cur] = await Promise.allSettled([`${base}/historical/jgbcme_all.csv`, `${base}/jgbcme.csv`].map((u) =>
-    retry(async () => parseMof(decodeJp(await (await get(u)).arrayBuffer()), a.symbol), deadline)));
+    retry(async () => parseMof(decodeJp(await (await get(u)).arrayBuffer()), a.symbol), deadline, true)));
   if (cur.status === 'rejected') throw cur.reason;
   // The current file comes last, so the monitor's keep-the-last dedup prefers it on an overlap.
   if (all.status === 'fulfilled') return { bars: [...all.value, ...cur.value].filter((b) => b.date >= start), symbol };
