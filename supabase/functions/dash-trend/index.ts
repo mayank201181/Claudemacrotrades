@@ -14,7 +14,8 @@
 // drops a long run; the fetches stop at a time budget and anything left is a failed download (STALE).
 // Spec deviations (all listed in _shared/trend.ts) that live here:
 //   D1 every number comes from this function's own fetches: Yahoo v8 chart (interval 1d, as in
-//      dash-history), FRED fredgraph.csv, ECB data-api csvdata, MOF jgbcme_all.csv + jgbcme.csv;
+//      dash-history), FRED fredgraph.csv, ECB data-api csvdata, MOF jgbcme_all.csv + jgbcme.csv (when
+//      the history file fails, the closes stored in dash.trend_px stand in for it; see fetchOther);
 //   D4 the Yahoo symbol of an asset, and any fallbacks tried in order when it fails, come from
 //      dash.config 'trend_symbols' ({asset_id: [symbol, fallback, …]}); without an entry, the
 //      universe's own symbol. A symbol ending '@1h' (CNH=X@1h) is built from Yahoo's hourly bars,
@@ -70,21 +71,32 @@ async function get(url: string): Promise<Response> {
 
 // Yahoo v8 chart, daily: each bar dated in the exchange's own time zone (the yfinance layout), the
 // value from Close or Adj Close per the asset. last_bar_utc is the latest bar's timestamp, in UTC.
-export function parseYahoo(j: any, field: AssetDef['field']): { bars: Bar[]; last_bar_utc: string | null } {
+// Yahoo can publish a day's Close hours before its Adj Close (2026-10-07: at 00:30 UTC the six
+// commodity ETFs had no Adj Close for 2026-10-06, which was there by 00:50, while the indices' Close
+// was). Adj Close is the Close times a factor that changes only at an ex-date, so a trailing bar with
+// a Close and no Adj Close yet takes its Close times the factor of the last bar that has both;
+// `filled` counts them (only trailing bars: a gap inside the series stays a gap).
+export function parseYahoo(j: any, field: AssetDef['field']): { bars: Bar[]; last_bar_utc: string | null; filled: number } {
   const res = j?.chart?.result?.[0];
   if (!res) throw new Error(j?.chart?.error?.description || 'yahoo: no result');
   const ts: number[] = res.timestamp ?? [];
   const q = res.indicators?.quote?.[0];
   const src: unknown[] | undefined = field === 'adjclose' ? res.indicators?.adjclose?.[0]?.adjclose : q?.close;
   if (!ts.length || !src) throw new Error(field === 'adjclose' ? 'yahoo: no adjclose' : 'yahoo: no bars');
+  const fin = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
   const day = new Intl.DateTimeFormat('en-CA', { timeZone: res.meta?.exchangeTimezoneName || 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' });
+  let lastAdj = -1;
+  if (field === 'adjclose') for (let i = ts.length - 1; i >= 0; i--) if (fin(src[i]) && fin(q?.close?.[i]) && q.close[i] > 0) { lastAdj = i; break; }
+  const factor = lastAdj >= 0 ? (src[lastAdj] as number) / q.close[lastAdj] : null;
   const bars: Bar[] = [];
+  let filled = 0;
   ts.forEach((t, i) => {
-    const v = src[i];
-    if (typeof v === 'number' && Number.isFinite(v)) bars.push({ date: day.format(new Date(t * 1000)), value: v });
+    let v = src[i];
+    if (!fin(v) && factor != null && i > lastAdj && fin(q?.close?.[i])) { v = q.close[i] * factor; filled++; }
+    if (fin(v)) bars.push({ date: day.format(new Date(t * 1000)), value: v });
   });
   const last = ts[ts.length - 1];
-  return { bars, last_bar_utc: Number.isFinite(last) ? new Date(last * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z') : null };
+  return { bars, last_bar_utc: Number.isFinite(last) ? new Date(last * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z') : null, filled };
 }
 
 // Yahoo v8 chart, hourly, to the daily bars of the FX daily layout. Yahoo serves only the latest day
@@ -293,7 +305,11 @@ async function fetchYahoo(a: AssetDef, symbols: string[], p1: number, p2: number
       // Yahoo answers some symbols (CNH=X, 000300.SS) with the latest day only, whatever the range asked;
       // that is a failed download, so the next symbol is tried and the error is reported.
       if (got.bars.length < MIN_BARS) throw new Error(`yahoo: only ${got.bars.length} daily bars`);
-      return { ...got, symbol: s, note: errs.length ? `used ${s} after ${errs.join('; ')}` : undefined };
+      const notes = [
+        ...(errs.length ? [`used ${s} after ${errs.join('; ')}`] : []),
+        ...('filled' in got && got.filled ? [`${s}: Adj Close of the latest ${got.filled} bar(s) not yet published, taken from Close`] : []),
+      ];
+      return { bars: got.bars, last_bar_utc: got.last_bar_utc, symbol: s, note: notes.length ? notes.join('; ') : undefined };
     } catch (e) { errs.push(`${s}: ${(e as Error).message}`); }
   }
   throw new Error(errs.join('; '));
@@ -308,13 +324,25 @@ async function fetchOther(a: AssetDef, start: string, deadline: number): Promise
     const url = `https://data-api.ecb.europa.eu/service/data/${a.symbol}?format=csvdata&startPeriod=${start}`;
     return { bars: await retry(async () => parseEcb(await (await get(url)).text()), deadline), symbol: a.symbol };
   }
-  // MOF: the full history file, then the current month's file; both are needed (without the second
-  // the series ends last month), so either failing fails the download.
+  // MOF: the full history file, then the current month's file. The current file is required (without
+  // it the series ends last month), so its failing fails the download. The history file has gone
+  // missing (404 from 2026-10-07); without it, the closes that earlier runs stored from the same
+  // files in dash.trend_px stand in for it, with a note.
   const base = 'https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate';
-  const [all, cur] = await Promise.all([`${base}/historical/jgbcme_all.csv`, `${base}/jgbcme.csv`].map((u) =>
+  const symbol = `${a.symbol} (jgbcme)`;
+  const [all, cur] = await Promise.allSettled([`${base}/historical/jgbcme_all.csv`, `${base}/jgbcme.csv`].map((u) =>
     retry(async () => parseMof(decodeJp(await (await get(u)).arrayBuffer()), a.symbol), deadline)));
+  if (cur.status === 'rejected') throw cur.reason;
   // The current file comes last, so the monitor's keep-the-last dedup prefers it on an overlap.
-  return { bars: [...all, ...cur].filter((b) => b.date >= start), symbol: `${a.symbol} (jgbcme)` };
+  if (all.status === 'fulfilled') return { bars: [...all.value, ...cur.value].filter((b) => b.date >= start), symbol };
+  const first = cur.value[0]?.date ?? '9999-12-31';
+  const old = await sql`select to_char(d, 'YYYY-MM-DD') as d, value from dash.trend_px
+    where asset_id = ${a.asset_id} and src = ${`${a.source}:${symbol}`} and d >= ${start} and d < ${first} order by d`;
+  return {
+    bars: [...old.map((r) => ({ date: r.d as string, value: Number(r.value) })), ...cur.value],
+    symbol,
+    note: `history file failed (${(all.reason as Error)?.message ?? all.reason}); used ${old.length} closes stored by earlier runs, to ${old.at(-1)?.d ?? 'none'}`,
+  };
 }
 
 // ---------- config ----------
