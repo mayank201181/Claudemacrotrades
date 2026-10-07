@@ -29,7 +29,11 @@ proposed and in force, weekly lessons).
   `011_trend_symbols.sql`, `012_trend_cnh_hourly.sql`). POST `{token, dry: true}` returns the text report without
   writing; `run_utc` replays a past run time; `only: [...]` tests a few assets (always dry), optionally with a
   `symbols` override. Deployed without JWT verification, like the other cron-called functions; the Trend tab reads it
-  through `public.dash_trend(p_run_date)`.
+  through `public.dash_trend(p_run_date)`. A TM1.1 shadow runs 10 minutes later (pg_cron `dash-trend-shadow-daily`,
+  POST `{token, shadow: 'TM1.1'}`): the 15 FX pairs with each close taken at 17:00 New York from hourly bars (Yahoo's
+  daily FX close is about the 01:00 London price at the start of its date, so TM1's FX spot is about a day old at the
+  morning run), stored in `dash.trend_shadow` and shown beside TM1 in the Trend tab until a switch is decided
+  (`013_trend_shadow.sql`; D6 in `_shared/trend.ts`).
 - `supabase/migrations/006_scores.sql` — question scoring views, the stance-call tables, and the rules/lessons store
   behind the weekly review: proposals go in force at the next Sunday 20:00 SGT window unless the owner opposes them,
   and the pipelines read them through `dash.rules_in_force()`.

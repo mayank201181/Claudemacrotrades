@@ -53,6 +53,7 @@
       .tr-detail { margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: var(--panel-2); }
       .tr-sigs { font-family: var(--mono); font-size: 12px; }
       .tr-mark { color: var(--warn); font-weight: 600; }
+      tr.tr-diff td { background: color-mix(in srgb, var(--warn) 10%, transparent); }
       pre.tr-report { white-space: pre; overflow-x: auto; font-size: 11.5px; line-height: 1.45; background: var(--panel-2); padding: 10px; border-radius: 8px; margin: 8px 0 0; }
       @media (max-width: 640px) { .tr-row { grid-template-columns: 1fr; gap: 4px; } .tr-lbl { padding-top: 0; } .tr-chip { min-width: 0; flex: 1 1 128px; } }`;
     document.head.appendChild(s);
@@ -149,19 +150,51 @@
           <td class="num hide-sm">${esc(fnum(r?.oos_hit21, 3))}</td><td>${r ? statusPill(r.status, esc) : ''}</td></tr>`;
       }).join('');
 
-      const pairs = [...new Set(barriers.map((b) => b.pair))];
-      const cell = (b, dp) => {
+            const cell = (b, dp) => {
         if (!b) return '<td class="num">—</td>';
         const adj = Number(b.vol_mult) !== 1;
         const t = `barrier ${fnum(b.barrier, dp)} (${b.side} ${fnum(b.k, 1)} sigma over 21 sessions); touch probability ${fnum(b.p_model, 3)} on rv60, ${fnum(b.p_adj, 3)} with vol_mult ${fnum(b.vol_mult, 2)}${b.lookup_hit === 'Y' ? '' : ' (no lookup line)'}`;
         return `<td class="num" title="${esc(t)}">${esc(fnum(b.barrier, dp))}<div class="muted small">${esc(fnum(b.fair_per100, 1))}${adj ? ` <span class="tr-mark" title="vol_mult ${esc(fnum(b.vol_mult, 2))}">×${esc(fnum(b.vol_mult, 2))}</span>` : ''}</div></td>`;
       };
-      const barRows = pairs.map((p) => {
-        const bs = barriers.filter((b) => b.pair === p), dp = byId[p]?.px_dp ?? 4, b0 = bs[0];
+      const rowsOf = (bars, dpOf) => [...new Set(bars.map((b) => b.pair))].map((p) => {
+        const bs = bars.filter((b) => b.pair === p), dp = dpOf[p] ?? 4, b0 = bs[0];
         const f = (side, k) => bs.find((b) => b.side === side && Number(b.k) === k);
         return `<tr><td><b>${esc(p)}</b><div class="muted small">${esc(b0.last_date || '')}</div></td><td class="num">${esc(fnum(b0.spot, dp))}</td><td class="num">${esc(fnum(b0.rv60, 1))}</td>
           ${cell(f('up', 1), dp)}${cell(f('up', 2), dp)}${cell(f('down', 1), dp)}${cell(f('down', 2), dp)}</tr>`;
       }).join('');
+      const barHead = '<thead><tr><th>Pair</th><th class="num">Spot</th><th class="num" title="60-session realised vol, % a year">rv60</th><th class="num">UP 1σ</th><th class="num">UP 2σ</th><th class="num">DN 1σ</th><th class="num">DN 2σ</th></tr></thead>';
+      const barRows = rowsOf(barriers, Object.fromEntries(states.map((r) => [r.asset_id, r.px_dp])));
+
+      // TM1.1 shadow (FX at the 17:00 New York close), shown beside TM1 until a switch is decided.
+      const sh = d.shadow;
+      let shadowHtml = '';
+      if (sh && Array.isArray(sh.states)) {
+        const sById = Object.fromEntries(sh.states.map((r) => [r.asset_id, r]));
+        const fxRows = states.filter((r) => r.asset_class === 'fx');
+        const agree = fxRows.filter((r) => sById[r.asset_id] && sById[r.asset_id].state === r.state).length;
+        const cmpRows = fxRows.map((r) => {
+          const s = sById[r.asset_id], dp = r.px_dp ?? 4;
+          const diff = s && s.state !== r.state;
+          const bp = s && Number(r.level) > 0 && Number(s.level) > 0 ? 1e4 * Math.log(Number(s.level) / Number(r.level)) : null;
+          const st = (x) => (x?.state ? `${esc(STATE_NAME[x.state] || x.state)} <span class="muted small">${esc(String(x.state_age ?? 'NA'))}</span>` : '<span class="muted">NA</span>');
+          return `<tr${diff ? ' class="tr-diff"' : ''}><td><b>${esc(r.asset_id)}</b>${diff ? ' <span class="tr-mark" title="TM1 and TM1.1 states differ">≠</span>' : ''}</td>
+            <td>${st(r)}</td><td class="num">${esc(fnum(r.level, dp))}<div class="muted small">${esc(r.last_date || 'NA')}</div></td>
+            <td>${st(s)}</td><td class="num">${esc(fnum(s?.level, dp))}<div class="muted small">${esc(s?.last_date || 'NA')}${s && s.status !== 'OK' ? ` · ${esc(s.status)}` : ''}</div></td>
+            <td class="num">${esc(sgn(bp, 0))}</td></tr>`;
+        }).join('');
+        const shEvents = (sh.events || []).map((e) => `<li><b>${esc(e.asset_id)}</b> ${esc(e.event_type)}${e.detail ? ` ${esc(e.detail)}` : ''} ${esc(evVal(e, sById[e.asset_id], 'prev'))} → ${esc(evVal(e, sById[e.asset_id], 'value'))}</li>`).join('');
+        const shErrs = Object.entries(sh.fetch_errors || {});
+        shadowHtml = `
+        <h2 class="sec" style="margin-top:16px">FX at the 5pm New York close <span style="text-transform:none;letter-spacing:0">(${esc(sh.params_version)} shadow)</span></h2>
+        <p class="note" style="margin:0 0 8px">Same rules and parameters as ${esc(run.params_version)}, but each FX close is the 17:00 New York price, built from hourly bars, so at the morning run the spot is a few hours old instead of about a day. It runs beside ${esc(run.params_version)} for two weeks before any switch; ${esc(run.params_version)} stays the board above. States agree on <b>${agree} of ${fxRows.length}</b> pairs; computed ${esc(sgt(sh.run_utc))}, ${statusPill(sh.status, esc)}.</p>
+        <div class="tablewrap"><table class="grid"><thead><tr><th>Pair</th><th>${esc(run.params_version)} state</th><th class="num">${esc(run.params_version)} spot</th><th>${esc(sh.params_version)} state</th><th class="num">${esc(sh.params_version)} spot</th><th class="num" title="${esc(sh.params_version)} spot vs ${esc(run.params_version)} spot, basis points">Δ bp</th></tr></thead>
+          <tbody>${cmpRows}</tbody></table></div>
+        <div class="tablewrap" style="margin-top:10px"><table class="grid">${barHead}
+          <tbody>${rowsOf(sh.barriers || [], Object.fromEntries(sh.states.map((r) => [r.asset_id, r.px_dp]))) || '<tr><td colspan="7" class="muted">No usable FX pair in the shadow run.</td></tr>'}</tbody></table></div>
+        <p class="note">The ${esc(sh.params_version)} barrier board, from the 17:00 New York spot; same formulas as above.</p>
+        ${shEvents ? `<details><summary>${esc(sh.params_version)} events (${(sh.events || []).length})</summary><ul class="small" style="margin:6px 0 0;padding-left:18px">${shEvents}</ul></details>` : ''}
+        ${shErrs.length ? `<details><summary>${esc(sh.params_version)} fetch notes (${shErrs.length})</summary><ul class="small" style="margin:6px 0 0;padding-left:18px">${shErrs.map(([k, v]) => `<li><b>${esc(k)}</b> ${esc(v)}</li>`).join('')}</ul></details>` : ''}`;
+      }
 
       const hits = d.hit_rates || [];
       const hitTable = `<div class="tablewrap" style="margin-top:8px"><table class="grid"><thead><tr><th>Class</th>${STATES.map((s) => `<th class="num">${STATE_NAME[s]}</th>`).join('')}</tr></thead><tbody>
@@ -187,9 +220,10 @@
         <div class="tablewrap"><table class="grid"><thead><tr><th>Asset</th><th>Event</th><th class="num">Prev → now</th><th>State</th><th class="num hide-sm">dist200</th><th class="num hide-sm" title="rv20 percentile of 3 years">rv20 pct</th><th class="num hide-sm">oos hit21</th><th>Status</th></tr></thead>
           <tbody>${evRows || '<tr><td colspan="8" class="muted">No events in this run.</td></tr>'}</tbody></table></div>
         <h2 class="sec" style="margin-top:16px">FX barrier board <span style="text-transform:none;letter-spacing:0">(21 sessions, rv60, zero drift)</span></h2>
-        <div class="tablewrap"><table class="grid"><thead><tr><th>Pair</th><th class="num">Spot</th><th class="num" title="60-session realised vol, % a year">rv60</th><th class="num">UP 1σ</th><th class="num">UP 2σ</th><th class="num">DN 1σ</th><th class="num">DN 2σ</th></tr></thead>
+        <div class="tablewrap"><table class="grid">${barHead}
           <tbody>${barRows || '<tr><td colspan="7" class="muted">No usable FX pair in this run.</td></tr>'}</tbody></table></div>
         <p class="note">Each cell: the one-touch barrier, and below it the fair value per 100 paid at touch: 100 × 2Φ(−k ÷ vol_mult). <span class="tr-mark">×1.15</span> marks a cell where the touch lookup scales the rv60 vol (vol_mult ≠ 1). Zero drift: the forward is ignored, so USDINR and USDIDR are not dealer-comparable without a forward adjustment.</p>
+        ${shadowHtml}
         <details style="margin-top:10px"><summary>Hit rates (${esc(run.params_version)})</summary>${hitTable}</details>
         <details style="margin-top:6px"><summary>Text report</summary><pre class="tr-report mono">${esc(run.report || '')}</pre></details>`;
       el.querySelectorAll('.tr-chip').forEach((b) => (b.onclick = () => {

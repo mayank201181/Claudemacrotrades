@@ -15,6 +15,10 @@
 //    final bar is more than 3 weekdays older than the run's previous weekday (no local calendars).
 // D4 CSI300: the Yahoo symbol (and its fallback) is configuration in the asset table, not logic here.
 // D5 run identity: run_date = the Singapore calendar date of run_utc (cron 00:30 UTC Tue–Sat).
+// D6 (TM1.1 only): an FX asset given an exch_close (17:00 New York) is on the New York close clock:
+//    its bar dated D is the 17:00 New York price on D, final once the run is 30 minutes past that
+//    close, and expected on the most recent New York business day that has closed (the US-listed
+//    rule). TM1's FX assets carry no exch_close, so TM1 keeps the spec's UTC-date rules unchanged.
 import { normCdf } from './convexity.ts';
 
 export type AssetClass = 'fx' | 'rates' | 'commodities' | 'equities';
@@ -213,7 +217,8 @@ const isUsListed = (a: AssetDef) => a.asset_class !== 'fx' && a.asset_class !== 
 // or after the close + 30 minutes. Rates (FRED / ECB / MOF) publish closed days only. `null` = cannot
 // tell (an equity or ETF without a configured close).
 function finalRule(a: AssetDef, runMs: number): (date: string) => boolean | null {
-  if (a.asset_class === 'fx') { const today = isoSec(runMs).slice(0, 10); return (date) => date < today; }
+  // An FX asset with an exch_close (D6, TM1.1) falls through to the exchange rule below.
+  if (a.asset_class === 'fx' && !a.exch_close) { const today = isoSec(runMs).slice(0, 10); return (date) => date < today; }
   if (a.asset_class === 'rates') return () => true;
   if (!a.exch_close) return () => null;
   const c = localClock(runMs, a.exch_close.tz), closed = c.min >= hhmmMin(a.exch_close.hhmm) + 30;
@@ -227,7 +232,7 @@ function finalRule(a: AssetDef, runMs: number): (date: string) => boolean | null
 export function staleByDate(a: AssetDef, last: string, runMs: number, runDate: string): boolean {
   if (a.asset_class === 'fx' || isUsListed(a)) {
     let d: number;
-    if (a.asset_class === 'fx') d = dayNum(isoSec(runMs).slice(0, 10)) - 1;
+    if (a.asset_class === 'fx' && !a.exch_close) d = dayNum(isoSec(runMs).slice(0, 10)) - 1;
     else {
       const c = localClock(runMs, NY_TZ);
       d = dayNum(c.date);

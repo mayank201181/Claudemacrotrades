@@ -21,6 +21,11 @@
 //      for an FX symbol whose daily series Yahoo no longer serves (see parseYahooHourly).
 // POST also takes symbols ({asset_id: [symbol, …]}, merged over 'trend_symbols') with only, so a
 // symbol choice can be tested on a few assets; it is never used for a stored run.
+// POST {token, shadow: 'TM1.1', dry?, diag?} runs the TM1.1 shadow instead (pg_cron
+// dash-trend-shadow-daily, 10 minutes after the main run): the 15 FX pairs only, each close the
+// 17:00 New York price (D6 in _shared/trend.ts; parseYahooHourlyNy, redateDaily), stored in
+// dash.trend_shadow by run_date and params_version beside the TM1 run, never in its tables.
+// diag adds the per-pair splice statistics to the reply.
 import postgres from 'npm:postgres@3.4.4';
 import { type AssetDef, type Bar, type Fetched, type Params, TM1_ASSETS, TM1_PARAMS, computeMonitor } from '../_shared/trend.ts';
 
@@ -114,6 +119,60 @@ export function parseYahooHourly(j: any): { bars: Bar[]; last_bar_utc: string | 
   const bars = [...byDate].map(([date, value]) => ({ date, value })).sort((a, b) => (a.date < b.date ? -1 : 1));
   const last = ts[ts.length - 1];
   return { bars, last_bar_utc: Number.isFinite(last) ? new Date(last * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z') : null };
+}
+
+// TM1.1 (D6): Yahoo v8 chart, hourly, to daily 17:00 New York closes. The bar dated D (a New York
+// weekday) is the close of the hourly bar starting 16:00 New York on D, or, when that bar has no
+// close, of the latest bar starting from 12:00 New York that has one. New York's UTC offset is looked
+// up once per UTC day at 12:00 UTC (the clocks change at 06:00 / 07:00 UTC on a Sunday, when FX is
+// shut). last_bar_utc as parseYahoo.
+export function parseYahooHourlyNy(j: any): { bars: Bar[]; last_bar_utc: string | null } {
+  const res = j?.chart?.result?.[0];
+  if (!res) throw new Error(j?.chart?.error?.description || 'yahoo: no result');
+  const ts: number[] = res.timestamp ?? [];
+  const src: unknown[] | undefined = res.indicators?.quote?.[0]?.close;
+  if (!ts.length || !src) throw new Error('yahoo: no bars');
+  const hourFmt = new Intl.DateTimeFormat('en-GB', { timeZone: 'America/New_York', hour: '2-digit', hourCycle: 'h23' });
+  const offset = new Map<number, number>();
+  const best = new Map<string, { h: number; v: number }>();
+  ts.forEach((t, i) => {
+    const v = src[i];
+    if (typeof v !== 'number' || !Number.isFinite(v)) return;
+    const utcDay = Math.floor(t / 86400);
+    let off = offset.get(utcDay);
+    if (off == null) { off = ((Number(hourFmt.format(new Date((utcDay * 86400 + 43200) * 1000))) - 12 + 36) % 24) - 12; offset.set(utcDay, off); }
+    const local = new Date((t + off * 3600) * 1000), wd = local.getUTCDay(), h = local.getUTCHours();
+    if (wd === 0 || wd === 6 || h < 12 || h > 16) return;
+    const date = local.toISOString().slice(0, 10), b = best.get(date);
+    if (!b || h >= b.h) best.set(date, { h, v });
+  });
+  const bars = [...best].map(([date, b]) => ({ date, value: b.v })).sort((a, b) => (a.date < b.date ? -1 : 1));
+  const last = ts[ts.length - 1];
+  return { bars, last_bar_utc: Number.isFinite(last) ? new Date(last * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z') : null };
+}
+
+// TM1.1 (D6): a finished Yahoo FX daily bar dated D carries about the 01:00 London price on D, which
+// is about 20:00 New York on the weekday before (see parseYahooHourly). For the history before the
+// hourly window, each such bar is re-dated to that previous weekday: about three hours after its
+// 17:00 New York close (spliceStats measures the gap on the overlap).
+export function redateDaily(bars: Bar[]): Bar[] {
+  const out: Bar[] = [];
+  for (const b of bars) {
+    let t = Date.parse(b.date + 'T00:00:00Z');
+    const wd = new Date(t).getUTCDay();
+    if (wd === 0 || wd === 6) continue;
+    do t -= 86400000; while ([0, 6].includes(new Date(t).getUTCDay()));
+    out.push({ date: isoDate(t), value: b.value });
+  }
+  return out;
+}
+
+// |ln(re-dated daily / 17:00 NY close)| in basis points over the dates both series have.
+export function spliceStats(re: Bar[], ny: Bar[]): { n: number; median_bp: number | null; p90_bp: number | null } {
+  const m = new Map(ny.map((b) => [b.date, b.value]));
+  const d = re.filter((b) => m.has(b.date)).map((b) => Math.abs(Math.log(b.value / m.get(b.date)!)) * 1e4).sort((a, b) => a - b);
+  const q = (p: number) => (d.length ? d[Math.min(d.length - 1, Math.floor(p * d.length))] : null);
+  return { n: d.length, median_bp: q(0.5), p90_bp: q(0.9) };
 }
 
 // CSV rows with RFC 4180 quoting (the ECB's titles carry commas inside quotes).
@@ -281,7 +340,7 @@ function readSymbols(v: unknown): Record<string, string[]> {
 
 // ---------- the run ----------
 
-type Body = { token?: string; run_utc?: string; dry?: boolean; only?: string[]; symbols?: Record<string, unknown> };
+type Body = { token?: string; run_utc?: string; dry?: boolean; only?: string[]; symbols?: Record<string, unknown>; shadow?: string; diag?: boolean };
 
 async function run(body: Body, runMs: number) {
   const t0 = Date.now(), deadline = t0 + FETCH_BUDGET_MS;
@@ -410,6 +469,99 @@ async function run(body: Body, runMs: number) {
   return { ...summary, px_rows: pxRows, ms: Date.now() - t0 };
 }
 
+// ---------- the TM1.1 shadow (D6) ----------
+
+const NY_CLOSE = { tz: 'America/New_York', hhmm: '17:00' };
+
+async function runShadow(body: Body, runMs: number) {
+  const t0 = Date.now(), deadline = t0 + FETCH_BUDGET_MS;
+  const dry = !!body.dry;
+  const cfg = new Map((await sql`select key, value from dash.config where key in ('trend_params', 'trend_symbols')`).map((r) => [r.key, r.value]));
+  const { params: base, note: paramsNote } = readParams(cfg.get('trend_params'));
+  const params: Params = { ...base, params_version: `${base.params_version}.1` }; // TM1 -> TM1.1: same hit rates and lookup
+  const symbols = readSymbols(cfg.get('trend_symbols'));
+  const sgt = isoDate(runMs + 8 * 3600_000);
+  const start = `${+sgt.slice(0, 4) - 8}${sgt.slice(4)}`;
+  const p1 = Math.floor(Date.parse(start) / 1000), p2 = Math.floor(runMs / 1000);
+  const utcDate = isoDate(runMs);
+
+  const universe: AssetDef[] = TM1_ASSETS.filter((a) => a.asset_class === 'fx').map((a) => ({ ...a, exch_close: NY_CLOSE }));
+  const errors: Record<string, string> = {};
+  if (paramsNote) errors._params = paramsNote;
+  const got = new Map<string, Got>();
+  const splice: Record<string, unknown> = {};
+  let first = true;
+  for (const a of universe) {
+    const conf = symbols[a.asset_id]?.[0] ?? a.symbol;
+    const hourlyOnly = conf.endsWith('@1h'), sym = conf.replace(/@1h$/, '');
+    if (Date.now() > deadline) { errors[a.asset_id] = 'time budget spent before this download'; continue; }
+    try {
+      if (!first) await sleep(YAHOO_SPACING_MS);
+      first = false;
+      const hUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=730d&interval=1h`;
+      const h = await retry(async () => parseYahooHourlyNy(await (await get(hUrl)).json()), deadline);
+      if (!h.bars.length) throw new Error('yahoo hourly: no bars');
+      let bars = h.bars;
+      // Before the hourly window: Yahoo's daily bars, re-dated (none for CNH, whose daily series Yahoo lacks).
+      if (!hourlyOnly) {
+        await sleep(YAHOO_SPACING_MS);
+        const dUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${p1}&period2=${p2}&interval=1d`;
+        const d = await retry(async () => parseYahoo(await (await get(dUrl)).json(), 'close'), deadline);
+        const re = redateDaily(d.bars), firstH = bars[0].date;
+        bars = [...re.filter((b) => b.date < firstH), ...bars];
+        if (body.diag) splice[a.asset_id] = { first_hourly: firstH, ...spliceStats(re, h.bars) };
+      }
+      if (bars.length < MIN_BARS) throw new Error(`only ${bars.length} daily bars`);
+      got.set(a.asset_id, { bars, last_bar_utc: h.last_bar_utc, symbol: `${sym}@ny17` });
+    } catch (e) { errors[a.asset_id] = `${sym}: ${(e as Error)?.message ?? String(e)}`; }
+  }
+
+  const assets = universe.map((a) => ({ ...a, symbol: got.get(a.asset_id)?.symbol ?? a.symbol }));
+  const data: Fetched[] = universe.map((a) => {
+    const g = got.get(a.asset_id);
+    if (!g) return { asset_id: a.asset_id, ok: false, error: errors[a.asset_id], bars: [], last_bar_utc: null };
+    return { asset_id: a.asset_id, ok: true, bars: g.bars.filter((b) => b.date <= utcDate), last_bar_utc: g.last_bar_utc ?? null };
+  });
+  const fetchMs = Date.now() - t0;
+  const m = computeMonitor(assets, data, params, { run_utc: new Date(runMs).toISOString() });
+  const summary: Record<string, unknown> = {
+    ok: true, shadow: params.params_version, run_date: m.meta.run_date, run_utc: m.meta.run_utc, status: m.meta.status,
+    n_assets: m.meta.n_assets, n_ok: m.meta.n_ok, n_stale: m.meta.n_stale, n_suspect: m.meta.n_suspect, n_events: m.meta.n_events,
+    as_of: m.meta.as_of, fetch_errors: errors, fetch_ms: fetchMs, dry, stored: false,
+  };
+  if (body.diag) summary.splice = splice;
+  if (dry) return { ...summary, report: m.report, ms: Date.now() - t0 };
+
+  const fin = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? x : null);
+  const ordOf = new Map(TM1_ASSETS.map((a, i) => [a.asset_id, i]));
+  const states = m.states.map((s) => {
+    const row: Record<string, unknown> = { ...s, ord: ordOf.get(s.asset_id), px_dp: assets.find((a) => a.asset_id === s.asset_id)!.px_dp };
+    for (const [k, v] of Object.entries(row)) if (typeof v === 'number') row[k] = fin(v);
+    return row;
+  });
+  const events = m.events.map((e) => ({
+    seq: e.seq, asset_id: e.asset_id, event_type: e.event_type, detail: e.detail,
+    value: fin(e.value), value_date: typeof e.value === 'string' && DATE_RE.test(e.value) ? e.value : null, prev: fin(e.prev),
+  }));
+  const barriers = m.barriers.map((b) => ({
+    pair: b.pair, k: b.k, side: b.side, last_date: b.last_date, spot: fin(b.spot), rv60: fin(b.rv60), h: b.h,
+    barrier: fin(b.barrier), p_model: fin(b.p_model), vol_mult: fin(b.vol_mult), lookup_hit: b.lookup_hit, p_adj: fin(b.p_adj), fair_per100: fin(b.fair_per100),
+  }));
+  await sql`insert into dash.trend_shadow ${sql({
+    run_date: m.meta.run_date, params_version: params.params_version, run_utc: m.meta.run_utc, status: m.meta.status,
+    n_assets: m.meta.n_assets, n_ok: m.meta.n_ok, n_stale: m.meta.n_stale, n_suspect: m.meta.n_suspect, n_events: m.meta.n_events,
+    last_bar_utc: m.meta.last_bar_utc, as_of: sql.json(m.meta.as_of as unknown as Json), fetch_errors: sql.json(errors),
+    params: sql.json(params as unknown as Json), states: sql.json(states as unknown as Json), events: sql.json(events as unknown as Json),
+    barriers: sql.json(barriers as unknown as Json), report: m.report,
+  } as Json)}
+    on conflict (run_date, params_version) do update set run_utc = excluded.run_utc, status = excluded.status, n_assets = excluded.n_assets,
+      n_ok = excluded.n_ok, n_stale = excluded.n_stale, n_suspect = excluded.n_suspect, n_events = excluded.n_events,
+      last_bar_utc = excluded.last_bar_utc, as_of = excluded.as_of, fetch_errors = excluded.fetch_errors, params = excluded.params,
+      states = excluded.states, events = excluded.events, barriers = excluded.barriers, report = excluded.report, computed_at = now()`;
+  summary.stored = true;
+  return { ...summary, ms: Date.now() - t0 };
+}
+
 Deno.serve(async (req) => {
   let body: Body = {};
   try { body = await req.json(); } catch { /* empty body */ }
@@ -425,12 +577,13 @@ Deno.serve(async (req) => {
   if (body.only != null && !(Array.isArray(body.only) && body.only.every((x) => TM1_ASSETS.some((a) => a.asset_id === x)))) {
     return new Response('bad only', { status: 400 });
   }
+  if (body.shadow != null && body.shadow !== 'TM1.1') return new Response('bad shadow', { status: 400 });
   const enc = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
     async start(ctrl) {
       const keepAlive = setInterval(() => { try { ctrl.enqueue(enc.encode(' ')); } catch { /* closed */ } }, 10_000);
       let out: unknown;
-      try { out = await run(body, runMs); } catch (e) {
+      try { out = body.shadow ? await runShadow(body, runMs) : await run(body, runMs); } catch (e) {
         console.error('dash-trend', e);
         out = { ok: false, error: (e as Error)?.message ?? String(e) };
       }
