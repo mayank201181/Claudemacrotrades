@@ -31,7 +31,11 @@ Voices, Review, Positioning, Trend.
 ## Live now (8 Oct) — waiting on the owner
 
 - **S3 CFTC v3, DV-49 STOP:** 148/150 raw files recovered locally; the 2 missing can't be refetched
-  exactly. Ruling needed: rebuild them as a logged deviation, or stop the CFTC study.
+  exactly. 8 Oct 09:48 SGT local report: DV-49 logged with `chosen_ex_ante=false`; no refetch tried
+  (original request code/params not recovered). P3 hashes every raw file into the manifest, receipts
+  and ledger, so the gap spreads: missing path/hash requirements A 16 (verified), B 3,336
+  (regenerable only after an authorised run-identity setup; 25 with unresolved readers), C 121.
+  Exact v3 restore is not possible. Ruling needed: v3 partial rebuild, a fresh v4, or stop.
 - **Event library Stage 1.1b:** repair rerun sent (Stage 1.1 died on a NumPy bug). Review output.
 - **Drivers pack (run locally in Astra):** due 8 Oct afternoon SGT; status checks ~14:15 and
   ~18:00 SGT. Review the final package.
