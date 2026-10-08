@@ -64,6 +64,20 @@ Voices, Review, Positioning, Trend.
   `c42b8bea…`, harness `dd6f0106…`, decisions `d40b4ef6…`, input manifest `aa4c1471…`.
   Likely cause (unconfirmed): the hosted sandbox kills detached processes between tool calls.
   Proposed: re-run the dry run, code unchanged, on the MacBook under a new owner restart allowance.
+  8 Oct ~17:20 SGT: Astra delivered `run_stage1_1b_local.sh` (Docker Desktop, foreground shim,
+  not run). Found a registered-code defect: `harness_additions_checks.py` L124 looks for
+  `runtime_part_1_invocation_*.json`, the harness writes `runtime_part_1_ordinary_invocation_000001.json`
+  (branch label), so final dry-run PASS can't happen as registered. Astra's fix: launcher byte-copy
+  aliases; its deviation record says the owner authorised them (owner only asked to be shown one).
+  Review recommends a logged pre-freeze amendment of the validator lookup instead of aliases, a
+  lookup-vs-output table for Parts 1–8 and both branches, proof the foreground shim doesn't void the
+  item 9 fault test, the list of manifest inputs the ZIPs lack (and why a synthetic run needs them),
+  base image by digest, platform, hash-locked packages and a pre-flight install outside the restart
+  count. 8 Oct ~17:25 SGT, to stop the relay loop: one standing instruction drafted for Astra
+  (authority to fix process issues as logged DVs; reply only with final PASS/FAIL or a design
+  decision). Rulings in it: aliases not approved, fix the validator lookup as a DV and re-hash;
+  3 local restarts granted; foreground approved if the real run uses the same hashed launcher;
+  synthetic data only. Waiting on the owner to paste it and run Astra's one command on the Mac.
 - **Drivers pack (run locally in Astra):** ST6–ST12 auto-advance, 3 workers running; agent ETA for ST12
   8 Oct 16:00–18:00 SGT, possibly overnight if a holdout stays open. Agent is silent until "status".
   Open (8 Oct ~17:00 SGT): same reply says ST5 placebo throughput "makes the 2 p.m. hard cutoff
