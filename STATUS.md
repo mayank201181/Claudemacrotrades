@@ -153,8 +153,9 @@ Voices, Review, Positioning, Trend.
   as history.
 - **Spec v11 drafted, not yet applied (8 Oct):** BOOK CHECK line (net factor exposure, LOPSIDED flag),
   a HEDGE class at EV ≥ 0 when lopsided into an event, and test (d) accepting a distant event the
-  market trades now. The draft is in the project files (`notes/trade_book_spec_v11_draft.md`); the
-  owner applies it on Drive. Once a hedge carries `class hedge`, the dashboard needs a hedge bucket.
+  market trades now. Full v11 text is in the project files (`notes/trade_book_spec_v11_full.txt`);
+  v10 archived on Drive as `trade_book_spec_archive_v10_2026-10-08`. The Drive connector cannot edit
+  a Doc's body, so the owner pastes v11 over the doc. Once a hedge carries `class hedge`, the dashboard needs a hedge bucket.
 - **Research integrity:** pre-register, never peek at outcomes, log deviations (DV-nn); the portfolio
   side never sees out-of-sample results.
 - BigQuery daily query cap 1.5 TiB. No Google Cloud sign-in from a session: the owner runs BigQuery
