@@ -35,7 +35,11 @@ Voices, Review, Positioning, Trend.
   (original request code/params not recovered). P3 hashes every raw file into the manifest, receipts
   and ledger, so the gap spreads: missing path/hash requirements A 16 (verified), B 3,336
   (regenerable only after an authorised run-identity setup; 25 with unresolved readers), C 121.
-  Exact v3 restore is not possible. Ruling needed: v3 partial rebuild, a fresh v4, or stop.
+  Exact v3 restore is not possible. **Ruled (8 Oct): v3 closed, frozen read-only; fresh v4 from source
+  under v3's protocol.** Outcome-exposure check: none per recovered v3 logs, but missing history can't
+  be certified. v4 plan drafted and hash-sealed (12:02 SGT): request code, parameters, deviations,
+  hashing, estimates. Open before any fetch: 2 static-input exceptions and historical P1/P3/P6
+  requirements need a protocol ruling; dependency lock and SDK review are pre-fetch prerequisites.
 - **Event library Stage 1.1b:** repair rerun sent (Stage 1.1 died on a NumPy bug). Review output.
 - **Drivers pack (run locally in Astra):** due 8 Oct afternoon SGT; status checks ~14:15 and
   ~18:00 SGT. Review the final package.
