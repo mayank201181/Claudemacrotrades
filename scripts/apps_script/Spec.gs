@@ -37,7 +37,7 @@ function applySpecEdits() {
     const raw = staged.getMimeType() === MimeType.GOOGLE_DOCS
       ? DocumentApp.openById(staged.getId()).getBody().getText()
       : staged.getBlob().getDataAsString('UTF-8');
-    edits = JSON.parse(raw.replace(/^﻿/, ''));
+    edits = JSON.parse(raw.replace(/^\uFEFF/, ''));
   } catch (e) { return reject('not JSON: ' + e); }
   if (!Array.isArray(edits) || !edits.length) return reject('expected a non-empty list');
 
