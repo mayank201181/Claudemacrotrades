@@ -8,9 +8,7 @@ _Last updated: 2026-10-08._
 
 ## Where things are
 
-- **Code:** PR #1 (`claude/macro-dashboard` → `main`), draft, 27 commits, +8k lines, mergeable, Vercel
-  preview green. Not merged yet. Work on a branch cut from `claude/macro-dashboard`, not from `main`
-  (`main` holds only the initial commit).
+- **Code:** on `main` (PR #1, the full dashboard, merged 2026-10-08). Branch from `main`.
 - **Live:** Vercel project `macro-desk` (root `site/`), Supabase project `macro-state-db`
   (`diiwqbxyhtgvozhncoef`), schema `dash`. Email login; the site reads only the `dash_*` RPCs.
 - **Public repo:** no trade, theme or digest data here, ever. Tokens live in `dash.config`.
@@ -40,8 +38,7 @@ Voices, Review, Positioning, Trend.
    - Yahoo late Adj Close on the six commodity ETFs at 00:30 UTC → patched from Close × last factor.
    - CSI300 on 510300.SS ETF; USDCNH built from CNH=X hourly bars (Yahoo gives one daily bar).
    - D2: no second price source yet, so the cross-check is always `XCHECK_NA`.
-3. **Merge PR #1** once the owner is happy (merging asks first, per `.claude/settings.json`).
-4. _Chat-only items from the 2026-10-05→07 session (to-dos, known bugs, design decisions not in
+3. _Chat-only items from the 2026-10-05→07 session (to-dos, known bugs, design decisions not in
    commits): not yet transcribed. Paste them here._
 
 ## Decisions on record
