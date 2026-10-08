@@ -70,7 +70,13 @@ Voices, Review, Positioning, Trend.
   before holdout. ST5 advanced to ST6 at 14:06; all 3 workers stopped ~14:41 SGT on an ST6
   unit-registry error. No ETA. Astra's earlier "verified all three workers running" (sent after the
   stop) was wrong. Next (8 Oct ~17:15 SGT): diagnosis only, no restart; owner approves any fix and
-  restart as a logged deviation. Do not extend ST5 past the pre-registered limit.
+  restart as a logged deviation.
+  17:13 SGT diagnosis: root cause = ST6 registry cached before the cutoff exclusions (crash before any
+  unit was claimed). Proposed cache-only repair NOT approved yet: the cutoff excluded 21/21 pairs, so
+  ST6 would calibrate on an empty cohort, and 0/12 L/T families marked NOT_EVALUATED contradicts the
+  rule. Holdout caveat stands (ThaiBMA preview, `DEV-20261007T104126211568Z-29335`). Open decision:
+  extend ST5 to finish placebo units as an outcome-blind logged deviation vs a fresh run with
+  pair-by-pair scheduling. Earlier "don't extend ST5" assumed partial exclusions only.
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
   run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
 
