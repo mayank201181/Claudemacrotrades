@@ -46,6 +46,15 @@ Voices, Review, Positioning, Trend.
   transformations; CFTC completeness checks have limits. **Flag:** a broad protocol read pulled
   historical disclosure text into the agent's context (values not repeated; see its scope note).
   Owner attestation still a placeholder.
+  16:16 SGT: disclosure text = section R of the PM's S3 GATE v3 instruction (design-only gate z values,
+  counts, OOS pass flags; already logged as R / DV-31..33). Plan re-sealed (manifest `a71aa56e…`).
+  Decision memo: S1 `s2_definition.txt` and S2 `s3_actual_release_dates.csv` (46 rows) are static PM
+  inputs; P1/P3/P6 historical-equality checks (v2 A7 486 hashes, stored-vs-rebuilt diffs, v1
+  reproduction <1e-10) are impossible without lost baselines; `s3_data_audit.csv` seed and
+  `s3_method_checks.csv` missing. Independent review (this repo's session) recommends: adopt S1/S2 as
+  static inputs; retire historical-equality claims explicitly; keep P3-null vs P5-fixed on the SAME
+  fresh inputs as the real test of FIX-1..4; drop P6; freeze `included`/`exclusion_reason` per contract
+  as a static input and leave xcheck correlation fields blank (they are full-period return stats).
 - **Event library Stage 1.1b (ChatGPT sandbox): failed pre-freeze HOLD (8 Oct ~12:06 SGT).** 4th
   disposable synthetic dry run: Part 1 completed (6 s), Part 2 blocked before its worker started
   (`ControllerOutcomeUnknown`; detached `Popen(start_new_session=True)` worker never wrote a start
@@ -55,8 +64,8 @@ Voices, Review, Positioning, Trend.
   `c42b8bea…`, harness `dd6f0106…`, decisions `d40b4ef6…`, input manifest `aa4c1471…`.
   Likely cause (unconfirmed): the hosted sandbox kills detached processes between tool calls.
   Proposed: re-run the dry run, code unchanged, on the MacBook under a new owner restart allowance.
-- **Drivers pack (run locally in Astra):** due 8 Oct afternoon SGT; status checks ~14:15 and
-  ~18:00 SGT. Review the final package.
+- **Drivers pack (run locally in Astra):** ST6–ST12 auto-advance, 3 workers running; agent ETA for ST12
+  8 Oct 16:00–18:00 SGT, possibly overnight if a holdout stays open. Agent is silent until "status".
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
   run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
 
