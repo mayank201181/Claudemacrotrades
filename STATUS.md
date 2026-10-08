@@ -144,6 +144,9 @@ Voices, Review, Positioning, Trend.
   invalidation; spot when a stop level is clear, options otherwise; tactical trades in a separate
   shadow book until ~30 signals are positive after costs; universe of 21 pairs; levels on daily
   closes; drivers fitted on changes and tested out of sample.
+- **Trade gate (8 Oct 2026):** the (c) expectancy gate is EV ≥ +0.30R only; the r/r ≥ 1.0 floor is
+  dropped. The owner updates `trade_book_spec` on Drive for both books; the Trades tab labels the old
+  floor's rejections as history.
 - **Research integrity:** pre-register, never peek at outcomes, log deviations (DV-nn); the portfolio
   side never sees out-of-sample results.
 - BigQuery daily query cap 1.5 TiB. No Google Cloud sign-in from a session: the owner runs BigQuery
