@@ -24,6 +24,7 @@ _Last updated: 2026-10-08._
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rules inputs | `40 22 * * *` UTC |
 | `dash-trend` (TM1) | 38-asset trend monitor, events, FX one-touch board | 00:30 UTC Tue–Sat |
 | `dash-trend` shadow (TM1.1) | 15 FX pairs on 17:00 NY closes, beside TM1 | 00:40 UTC Tue–Sat |
+| Grok Bot crowding routine (`docs/grok_crowding_routine.md`) | X crowding read per open trade/tested idea → email → Grok tab, source "Crowding check". Set up in Grok Bot by the owner; not yet read by the digest routines | Sun 17:00 SGT + before tier-1 |
 | `dash-history`, `dash-gdelt` | research relays (Yahoo daily/hourly bars, GDELT DOC API) | on call |
 
 Site tabs: Themes, Trades (linear + convexity cards), YouTube, Podcast, Grok, Substack, Questions,

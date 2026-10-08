@@ -144,7 +144,7 @@
     grok: { name: 'Grok Full Consolidated', open: /network pulse a|markets intel/i },
     substack: { name: 'Newsletters (from the Email Digest)', open: /market/i },
   };
-  const SOURCE_NAME = { fable: 'Fable 5.1', opus: 'Opus 5.5', chatgpt: 'ChatGPT', claude: 'Claude' };
+  const SOURCE_NAME = { fable: 'Fable 5.1', opus: 'Opus 5.5', chatgpt: 'ChatGPT', claude: 'Claude', crowding: 'Crowding check' };
   const feedState = {};
 
   async function renderFeed(family) {
