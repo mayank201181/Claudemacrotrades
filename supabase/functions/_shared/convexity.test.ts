@@ -181,10 +181,11 @@ test('gate arithmetic (items 17–18)', () => {
   assert.deepEqual(gate(0.13, 0.1), { pass: true, pgate: true, ev: 0.3 });
   const rr = 1 / 0.1 - 1;
   assert.equal(Math.floor((0.13 * rr - (1 - 0.13)) * 100) / 100, 0.29);
-  // the other two limits
-  assert.equal(gate(0.76, 0.5).pass, false);
+  // the premium floor stays; the p ≤ 75% cap and the premium ≤ 50% limit are gone (8 Oct 2026)
   assert.equal(gate(0.13, 0.099).pass, false);
-  assert.equal(gate(0.7, 0.501).pass, false);
+  assert.equal(gate(0.76, 0.5).pass, true);
+  assert.equal(gate(0.7, 0.501).pass, true);
+  assert.equal(gate(0.64, 0.5).pass, false);
   assert.equal(spreadP([60, 50, 40, 30, 20]), 0.4); // five-point rule: (60 + 200 + 80 + 120 + 20)/12
 });
 
