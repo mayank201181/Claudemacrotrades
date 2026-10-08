@@ -77,6 +77,12 @@ Voices, Review, Positioning, Trend.
   rule. Holdout caveat stands (ThaiBMA preview, `DEV-20261007T104126211568Z-29335`). Open decision:
   extend ST5 to finish placebo units as an outcome-blind logged deviation vs a fresh run with
   pair-by-pair scheduling. Earlier "don't extend ST5" assumed partial exclusions only.
+  17:30 SGT: cause = draw-major scheduling across pairs (every pair also lacks 54 non-placebo units);
+  ST5 10,677/15,989 units. No pre-registered all-pairs-excluded rule. Second raw preview (MAS DEV)
+  also on record in `data_exposure.json`. Two shared units failed terminally. Recommended to owner:
+  option (a), extend ST5 by up to 8 active h with pair-priority ordering, shift later cutoffs
+  (L/T, 26/30/31 h) by the extension used, one diagnosed retry per failed shared unit, standing
+  authority for process fixes as logged deviations. No defensible ST12 ETA.
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
   run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
 
