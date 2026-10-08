@@ -237,10 +237,11 @@ export function evPrint(p: number, p0: number): number {
   return Math.floor((100 * (pt - p0t)) / p0t + 1e-9) / 100;
 }
 
-// The convexity gate (test (c)), decided in whole tenths of a point.
+// The convexity gate (test (c)), decided in whole tenths of a point. EV only since 8 Oct 2026: the
+// p ≤ 75% cap and the premium ≤ 50% limit (the r/r ≥ 1.0 floor in premium terms) are dropped.
 export function gate(p: number, p0: number): { pass: boolean; pgate: boolean; ev: number } {
   const pt = tenths(p), p0t = tenths(p0);
-  return { pass: 10 * pt >= 13 * p0t && pt <= 750 && p0t >= 100 && p0t <= 500, pgate: 10 * pt < 14 * p0t, ev: evPrint(p, p0) };
+  return { pass: 10 * pt >= 13 * p0t && p0t >= 100, pgate: 10 * pt < 14 * p0t, ev: evPrint(p, p0) };
 }
 
 // ---------- scoring (R01 item 5) ----------

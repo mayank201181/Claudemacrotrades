@@ -144,9 +144,15 @@ Voices, Review, Positioning, Trend.
   invalidation; spot when a stop level is clear, options otherwise; tactical trades in a separate
   shadow book until ~30 signals are positive after costs; universe of 21 pairs; levels on daily
   closes; drivers fitted on changes and tested out of sample.
-- **Trade gate (8 Oct 2026):** the (c) expectancy gate is EV ≥ +0.30R only; the r/r ≥ 1.0 floor is
-  dropped. The owner updates `trade_book_spec` on Drive for both books; the Trades tab labels the old
-  floor's rejections as history.
+- **Trade gate (8 Oct 2026):** the (c) expectancy gate is EV ≥ +0.30R only. The r/r ≥ 1.0 floor and
+  the 75% cap on p are dropped (a p above 75% must name its basis and is scored apart). The same goes
+  for R01 convexity cards (premium ≤ 50% and p ≤ 75% gone; the 10% premium minimum stays). The owner
+  updates `trade_book_spec` on Drive for both books; the Trades tab labels the old floor's rejections
+  as history.
+- **Spec v11 drafted, not yet applied (8 Oct):** BOOK CHECK line (net factor exposure, LOPSIDED flag),
+  a HEDGE class at EV ≥ 0 when lopsided into an event, and test (d) accepting a distant event the
+  market trades now. The draft is in the project files (`notes/trade_book_spec_v11_draft.md`); the
+  owner applies it on Drive. Once a hedge carries `class hedge`, the dashboard needs a hedge bucket.
 - **Research integrity:** pre-register, never peek at outcomes, log deviations (DV-nn); the portfolio
   side never sees out-of-sample results.
 - BigQuery daily query cap 1.5 TiB. No Google Cloud sign-in from a session: the owner runs BigQuery
