@@ -18,6 +18,7 @@ _Last updated: 2026-10-08._
 | Piece | What it does | Schedule |
 |---|---|---|
 | `scripts/apps_script/Code.gs` | Gmail + Drive feeder in the owner's Google account → `dash-ingest` | every 10 min |
+| `scripts/apps_script/Spec.gs` | applies a staged `trade_book_spec_edits` JSON (find/replace, each exactly once) to the spec Doc, archiving it first | every 10 min |
 | `dash-ingest` | raw payloads → `dash` tables (digests, trade books, feeds, questions) | on post |
 | `dash-mark` | live R per open trade, shadow outcomes in ATR(20) units | `7 * * * *` |
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rules inputs | `40 22 * * *` UTC |
@@ -155,7 +156,7 @@ Voices, Review, Positioning, Trend.
   a HEDGE class at EV ≥ 0 when lopsided into an event, and test (d) accepting a distant event the
   market trades now. Full v11 text is in the project files (`notes/trade_book_spec_v11_full.txt`);
   v10 archived on Drive as `trade_book_spec_archive_v10_2026-10-08`. The Drive connector cannot edit
-  a Doc's body, so the owner pastes v11 over the doc. Once a hedge carries `class hedge`, the dashboard needs a hedge bucket.
+  a Doc's body, so the owner pasted v11 over the doc (verified 8 Oct). Later edits go through `Spec.gs`. Once a hedge carries `class hedge`, the dashboard needs a hedge bucket.
 - **Research integrity:** pre-register, never peek at outcomes, log deviations (DV-nn); the portfolio
   side never sees out-of-sample results.
 - BigQuery daily query cap 1.5 TiB. No Google Cloud sign-in from a session: the owner runs BigQuery
@@ -172,6 +173,11 @@ Voices, Review, Positioning, Trend.
 ## Working conventions
 
 - One session per feature or per day; this file carries continuity.
+- To change `trade_book_spec`: create a JSON file titled `trade_book_spec_edits` in the spec folder
+  (Drive connector `create_file`, text/plain, no conversion) holding `[{"find","replace"}]`. Each find
+  must occur exactly once in the live text, and edits must not overlap. `Spec.gs` applies it within
+  10 minutes and archives the old version, or renames the file `_rejected_<date>` and logs why. The
+  Drive connector cannot edit a Doc's body directly.
 - Tests: `deno test supabase/functions/_shared/` (parse, convexity; no trend test file in the
   repo). Deno isn't preinstalled in cloud sessions.
 - New migrations are numbered after `013_trend_shadow.sql`.
