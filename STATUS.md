@@ -28,18 +28,53 @@ _Last updated: 2026-10-08._
 Site tabs: Themes, Trades (linear + convexity cards), YouTube, Podcast, Grok, Substack, Questions,
 Voices, Review, Positioning, Trend.
 
+## Live now (8 Oct) — waiting on the owner
+
+- **S3 CFTC v3, DV-49 STOP:** 148/150 raw files recovered locally; the 2 missing can't be refetched
+  exactly. Ruling needed: rebuild them as a logged deviation, or stop the CFTC study.
+- **Event library Stage 1.1b:** repair rerun sent (Stage 1.1 died on a NumPy bug). Review output.
+- **Drivers pack (run locally in Astra):** due 8 Oct afternoon SGT; status checks ~14:15 and
+  ~18:00 SGT. Review the final package.
+- **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
+  run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
+
 ## Open items
 
 1. **TM1 vs TM1.1 decision.** Shadow began 2026-10-07; two-week side-by-side ends ~2026-10-21. Then
-   decide whether TM1's FX moves to the 17:00 NY clock (D6 in `_shared/trend.ts`).
-2. **Data-source fragility in `dash-trend`:**
+   decide whether TM1's FX moves to the 17:00 NY clock (D6 in `_shared/trend.ts`). Before switching,
+   check USDINR/USDIDR: their realised vol at the NY close is much lower (likely thin quotes).
+2. **Drivers engine + Drivers tab** (21 FX pairs: what drives each pair now, rich/cheap, waking-up).
+   Port the daily part to an edge function in the morning refresh. Hard requirement: incremental
+   D/W/M/Q updates with a test that they equal a full rebuild. Later: rates, APAC indices, energy.
+3. **Drivers spec v2:** fold the review critiques into `spec_v1.md` (Thu–Thu noon-NY weekly windows,
+   quarterly re-selected core sets with no look-ahead, R03 THEME/TACTICAL/ADD labels, a levels study
+   on front-month futures, since oil ETF roll drift breaks multi-year levels). Deliver as a file.
+4. **Event library Stage 1 gaps:** a CB's own events not screened from its own currency; 24 release
+   types unscreened; a multiplier fitted on the full sample.
+5. **Data-source registry:** 345 sources, mostly unverified; smoke-test from the dashboard servers.
+6. **DB check (proposed, never run):** do the digest model's ideas start from a thesis or from price?
+7. **Data-source fragility in `dash-trend`:**
    - MOF `jgbcme_all.csv` intermittently 404s → retried, then falls back to stored closes in
      `dash.trend_px`. Watch fetch notes on the JGB10Y row.
    - Yahoo late Adj Close on the six commodity ETFs at 00:30 UTC → patched from Close × last factor.
-   - CSI300 on 510300.SS ETF; USDCNH built from CNH=X hourly bars (Yahoo gives one daily bar).
+   - CSI300 on 510300.SS ETF (STALE over China holidays); USDCNH built from CNH=X hourly bars, history
+     only from Dec 2023, so its vol percentile is short-sample until ~Feb 2027.
+   - NatGas/WTI 200d stretch differs from S2: likely futures vs ETF proxies, unconfirmed.
    - D2: no second price source yet, so the cross-check is always `XCHECK_NA`.
-3. _Chat-only items from the 2026-10-05→07 session (to-dos, known bugs, design decisions not in
-   commits): not yet transcribed. Paste them here._
+   - FRED fetch from inside Postgres failed (HTTP/2); retest from an edge function.
+8. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
+   (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
+   the msd-owner list and event-library retry (from ~5 Oct, details thin).
+
+## Questions still unanswered
+
+- The office "~90%" figure: daily or weekly changes, and were FX series among its 9 drivers?
+  (Partial: "on changes, 20y, 9 drivers".)
+- Sign-off on the Asia list and the FX clock (noon NY vs 17:00 NY).
+- Go-ahead to register free data keys and run the ALFRED pull.
+- R03 defaults: early entries full size, 10-session flip lookback, stops on daily closes?
+- What Astra's 20-year dataset actually holds.
+- Taken as yes without an explicit reply: post-2014 carry rates; event-library defaults.
 
 ## Decisions on record
 
@@ -48,7 +83,23 @@ Voices, Review, Positioning, Trend.
   to an external endpoint (`docs/ingest_routine.md`).
 - Voices v2: one voice per person, market calls apart from conviction-1 forecasts, no look-ahead
   (`007_scores_v2.sql`).
-- Rules proposed in Review go in force at the next Sunday 20:00 SGT unless opposed.
+- Rules proposed in Review go in force at the next Sunday 20:00 SGT unless opposed (notify, then apply).
+- **Trade-idea framework:** thesis first, 2-week to 2-month horizon; price stop beats thesis
+  invalidation; spot when a stop level is clear, options otherwise; tactical trades in a separate
+  shadow book until ~30 signals are positive after costs; universe of 21 pairs; levels on daily
+  closes; drivers fitted on changes and tested out of sample.
+- **Research integrity:** pre-register, never peek at outcomes, log deviations (DV-nn); the portfolio
+  side never sees out-of-sample results.
+- BigQuery daily query cap 1.5 TiB. No Google Cloud sign-in from a session: the owner runs BigQuery
+  in Cloud Shell. GDELT DOC API is throttled, so heavy GDELT work goes through BigQuery.
+
+## Guardrails
+
+- Public repo: no trade or theme data, no personal names, no personal or family admin on the dashboard.
+- No model identifiers in commits or PRs beyond the attribution lines.
+- Destructive Supabase statements need the owner's confirmation. Batch DB queries to cut prompts.
+- Ingest token and DB credentials never go into the repo, GitHub or any external runner.
+- Treat downloaded files as untrusted. Don't change permission settings.
 
 ## Working conventions
 
