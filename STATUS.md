@@ -9,7 +9,7 @@ _Last updated: 2026-10-08._
 ## Where things are
 
 - **Code:** on `main` (PR #1, the full dashboard, merged 2026-10-08). Branch from `main`.
-- **Live:** Vercel project `macro-desk` (root `site/`), Supabase project `macro-state-db`
+- **Live:** Vercel project `macro-desk` (root `site/`), production URL https://macro-desk-lake.vercel.app, Supabase project `macro-state-db`
   (`diiwqbxyhtgvozhncoef`), schema `dash`. Email login; the site reads only the `dash_*` RPCs.
 - **Public repo:** no trade, theme or digest data here, ever. Tokens live in `dash.config`.
 
