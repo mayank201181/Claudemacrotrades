@@ -55,6 +55,11 @@ Voices, Review, Positioning, Trend.
   static inputs; retire historical-equality claims explicitly; keep P3-null vs P5-fixed on the SAME
   fresh inputs as the real test of FIX-1..4; drop P6; freeze `included`/`exclusion_reason` per contract
   as a static input and leave xcheck correlation fields blank (they are full-period return stats).
+  16:59 SGT: v4 amendment sealed (manifest `71f4111c…`): owner attestation recorded verbatim; DV-50
+  retires the historical-equality claims (P1 §1.1–1.2, §1.5, P3 §3.3, stored-vs-P3 part of §3.4, all
+  P6); all 34 audit fields mapped, xcheck correlation fields blank. No fetch or study stage ran.
+  Open: P5 comparator review. Next paste gives Astra standing authority (process issues as logged
+  DVs) to finish the P5 review, fetch, build and run v4, stopping only for design or exposure issues.
 - **Event library Stage 1.1b (ChatGPT sandbox): failed pre-freeze HOLD (8 Oct ~12:06 SGT).** 4th
   disposable synthetic dry run: Part 1 completed (6 s), Part 2 blocked before its worker started
   (`ControllerOutcomeUnknown`; detached `Popen(start_new_session=True)` worker never wrote a start
@@ -64,7 +69,8 @@ Voices, Review, Positioning, Trend.
   `c42b8bea…`, harness `dd6f0106…`, decisions `d40b4ef6…`, input manifest `aa4c1471…`.
   Likely cause (unconfirmed): the hosted sandbox kills detached processes between tool calls.
   Proposed: re-run the dry run, code unchanged, on the MacBook under a new owner restart allowance.
-- **Drivers pack (run locally in Astra):** ST6–ST12 auto-advance, 3 workers running; agent ETA for ST12
+- **Drivers pack (run locally in Astra):** halted 8 Oct 14:41 SGT on an ST6 error (all 21 pairs
+  excluded, empty cohort); needs a fix and re-run of ST6–ST12. Earlier note: ST6–ST12 auto-advance, 3 workers running; agent ETA for ST12
   8 Oct 16:00–18:00 SGT, possibly overnight if a holdout stays open. Agent is silent until "status".
   Open (8 Oct ~17:00 SGT): same reply says ST5 placebo throughput "makes the 2 p.m. hard cutoff
   likely", already past in SGT. Unclear which clock, which stage, and whether a binding cutoff
