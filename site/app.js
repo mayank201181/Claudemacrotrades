@@ -452,8 +452,8 @@
     c: 'expectancy below the gate (EV < +0.30R)',
     d: 'no dated catalyst or mechanism in motion',
     e: 'already priced by the model\u2019s own judgement (for a washout: crowding shown only by price)',
-    f: 'book caps full',
-    g: 'vetoed by you in the last 60 days',
+    f: 'book caps full (retired 8 Oct)',
+    g: 'vetoed by you in the last 60 days (retired 8 Oct)',
   };
   const gateKey = (x) => {
     if (x.verdict === 'covered') return 'covered';
@@ -516,7 +516,7 @@
     $('#tradesBody').innerHTML = gateAudit(tested) + `<div class="tablewrap"><table class="grid"><thead><tr>
       <th>Idea & reason not carded</th><th class="hide-sm">Proxy</th><th class="hide-sm">Dir</th><th>R:R</th><th class="hide-sm">p vs p0</th><th>EV</th><th>Verdict</th><th title="Move in the idea's direction 5 sessions later, in ATR(20) units">+5d ATR</th><th title="Move in the idea's direction to the latest daily close, in ATR(20) units">To date</th>
       </tr></thead><tbody>${out.join('')}</tbody></table></div>
-      <p class="note">Gate: EV = p·r/r − (1−p) ≥ +0.3R (no r/r floor since 8 Oct 2026). Fail codes (trade_book_spec, the first letter failed): (a) no priceable proxy · (b) stop/target without meaning · (c) expectancy · (d) no catalyst · (e) already priced, or a washout whose crowding is price only · (f) caps · (g) vetoed. Outcome columns are shadow-tracked by the hourly job from the first price a reader could deal at after the digest (the last live hourly close before 08:00 SGT, or the next open if the market was shut); they are not trades.</p>`;
+      <p class="note">Gate: EV = p·r/r − (1−p) ≥ +0.3R (no r/r floor since 8 Oct 2026). Fail codes (trade_book_spec, the first letter failed): (a) no priceable proxy · (b) stop/target without meaning · (c) expectancy · (d) no catalyst · (e) already priced, or a washout whose crowding is price only · (f) caps and (g) vetoed, both retired 8 Oct 2026. Outcome columns are shadow-tracked by the hourly job from the first price a reader could deal at after the digest (the last live hourly close before 08:00 SGT, or the next open if the market was shut); they are not trades.</p>`;
     bindRows();
   }
 
