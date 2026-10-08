@@ -85,7 +85,12 @@ Voices, Review, Positioning, Trend.
   authority for process fixes as logged deviations. No defensible ST12 ETA.
   18:07 SGT: owner approved; Astra confirms amendment logged, repairs validated, 3 workers running,
   8 h ST5 cap, auto ST6–ST12, stop if no pair completes. 18:11 SGT check: pair-by-pair order yes,
-  later limits shifted yes. Next look: "status" in the Astra chat (stage, pairs complete, hours).
+  later limits shifted yes. 19:56 SGT: final diagnostic hit the date-access guard in all 21 pairs;
+  guard correct (warmup dates presented as evaluation dates), diagnostic date range fixed and logged,
+  guard byte-identical. 20:30 SGT: ST5 extension cap raised 8 → 24 active h (final, completion-only
+  deviation, before any results); later limits shift by actual use; independent 48 h wall cap
+  unchanged, so check it isn't the binding limit. Workers use no ChatGPT credits. Next look:
+  "status" on 9 Oct morning.
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
   run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
 
