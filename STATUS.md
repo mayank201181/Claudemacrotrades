@@ -83,6 +83,9 @@ Voices, Review, Positioning, Trend.
   option (a), extend ST5 by up to 8 active h with pair-priority ordering, shift later cutoffs
   (L/T, 26/30/31 h) by the extension used, one diagnosed retry per failed shared unit, standing
   authority for process fixes as logged deviations. No defensible ST12 ETA.
+  18:07 SGT: owner approved; Astra confirms amendment logged, repairs validated, 3 workers running,
+  8 h ST5 cap, auto ST6–ST12, stop if no pair completes. Pair-priority order and cutoff shift not
+  explicitly confirmed yet.
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
   run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
 
