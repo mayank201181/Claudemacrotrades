@@ -40,6 +40,12 @@ Voices, Review, Positioning, Trend.
   be certified. v4 plan drafted and hash-sealed (12:02 SGT): request code, parameters, deviations,
   hashing, estimates. Open before any fetch: 2 static-input exceptions and historical P1/P3/P6
   requirements need a protocol ruling; dependency lock and SDK review are pre-fetch prerequisites.
+  13:15 SGT: env locked (Python 3.12.14, 28 pinned packages, dependency checks pass); decision memo,
+  SDK findings, exact changes delivered; plan re-sealed (`PLAN_SHA256SUMS.txt` sha256 `625fdffc…`).
+  Still pre-fetch blockers: SSL key-log controls, Yahoo auxiliary requests, env settings,
+  transformations; CFTC completeness checks have limits. **Flag:** a broad protocol read pulled
+  historical disclosure text into the agent's context (values not repeated; see its scope note).
+  Owner attestation still a placeholder.
 - **Event library Stage 1.1b (ChatGPT sandbox): failed pre-freeze HOLD (8 Oct ~12:06 SGT).** 4th
   disposable synthetic dry run: Part 1 completed (6 s), Part 2 blocked before its worker started
   (`ControllerOutcomeUnknown`; detached `Popen(start_new_session=True)` worker never wrote a start
