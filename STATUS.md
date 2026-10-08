@@ -66,6 +66,9 @@ Voices, Review, Positioning, Trend.
   Proposed: re-run the dry run, code unchanged, on the MacBook under a new owner restart allowance.
 - **Drivers pack (run locally in Astra):** ST6–ST12 auto-advance, 3 workers running; agent ETA for ST12
   8 Oct 16:00–18:00 SGT, possibly overnight if a holdout stays open. Agent is silent until "status".
+  Open (8 Oct ~17:00 SGT): same reply says ST5 placebo throughput "makes the 2 p.m. hard cutoff
+  likely", already past in SGT. Unclear which clock, which stage, and whether a binding cutoff
+  truncates placebo units (would need a DV entry and a pre-registered rule). Queried via "status".
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
   run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
 
