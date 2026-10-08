@@ -84,8 +84,8 @@ Voices, Review, Positioning, Trend.
   (L/T, 26/30/31 h) by the extension used, one diagnosed retry per failed shared unit, standing
   authority for process fixes as logged deviations. No defensible ST12 ETA.
   18:07 SGT: owner approved; Astra confirms amendment logged, repairs validated, 3 workers running,
-  8 h ST5 cap, auto ST6–ST12, stop if no pair completes. Pair-priority order and cutoff shift not
-  explicitly confirmed yet.
+  8 h ST5 cap, auto ST6–ST12, stop if no pair completes. 18:11 SGT check: pair-by-pair order yes,
+  later limits shifted yes. Next look: "status" in the Astra chat (stage, pairs complete, hours).
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
   run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
 
