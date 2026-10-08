@@ -40,7 +40,15 @@ Voices, Review, Positioning, Trend.
   be certified. v4 plan drafted and hash-sealed (12:02 SGT): request code, parameters, deviations,
   hashing, estimates. Open before any fetch: 2 static-input exceptions and historical P1/P3/P6
   requirements need a protocol ruling; dependency lock and SDK review are pre-fetch prerequisites.
-- **Event library Stage 1.1b:** repair rerun sent (Stage 1.1 died on a NumPy bug). Review output.
+- **Event library Stage 1.1b (ChatGPT sandbox): failed pre-freeze HOLD (8 Oct ~12:06 SGT).** 4th
+  disposable synthetic dry run: Part 1 completed (6 s), Part 2 blocked before its worker started
+  (`ControllerOutcomeUnknown`; detached `Popen(start_new_session=True)` worker never wrote a start
+  marker). All 3 permitted restarts used. No freeze, no real run, no DB write, no results seen.
+  Untested: Parts 3–8, item 9 Part 4 fault test, item 14b for Parts 5–8, full fake-bootstrap workload
+  (26 assets × 1,000 draws × 999 reps). Registered hashes: spec `a338407b…`, event_library.py
+  `c42b8bea…`, harness `dd6f0106…`, decisions `d40b4ef6…`, input manifest `aa4c1471…`.
+  Likely cause (unconfirmed): the hosted sandbox kills detached processes between tool calls.
+  Proposed: re-run the dry run, code unchanged, on the MacBook under a new owner restart allowance.
 - **Drivers pack (run locally in Astra):** due 8 Oct afternoon SGT; status checks ~14:15 and
   ~18:00 SGT. Review the final package.
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
