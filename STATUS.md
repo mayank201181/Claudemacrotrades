@@ -156,6 +156,9 @@ Voices, Review, Positioning, Trend.
   R01 option card (premium = 1R) satisfies test (b). The owner
   updates `trade_book_spec` on Drive for both books; the Trades tab labels the old floor's rejections
   as history.
+- **Thin edge (9 Oct 2026, spec v12):** test (c) is EV > 0, no longer ≥ +0.3R. Cards between 0 and +0.3R
+  are tagged "thin edge" and scored apart (SCORECARD, Trades tab). After 30 thin-edge closes, the weekly
+  review compares their realised R with zero; at or below zero, +0.3R returns. R01 updated to match.
 - **Spec v11 drafted, not yet applied (8 Oct):** BOOK CHECK line (net factor exposure, LOPSIDED flag),
   a HEDGE class at EV ≥ 0 when lopsided into an event, and test (d) accepting a distant event the
   market trades now. Full v11 text is in the project files (`notes/trade_book_spec_v11_full.txt`);

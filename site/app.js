@@ -366,7 +366,7 @@
           <td class="num hide-sm">${esc((t.opened || '').slice(0, 10))}</td>
           <td class="num">${lvl(t.entry)}</td><td class="num">${lvl(t.stop)}</td><td class="num">${lvl(t.target)}</td>
           <td class="num hide-sm">${fmt(t.rr)}</td>
-          <td class="num hide-sm">${t.p != null ? `${fmt(t.p, 0)}%` : '—'} / ${fmtR(t.ev)}</td>
+          <td class="num hide-sm">${t.p != null ? `${fmt(t.p, 0)}%` : '—'} / ${fmtR(t.ev)}${thinTag(t)}</td>
           <td class="num">${t.status === 'open' && lv ? px(lv.price) : isClosed(t) ? 'closed' : '—'}<div class="muted small">${t.status === 'open' && lv ? ago(lv.as_of) : esc((t.closed || '').slice(0, 10))}</div></td>
           <td class="num ${cls(r)}"><b>${fmtR(r)}</b></td>
         </tr>${isOpen ? `<tr class="detail"><td colspan="11">${tradeDetail(t)}</td></tr>` : ''}`;
@@ -402,7 +402,7 @@
         <td class="num">${lvl(t.entry)}</td><td class="num">—</td>
         <td class="num">${esc(g.strike || '—')}${mark != null ? `<div class="muted small">(${esc(awayTxt(t, mark))})</div>` : ''}</td>
         <td class="num hide-sm">${fmt(t.rr)}</td>
-        <td class="num hide-sm">${pTxt} / ${fmtR(t.ev)}</td>
+        <td class="num hide-sm">${pTxt} / ${fmtR(t.ev)}${thinTag(t)}</td>
         <td class="num">${live ? px(lv.price) : isClosed(t) ? 'closed' : '—'}<div class="muted small">${live ? `${ago(lv.as_of)}${lv.v != null ? ` · V ${(n(lv.v) * 100).toFixed(1)}%` : ''}` : esc((t.closed || '').slice(0, 10))}</div></td>
         <td class="num ${cls(r)}"><b>${fmtR(r)}</b></td>
       </tr>${isOpen ? `<tr class="detail"><td colspan="11">${tradeDetail(t)}</td></tr>` : ''}`;
@@ -445,11 +445,15 @@
       <div>Premium</div><div class="mono">p0 ${t.p0 != null ? fmt(t.p0, 1) + '%' : '—'} · paid ${p0f != null ? (p0f * 100).toFixed(1) + '%' : '—'} · pays ${p0f ? fmt(1 / p0f - 1, 2) : '—'}R net</div>`;
   }
 
+  // Cards opened since 9 Oct 2026 pass at EV > 0; those under +0.3R are THIN EDGE and scored apart.
+  const thinTag = (t) => (t.opened || '') >= '2026-10-09' && n(t.ev) != null && n(t.ev) > 0 && n(t.ev) < 0.3 && t.tclass !== 'hedge'
+    ? '<div class="muted small">thin edge</div>' : '';
+
   // THE TRADE TEST (trade_book_spec): an idea that is not carded names the first letter it failed.
   const GATES = {
     a: 'no priceable proxy',
     b: 'stop and target not at levels with meaning',
-    c: 'expectancy below the gate (EV < +0.30R)',
+    c: 'expectancy at or below zero (EV ≤ 0; the gate was +0.30R until 9 Oct)',
     d: 'no dated catalyst or mechanism in motion',
     e: 'already priced by the model\u2019s own judgement (for a washout: crowding shown only by price)',
     f: 'book caps full (retired 8 Oct)',
@@ -465,7 +469,7 @@
     return n(x.ev) != null && n(x.ev) >= 0.15 ? 'c-near' : 'c-far';
   };
   const GATE_ROWS = [
-    ['c-near', '(c) near miss: EV +0.15 to +0.30R'], ['c-far', '(c) EV below +0.15R'], ['c-rr', '(c) r/r below 1.0 (old floor, dropped 8 Oct)'],
+    ['c-near', '(c) near miss: EV +0.15 to +0.30R (old gate; cards as thin edge since 9 Oct)'], ['c-far', '(c) EV below +0.15R'], ['c-rr', '(c) r/r below 1.0 (old floor, dropped 8 Oct)'],
     ['a', '(a) ' + GATES.a], ['b', '(b) ' + GATES.b], ['d', '(d) ' + GATES.d], ['e', '(e) ' + GATES.e],
     ['f', '(f) ' + GATES.f], ['g', '(g) ' + GATES.g], ['covered', 'covered by an open trade'], ['?', 'no letter given'],
   ];
@@ -516,18 +520,18 @@
     $('#tradesBody').innerHTML = gateAudit(tested) + `<div class="tablewrap"><table class="grid"><thead><tr>
       <th>Idea & reason not carded</th><th class="hide-sm">Proxy</th><th class="hide-sm">Dir</th><th>R:R</th><th class="hide-sm">p vs p0</th><th>EV</th><th>Verdict</th><th title="Move in the idea's direction 5 sessions later, in ATR(20) units">+5d ATR</th><th title="Move in the idea's direction to the latest daily close, in ATR(20) units">To date</th>
       </tr></thead><tbody>${out.join('')}</tbody></table></div>
-      <p class="note">Gate: EV = p·r/r − (1−p) ≥ +0.3R (no r/r floor since 8 Oct 2026). Fail codes (trade_book_spec, the first letter failed): (a) no priceable proxy · (b) stop/target without meaning · (c) expectancy · (d) no catalyst · (e) already priced, or a washout whose crowding is price only · (f) caps and (g) vetoed, both retired 8 Oct 2026. Outcome columns are shadow-tracked by the hourly job from the first price a reader could deal at after the digest (the last live hourly close before 08:00 SGT, or the next open if the market was shut); they are not trades.</p>`;
+      <p class="note">Gate: EV = p·r/r − (1−p) > 0 since 9 Oct 2026 (it was +0.3R; a card between 0 and +0.3R is tagged thin edge and scored apart), no r/r floor since 8 Oct. Fail codes (trade_book_spec, the first letter failed): (a) no priceable proxy · (b) stop/target without meaning · (c) expectancy · (d) no catalyst · (e) already priced, or a washout whose crowding is price only · (f) caps and (g) vetoed, both retired 8 Oct 2026. Outcome columns are shadow-tracked by the hourly job from the first price a reader could deal at after the digest (the last live hourly close before 08:00 SGT, or the next open if the market was shut); they are not trades.</p>`;
     bindRows();
   }
 
-  // The gate is on EV, not on p: EV = p·rr − (1−p) ≥ +0.3R. Solved for p at the idea's own r/r it
-  // reads p ≥ 1.3 / (1 + rr) in 5% steps — 55% at 1.45, 35% at 3, 25% at 5 — so asymmetric ideas pass at low p.
+  // The gate is on EV, not on p: EV = p·rr − (1−p) > 0 since 9 Oct 2026 (+0.3R before). Solved for p at the
+  // idea's own r/r it reads p > 1 / (1 + rr), the next 5% step above — 45% at 1.5, 30% at 3, 20% at 5.
   function gateLine(x) {
     const rr = n(x.rr);
     if (rr == null || rr <= 0) return '';
     if (rr < 1 && n(x.ev) != null && n(x.ev) >= 0.3) return `r/r ${fmt(rr)} was below the old 1.0 floor (dropped 8 Oct); EV ${fmtR(x.ev)} clears the gate`;
-    const need = Math.min(100, Math.ceil((130 / (1 + rr)) / 5 - 1e-9) * 5);
-    return `EV ${fmtR(x.ev)} vs the +0.30R gate${x.p != null ? ` (p ${fmt(x.p, 0)}% at r/r ${fmt(rr)}; random walk ${fmt(x.p0, 0)}%)` : ''} — at this r/r EV clears only with p ≥ ${need}%`;
+    const need = Math.min(100, (Math.floor((100 / (1 + rr)) / 5 + 1e-9) + 1) * 5);
+    return `EV ${fmtR(x.ev)} vs the EV > 0 gate${x.p != null ? ` (p ${fmt(x.p, 0)}% at r/r ${fmt(rr)}; random walk ${fmt(x.p0, 0)}%)` : ''} — at this r/r EV clears only with p ≥ ${need}%`;
   }
 
   function ideaDetail(x) {
