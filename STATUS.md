@@ -66,7 +66,7 @@ Voices, Review, Positioning, Trend.
   `c42b8bea…`, harness `dd6f0106…`, decisions `d40b4ef6…`, input manifest `aa4c1471…`.
   Likely cause (unconfirmed): the hosted sandbox kills detached processes between tool calls.
   Proposed: re-run the dry run, code unchanged, on the MacBook under a new owner restart allowance.
-- **Drivers pack (run locally in Astra): HALTED.** 20-active-hour limit (pack §1.8, OF18/OF8) hit
+- **Drivers pack (local on MacBook, monitored by Claude): RUNNING, ST8.** Earlier history: 20-active-hour limit (pack §1.8, OF18/OF8) hit
   8 Oct 14:00 SGT; ST5 placebo 5,235/9,405 units, logged `DEV-20261008T060022225612Z-35907` plus
   pair exclusions; incomplete ST5 pairs excluded, incomplete L/T families NOT_EVALUATED, freeze
   before holdout. ST5 advanced to ST6 at 14:06; all 3 workers stopped ~14:41 SGT on an ST6
@@ -91,8 +91,12 @@ Voices, Review, Positioning, Trend.
   guard correct (warmup dates presented as evaluation dates), diagnostic date range fixed and logged,
   guard byte-identical. 20:30 SGT: ST5 extension cap raised 8 → 24 active h (final, completion-only
   deviation, before any results); later limits shift by actual use; independent 48 h wall cap
-  unchanged, so check it isn't the binding limit. Workers use no ChatGPT credits. Next look:
-  "status" on 9 Oct morning.
+  unchanged, so check it isn't the binding limit. Workers use no ChatGPT credits.
+  ~21:00 SGT: monitoring moved from Astra to Claude (read-only on `~/drvpack`; Astra fallback only).
+  9 Oct 03:58 SGT: ST5 done (all runnable units); extension closed after 9.7/24 h
+  (`DEV-20261008T195758580044Z-5665`). 20/21 pairs eligible; AUDUSD excluded (7 ST5 units failed)
+  per §1.8. ST6–ST7 done. 07:25 SGT: ST8 72/485, 3 workers alive, projected finish ~36.4 active h,
+  inside the 48 h wall cap (18:00 SGT 9 Oct).
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
   run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
 
