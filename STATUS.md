@@ -24,6 +24,8 @@ _Last updated: 2026-10-08._
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rules inputs | `40 22 * * *` UTC |
 | `dash-trend` (TM1) | 38-asset trend monitor, events, FX one-touch board | 00:30 UTC Tue–Sat |
 | `dash-trend` shadow (TM1.1) | 15 FX pairs on 17:00 NY closes, beside TM1 | 00:40 UTC Tue–Sat |
+| Grok Bot console routine (`docs/grok_console_routine.md`) | builds the daily GROK FULL CONSOLIDATED email in place of the ChatGPT Work task (saves ChatGPT credits); trial in TEST MODE first (digests ignore "GROK BOT CONSOLE TEST"), then the owner turns the ChatGPT task off. Both Macro Takeaways routines also run a daily completeness sweep (own web check of the last 24h incl. the Asia-morning gap; spec `docs/completeness_sweep_spec.md`, live copy = Drive doc completeness_sweep_spec) (9 Oct) | daily 06:50 SGT |
+| Grok Bot crowding routine (`docs/grok_crowding_routine.md`) | X crowding read per open trade/tested idea → email → Grok tab, source "Crowding check". Set up in Grok Bot by the owner. Both Macro Takeaways routines read it as positioning evidence (9 Oct) | Sun 17:00 SGT + before tier-1 |
 | `dash-history`, `dash-gdelt` | research relays (Yahoo daily/hourly bars, GDELT DOC API) | on call |
 
 Site tabs: Themes, Trades (linear + convexity cards), YouTube, Podcast, Grok, Substack, Questions,

@@ -15,12 +15,14 @@ export function feedFamily(subject: string): Family | null {
   if (/^MACRO TAKEAWAYS/i.test(subject)) return null;
   if (/YouTube Digest/i.test(subject)) return 'youtube';
   if (/Podcast Digest/i.test(subject)) return 'podcast';
-  if (/GROK FULL CONSOLIDATED/i.test(subject)) return 'grok';
+  if (/GROK FULL CONSOLIDATED|GROK CROWDING CHECK/i.test(subject)) return 'grok';
   if (/Email Digest/i.test(subject) && !/source alert/i.test(subject)) return 'substack';
   return null;
 }
 
 export function feedSource(subject: string): string {
+  if (/GROK CROWDING CHECK/i.test(subject)) return 'crowding'; // Grok Bot weekly routine (docs/grok_crowding_routine.md)
+  if (/Grok Bot/i.test(subject)) return 'grokbot'; // console built by Grok Bot instead of ChatGPT (docs/grok_console_routine.md)
   if (/\[Fable[^\]]*\]/i.test(subject)) return 'fable';
   if (/\[Opus[^\]]*\]/i.test(subject)) return 'opus';
   if (/ChatGPT/i.test(subject)) return 'chatgpt';
