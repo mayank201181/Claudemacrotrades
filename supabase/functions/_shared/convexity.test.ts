@@ -170,22 +170,24 @@ test('gate arithmetic (items 17–18)', () => {
   const p = spreadP([57, 43, 31]);
   assert.equal(p, 0.433);
   eq4(p / 0.325 - 1, 0.3323, 'EV');
-  assert.deepEqual(gate(p, 0.325), { pass: true, pgate: true, ev: 0.33 });
+  assert.deepEqual(gate(p, 0.325), { pass: true, pgate: false, thin: false, ev: 0.33 });
   const p2 = spreadP([55, 42, 30]);
   assert.equal(p2, 0.422);
-  eq4(p2 / 0.325 - 1, 0.2985, 'EV fail');
-  assert.deepEqual(gate(p2, 0.325), { pass: false, pgate: true, ev: 0.29 });
-  // boundaries pass and print +0.30R; the naive floors print 0.29
-  assert.deepEqual(gate(0.143, 0.11), { pass: true, pgate: true, ev: 0.3 });
+  eq4(p2 / 0.325 - 1, 0.2985, 'EV thin');
+  assert.deepEqual(gate(p2, 0.325), { pass: true, pgate: false, thin: true, ev: 0.29 });
+  // the +0.30R boundary is full edge and prints +0.30R; the naive floors print 0.29
+  assert.deepEqual(gate(0.143, 0.11), { pass: true, pgate: false, thin: false, ev: 0.3 });
   assert.equal(Math.floor((0.143 / 0.11 - 1) * 100) / 100, 0.29);
-  assert.deepEqual(gate(0.13, 0.1), { pass: true, pgate: true, ev: 0.3 });
+  assert.deepEqual(gate(0.13, 0.1), { pass: true, pgate: false, thin: false, ev: 0.3 });
   const rr = 1 / 0.1 - 1;
   assert.equal(Math.floor((0.13 * rr - (1 - 0.13)) * 100) / 100, 0.29);
   // the premium floor stays; the p ≤ 75% cap and the premium ≤ 50% limit are gone (8 Oct 2026)
   assert.equal(gate(0.13, 0.099).pass, false);
   assert.equal(gate(0.76, 0.5).pass, true);
   assert.equal(gate(0.7, 0.501).pass, true);
-  assert.equal(gate(0.64, 0.5).pass, false);
+  // EV > 0 since 9 Oct 2026: p must beat p0, and under 1.3 × p0 the card is thin edge
+  assert.equal(gate(0.5, 0.5).pass, false);
+  assert.deepEqual(gate(0.51, 0.5), { pass: true, pgate: true, thin: true, ev: 0.02 });
   assert.equal(spreadP([60, 50, 40, 30, 20]), 0.4); // five-point rule: (60 + 200 + 80 + 120 + 20)/12
 });
 
