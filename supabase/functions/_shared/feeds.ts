@@ -22,6 +22,7 @@ export function feedFamily(subject: string): Family | null {
 
 export function feedSource(subject: string): string {
   if (/GROK CROWDING CHECK/i.test(subject)) return 'crowding'; // Grok Bot weekly routine (docs/grok_crowding_routine.md)
+  if (/Grok Bot/i.test(subject)) return 'grokbot'; // console built by Grok Bot instead of ChatGPT (docs/grok_console_routine.md)
   if (/\[Fable[^\]]*\]/i.test(subject)) return 'fable';
   if (/\[Opus[^\]]*\]/i.test(subject)) return 'opus';
   if (/ChatGPT/i.test(subject)) return 'chatgpt';
