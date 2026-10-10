@@ -157,6 +157,8 @@ Voices, Review, Positioning, Trend.
     live (TEST MODE off) with the ChatGPT console kept running in parallel (digests take the richer one).
     `015_grokbot_source.sql` labels it 'grokbot' on the Grok tab (applied by the owner in the SQL editor,
     10 Oct; trigger verified).
+    Neither Grok Bot routine had actually been set up; the owner created both on 10 Oct from pastes (console daily
+    06:50 SGT with TEST MODE = OFF, no trial; crowding check Sundays 17:00 SGT). First emails due Sun 11 Oct.
     Owner yes (10 Oct 08:32 UTC) to applying 015 and to CFTC v5 on the Mac after the drivers holdout (needs the
     v4 P4 split fix, the compiler fix and a protocol ruling on the 20 Nikkei PR-5 rows; ~2-3 days Mac time, uncertain).
     Thesis-vs-price check done (first read, 10 days): idea titles are catalyst-led, the idea pool leans against
