@@ -153,6 +153,10 @@ Voices, Review, Positioning, Trend.
     holdout pending), CFTC S3 v4 (sealed, no result; no v5 for now, revisit with the drivers tactical
     family), eventday (dry run in progress), GDELT (parked). To-dos: run the thesis-vs-price DB check
     (item 6); hedge bucket on the Trades tab; check whether digests read the Trend tab.
+    Owner replies (10 Oct): CFTC stays sealed for now; run the thesis-vs-price check; Grok Bot console goes
+    live (TEST MODE off) with the ChatGPT console kept running in parallel (digests take the richer one).
+    `015_grokbot_source.sql` labels it 'grokbot' on the Grok tab; not applied yet (needs owner OK for a
+    production DB change). Until then it shows as "Claude".
 
 ## Questions still unanswered
 
