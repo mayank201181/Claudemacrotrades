@@ -147,6 +147,13 @@ Voices, Review, Positioning, Trend.
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
 
+10. **Workstream audit (10 Oct 2026).** Read-only review of every study and pipeline (project file
+    `notes/workstream_audit_10oct2026.md`). Feeding daily ideas: gates/R01, BOOK CHECK, completeness sweep,
+    crowding check, Positioning (raw CFTC via B7), Voices/Questions. Not feeding anything: drivers (closest;
+    holdout pending), CFTC S3 v4 (sealed, no result; no v5 for now, revisit with the drivers tactical
+    family), eventday (dry run in progress), GDELT (parked). To-dos: run the thesis-vs-price DB check
+    (item 6); hedge bucket on the Trades tab; check whether digests read the Trend tab.
+
 ## Questions still unanswered
 
 - The office "~90%" figure: daily or weekly changes, and were FX series among its 9 drivers?
