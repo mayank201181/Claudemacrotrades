@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-08._
+_Last updated: 2026-10-10._
 
 ## Where things are
 
@@ -132,7 +132,18 @@ Voices, Review, Positioning, Trend.
    - NatGas/WTI 200d stretch differs from S2: likely futures vs ETF proxies, unconfirmed.
    - D2: no second price source yet, so the cross-check is always `XCHECK_NA`.
    - FRED fetch from inside Postgres failed (HTTP/2); retest from an edge function.
-8. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
+8. **Digest completeness: primary-source pages (10 Oct 2026).** Both Macro Takeaways runs on Sat 10 Oct
+   ran the completeness sweep (Opus footer: 14 searches, window to 07:53 SGT, "weekend: no Asia
+   session") and both missed the RBI's overnight rupee package (OMC dollar window, 20% FERR, $5m
+   no-underlying limit, rebooking ban). Cause: the sweep is search-only, and no outlet had written the
+   story up by ~07:30 SGT (first pickups ~08:40 SGT); only rbi.org.in had it. Fix drafted: section A0
+   of `completeness_sweep_spec` fetches 14 central-bank, ministry and regulator listing pages directly
+   every day, weekends included, with a stale-page fallback and a footer count. Text is in project file
+   `notes/completeness_sweep_A0_primary_sources.txt`. The Drive connector can't edit the Doc body and
+   `Spec.gs` only handles `trade_book_spec`, so the owner pastes A0 into the doc above "A. CHECKLIST".
+   No routine edit needed (Opus prompt is at 65,388 of 65,536 bytes). Note: cached readers (Exa)
+   still showed the RBI page without the 10 Oct items hours later, so A0 must use a live fetch.
+9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
 
