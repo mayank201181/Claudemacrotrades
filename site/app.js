@@ -144,7 +144,7 @@
     grok: { name: 'Grok Full Consolidated', open: /network pulse a|markets intel/i },
     substack: { name: 'Newsletters (from the Email Digest)', open: /market/i },
   };
-  const SOURCE_NAME = { fable: 'Fable 5.1', opus: 'Opus 5.5', chatgpt: 'ChatGPT', claude: 'Claude' };
+  const SOURCE_NAME = { fable: 'Fable 5.1', opus: 'Opus 5.5', chatgpt: 'ChatGPT', claude: 'Claude', crowding: 'Crowding check', grokbot: 'Grok Bot' };
   const feedState = {};
 
   async function renderFeed(family) {
@@ -176,7 +176,7 @@
     if (my !== seq || state.tab !== family) return;
     const rows = fs.rows[key] || [];
     const sources = [...new Set(rows.map((r) => r.source))];
-    const pref = [fs.source, state.model, 'opus', 'fable', 'chatgpt', 'claude'];
+    const pref = [fs.source, state.model, 'opus', 'fable', 'chatgpt', 'grokbot', 'claude'];
     const src = pref.find((s) => s && sources.includes(s)) || sources[0];
     fs.source = src;
     $('#sourceSeg').innerHTML = sources.length > 1 ? sources.map((s) => `<button data-src="${s}" class="${s === src ? 'active' : ''}">${esc(SOURCE_NAME[s] || s)}</button>`).join('') : '';
