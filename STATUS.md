@@ -136,11 +136,11 @@ Voices, Review, Positioning, Trend.
    ran the completeness sweep (Opus footer: 14 searches, window to 07:53 SGT, "weekend: no Asia
    session") and both missed the RBI's overnight rupee package (OMC dollar window, 20% FERR, $5m
    no-underlying limit, rebooking ban). Cause: the sweep is search-only, and no outlet had written the
-   story up by ~07:30 SGT (first pickups ~08:40 SGT); only rbi.org.in had it. Fix drafted: section A0
+   story up by ~07:30 SGT (first pickups ~08:40 SGT); only rbi.org.in had it. Fix live: section A0
    of `completeness_sweep_spec` fetches 14 central-bank, ministry and regulator listing pages directly
    every day, weekends included, with a stale-page fallback and a footer count. Text is in project file
    `notes/completeness_sweep_A0_primary_sources.txt`. The Drive connector can't edit the Doc body and
-   `Spec.gs` only handles `trade_book_spec`, so the owner pastes A0 into the doc above "A. CHECKLIST".
+   `Spec.gs` only handles `trade_book_spec`, so the owner pasted A0 into the doc above "A. CHECKLIST" (verified 10 Oct 12:35 SGT; first run Sun 11 Oct 07:15 SGT, check its "Primary pages: F/14" footer).
    No routine edit needed (Opus prompt is at 65,388 of 65,536 bytes). Note: cached readers (Exa)
    still showed the RBI page without the 10 Oct items hours later, so A0 must use a live fetch.
 9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
