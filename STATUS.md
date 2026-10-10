@@ -122,7 +122,7 @@ Voices, Review, Positioning, Trend.
 4. **Event library Stage 1 gaps:** a CB's own events not screened from its own currency; 24 release
    types unscreened; a multiplier fitted on the full sample.
 5. **Data-source registry:** 345 sources, mostly unverified; smoke-test from the dashboard servers.
-6. **DB check (proposed, never run):** do the digest model's ideas start from a thesis or from price?
+6. **DB check:** do the digest model's ideas start from a thesis or from price? First read done 10 Oct (item 10); re-run after ~30 carded trades.
 7. **Data-source fragility in `dash-trend`:**
    - MOF `jgbcme_all.csv` intermittently 404s → retried, then falls back to stored closes in
      `dash.trend_px`. Watch fetch notes on the JGB10Y row.
@@ -146,6 +146,27 @@ Voices, Review, Positioning, Trend.
 9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
+
+10. **Workstream audit (10 Oct 2026).** Read-only review of every study and pipeline (project file
+    `notes/workstream_audit_10oct2026.md`). Feeding daily ideas: gates/R01, BOOK CHECK, completeness sweep,
+    crowding check, Positioning (raw CFTC via B7), Voices/Questions. Not feeding anything: drivers (closest;
+    holdout pending), CFTC S3 v4 (sealed, no result; no v5 for now, revisit with the drivers tactical
+    family), eventday (dry run in progress), GDELT (parked). To-dos: run the thesis-vs-price DB check
+    (item 6); hedge bucket on the Trades tab; check whether digests read the Trend tab.
+    Owner replies (10 Oct): CFTC stays sealed for now; run the thesis-vs-price check; Grok Bot console goes
+    live (TEST MODE off) with the ChatGPT console kept running in parallel (digests take the richer one).
+    `015_grokbot_source.sql` labels it 'grokbot' on the Grok tab (applied by the owner in the SQL editor,
+    10 Oct; trigger verified).
+    Neither Grok Bot routine had actually been set up; the owner created both on 10 Oct from pastes (console daily
+    06:50 SGT with TEST MODE = OFF, no trial; crowding check Sundays 17:00 SGT). First emails due Sun 11 Oct.
+    Grok Bot delivers each report as an HTML attachment with a one-line body, which neither the dashboard nor
+    the digests can read. `Code.gs` now uses the attachment as the body and mails one inline copy
+    (subject + " | inline copy") for the digests; the feeder skips those copies. Keep the ChatGPT console on
+    until an inline Grok Bot console has been read by a digest.
+    Owner yes (10 Oct 08:32 UTC) to applying 015 and to CFTC v5 on the Mac after the drivers holdout (needs the
+    v4 P4 split fix, the compiler fix and a protocol ruling on the 20 Nikkei PR-5 rows; ~2-3 days Mac time, uncertain).
+    Thesis-vs-price check done (first read, 10 days): idea titles are catalyst-led, the idea pool leans against
+    the prior 20-day move, carded trades skew with it (6/8). Re-run after ~30 carded trades.
 
 ## Questions still unanswered
 
