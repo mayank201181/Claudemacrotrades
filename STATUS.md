@@ -143,7 +143,14 @@ Voices, Review, Positioning, Trend.
    `Spec.gs` only handles `trade_book_spec`, so the owner pasted A0 into the doc above "A. CHECKLIST" (verified 10 Oct 12:35 SGT; first run Sun 11 Oct 07:15 SGT, check its "Primary pages: F/14" footer).
    No routine edit needed (Opus prompt is at 65,388 of 65,536 bytes). Note: cached readers (Exa)
    still showed the RBI page without the 10 Oct items hours later, so A0 must use a live fetch.
-9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
+9. **News and data connectors (10 Oct 2026).** Owner chose: trial MT Newswires in the completeness
+   sweep first; hold LSEG until compliance clears using a firm licence (a personal LSEG Workspace
+   licence is costly, price unverified). Owner step: subscribe to MT Newswires and connect it on
+   claude.ai (Settings, Connectors); then add one line to `completeness_sweep_spec` telling the sweep
+   to use it, and score it on misses caught. Bigdata.com is already connected and reachable from cloud
+   routines but has a zero pay-as-you-go balance (the Bigdata *plugin* fails separately at the proxy).
+   Daloopa skipped (equity fundamentals only). RBI-type misses are already covered by section A0.
+10. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
 
