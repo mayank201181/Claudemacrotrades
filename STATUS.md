@@ -122,7 +122,7 @@ Voices, Review, Positioning, Trend.
 4. **Event library Stage 1 gaps:** a CB's own events not screened from its own currency; 24 release
    types unscreened; a multiplier fitted on the full sample.
 5. **Data-source registry:** 345 sources, mostly unverified; smoke-test from the dashboard servers.
-6. **DB check (proposed, never run):** do the digest model's ideas start from a thesis or from price?
+6. **DB check:** do the digest model's ideas start from a thesis or from price? First read done 10 Oct (item 10); re-run after ~30 carded trades.
 7. **Data-source fragility in `dash-trend`:**
    - MOF `jgbcme_all.csv` intermittently 404s → retried, then falls back to stored closes in
      `dash.trend_px`. Watch fetch notes on the JGB10Y row.
@@ -157,6 +157,10 @@ Voices, Review, Positioning, Trend.
     live (TEST MODE off) with the ChatGPT console kept running in parallel (digests take the richer one).
     `015_grokbot_source.sql` labels it 'grokbot' on the Grok tab; not applied yet (needs owner OK for a
     production DB change). Until then it shows as "Claude".
+    Owner yes (10 Oct 08:32 UTC) to applying 015 and to CFTC v5 on the Mac after the drivers holdout (needs the
+    v4 P4 split fix, the compiler fix and a protocol ruling on the 20 Nikkei PR-5 rows; ~2-3 days Mac time, uncertain).
+    Thesis-vs-price check done (first read, 10 days): idea titles are catalyst-led, the idea pool leans against
+    the prior 20-day move, carded trades skew with it (6/8). Re-run after ~30 carded trades.
 
 ## Questions still unanswered
 
