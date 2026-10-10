@@ -19,6 +19,19 @@ function post_(url, body) {
   return { code: r.getResponseCode(), text: r.getContentText() };
 }
 
+// Grok Bot emails its reports as an HTML attachment with a one-line body. Neither the dashboard nor the
+// digests can open attachments, so use the attachment as the body here, and mail an inline copy to the same
+// address (subject + INLINE) once, for the digests to read. A long body is left alone.
+const INLINE = ' | inline copy';
+function bodyOf_(m) {
+  const body = m.getBody();
+  if (body.replace(/<[^>]*>/g, '').length > 2000) return { html: body, fromAttachment: false };
+  const att = m.getAttachments().filter(function (a) {
+    return /html/i.test(a.getContentType()) || /\.html?$/i.test(a.getName());
+  })[0];
+  return att ? { html: att.getDataAsString('UTF-8'), fromAttachment: true } : { html: body, fromAttachment: false };
+}
+
 function syncMacroDesk() {
   const started = Date.now();
   const props = PropertiesService.getScriptProperties();
@@ -57,8 +70,14 @@ function syncMacroDesk() {
         const subject = m.getSubject();
         // Replies and forwards quote the digest but are not digests.
         if (/^\s*(re|fwd?|fw)\s*:/i.test(subject) || !re.test(subject) || props.getProperty('s:' + m.getId())) return;
+        if (subject.indexOf(INLINE) >= 0) return; // our own copy of an attachment already sent below
+        const b = bodyOf_(m);
+        if (b.fromAttachment && !props.getProperty('inl:' + m.getId())) {
+          GmailApp.sendEmail(m.getTo(), subject + INLINE, 'HTML copy of the attached report.', { htmlBody: b.html });
+          props.setProperty('inl:' + m.getId(), String(Date.now()));
+        }
         const res = post_(ENDPOINT, { kind: 'gmail_thread', data: { messages: [{
-          id: m.getId(), subject: subject, date: m.getDate().toISOString(), htmlBody: m.getBody() }] } });
+          id: m.getId(), subject: subject, date: m.getDate().toISOString(), htmlBody: b.html }] } });
         console.log(spec.key + ' ' + subject.slice(0, 70) + ' → ' + res.code + ' ' + res.text.slice(0, 120));
         if (res.code === 200) { props.setProperty('s:' + m.getId(), String(Date.now())); changed = true; } else { allOk = false; }
       });
@@ -69,7 +88,7 @@ function syncMacroDesk() {
   // Forget message ids older than 10 days (the 3-day window never revisits them).
   const all = props.getProperties();
   Object.keys(all).forEach(function (k) {
-    if (k.indexOf('s:') === 0 && Date.now() - Number(all[k]) > 10 * 86400000) props.deleteProperty(k);
+    if ((k.indexOf('s:') === 0 || k.indexOf('inl:') === 0) && Date.now() - Number(all[k]) > 10 * 86400000) props.deleteProperty(k);
   });
 
   if (changed) console.log('marks → ' + post_(MARK, {}).text.slice(0, 200));

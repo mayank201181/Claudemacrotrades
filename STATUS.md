@@ -159,6 +159,10 @@ Voices, Review, Positioning, Trend.
     10 Oct; trigger verified).
     Neither Grok Bot routine had actually been set up; the owner created both on 10 Oct from pastes (console daily
     06:50 SGT with TEST MODE = OFF, no trial; crowding check Sundays 17:00 SGT). First emails due Sun 11 Oct.
+    Grok Bot delivers each report as an HTML attachment with a one-line body, which neither the dashboard nor
+    the digests can read. `Code.gs` now uses the attachment as the body and mails one inline copy
+    (subject + " | inline copy") for the digests; the feeder skips those copies. Keep the ChatGPT console on
+    until an inline Grok Bot console has been read by a digest.
     Owner yes (10 Oct 08:32 UTC) to applying 015 and to CFTC v5 on the Mac after the drivers holdout (needs the
     v4 P4 split fix, the compiler fix and a protocol ruling on the 20 Nikkei PR-5 rows; ~2-3 days Mac time, uncertain).
     Thesis-vs-price check done (first read, 10 days): idea titles are catalyst-led, the idea pool leans against
