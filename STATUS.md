@@ -163,6 +163,9 @@ Voices, Review, Positioning, Trend.
     the digests can read. `Code.gs` now uses the attachment as the body and mails one inline copy
     (subject + " | inline copy") for the digests; the feeder skips those copies. Keep the ChatGPT console on
     until an inline Grok Bot console has been read by a digest.
+    11 Oct check: Grok Bot console arrived 07:01 SGT (attachment), feeder sent the inline copy and stored it as
+    'grokbot' (10 sections). Opus used the ChatGPT console and skipped the Grok Bot copy as a duplicate. First A0
+    footer: "Primary pages: 8/14"; MAS, PBoC, SAFE, BoK, MoF Japan and RBA unreachable (site-searched instead).
     Owner yes (10 Oct 08:32 UTC) to applying 015 and to CFTC v5 on the Mac after the drivers holdout (needs the
     v4 P4 split fix, the compiler fix and a protocol ruling on the 20 Nikkei PR-5 rows; ~2-3 days Mac time, uncertain).
     Thesis-vs-price check done (first read, 10 days): idea titles are catalyst-led, the idea pool leans against
