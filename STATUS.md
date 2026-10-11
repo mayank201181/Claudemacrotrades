@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-10._
+_Last updated: 2026-10-11._
 
 ## Where things are
 
@@ -179,6 +179,13 @@ Voices, Review, Positioning, Trend.
 - **Thin edge (9 Oct 2026, spec v12):** test (c) is EV > 0, no longer ≥ +0.3R. Cards between 0 and +0.3R
   are tagged "thin edge" and scored apart (SCORECARD, Trades tab). After 30 thin-edge closes, the weekly
   review compares their realised R with zero; at or below zero, +0.3R returns. R01 updated to match.
+- **First-hour exits (11 Oct 2026, spec v13):** a VIEW CHANGED close (thesis dead, at a review or
+  between reviews) and a reader "close Pnn" exit at the close of the first hourly bar of the proxy
+  that starts after the decision, the same clock as entries, instead of the latest mark or the next
+  daily close. If that bar has not printed by the run, the trade shows "closing" and the next run
+  closes it at that bar. Trades already declared dead with a later planned exit switch on the first
+  v13 run. Applies to both books (they read the same spec). R01 EARLY CLOSE gets the same wording
+  (SQL handed to the owner, since R01 lives in `dash.rules`).
 - **Spec v11 drafted, not yet applied (8 Oct):** BOOK CHECK line (net factor exposure, LOPSIDED flag),
   a HEDGE class at EV ≥ 0 when lopsided into an event, and test (d) accepting a distant event the
   market trades now. Full v11 text is in the project files (`notes/trade_book_spec_v11_full.txt`);
