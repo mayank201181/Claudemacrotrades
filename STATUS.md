@@ -56,15 +56,23 @@ Voices, Review, Positioning, Trend.
   static inputs; retire historical-equality claims explicitly; keep P3-null vs P5-fixed on the SAME
   fresh inputs as the real test of FIX-1..4; drop P6; freeze `included`/`exclusion_reason` per contract
   as a static input and leave xcheck correlation fields blank (they are full-period return stats).
-- **Event library Stage 1.1b (ChatGPT sandbox): failed pre-freeze HOLD (8 Oct ~12:06 SGT).** 4th
-  disposable synthetic dry run: Part 1 completed (6 s), Part 2 blocked before its worker started
-  (`ControllerOutcomeUnknown`; detached `Popen(start_new_session=True)` worker never wrote a start
-  marker). All 3 permitted restarts used. No freeze, no real run, no DB write, no results seen.
-  Untested: Parts 3–8, item 9 Part 4 fault test, item 14b for Parts 5–8, full fake-bootstrap workload
-  (26 assets × 1,000 draws × 999 reps). Registered hashes: spec `a338407b…`, event_library.py
-  `c42b8bea…`, harness `dd6f0106…`, decisions `d40b4ef6…`, input manifest `aa4c1471…`.
-  Likely cause (unconfirmed): the hosted sandbox kills detached processes between tool calls.
-  Proposed: re-run the dry run, code unchanged, on the MacBook under a new owner restart allowance.
+- **Event library Stage 1.1b synthetic dry run (Claude-run in a cloud container; Astra paused):
+  attempt 4 of 4 FAILED 11 Oct 17:44 SGT at Part 6; comparator fixed; waiting on the owner for a
+  4th restart.** 8 Oct standing instruction: process fixes as logged DVs, no file aliases, synthetic
+  only, 3 restarts. Validator lookup fixed as a DV and re-hashed; package runs natively on Python
+  3.12.14 (no Docker). Attempt 2 killed by the 2 h tool cap; attempt 3 failed at Part 5 on a
+  comparator coverage check (`DV_CHECKPOINT_COVERAGE_BASELINE_IDENTICAL`, owner yes 9 Oct 07:21 SGT);
+  attempt 4 passed Parts 1–5, survived two container restarts (resumed in place as logged DVs, owner
+  yes 10 Oct 07:54 SGT), then failed the Part 6 kill-and-resume comparison: Part 6 is the first part
+  to archive clock-bearing timing files, and the comparator keyed their content-addressed archive
+  copies by raw hash. Fix `DV_CHECKPOINT_ARCHIVE_BLOB_PROJECTION` (11 Oct, under the standing
+  instruction): archive copies inherit the archived file's scope and identity; proven offline on the
+  saved Part 6 trees (34,631/34,631 equal; the original comparator reproduces the error) and on the
+  comparator fixtures. A changed comparator cannot be swapped into the failed attempt (pinned by its
+  harness setup and controller binding), so a fresh attempt from Part 1 (~3 days) is needed; the
+  ledger caps restarts at 3, so the extension is a logged DV on the owner's say-so. Untested so far:
+  Part 6 sigterm branch, Parts 7–8, packaging, final validation. No freeze, no real run, no results
+  seen.
 - **Drivers pack (local on MacBook, monitored by Claude): COMPLETE, package built 9 Oct.** Earlier history: 20-active-hour limit (pack §1.8, OF18/OF8) hit
   8 Oct 14:00 SGT; ST5 placebo 5,235/9,405 units, logged `DEV-20261008T060022225612Z-35907` plus
   pair exclusions; incomplete ST5 pairs excluded, incomplete L/T families NOT_EVALUATED, freeze
