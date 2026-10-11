@@ -4,12 +4,12 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-08._
+_Last updated: 2026-10-11._
 
 ## Where things are
 
 - **Code:** on `main` (PR #1, the full dashboard, merged 2026-10-08). Branch from `main`.
-- **Live:** Vercel project `macro-desk` (root `site/`), Supabase project `macro-state-db`
+- **Live:** Vercel project `macro-desk` (root `site/`), production URL https://macro-desk-lake.vercel.app, Supabase project `macro-state-db`
   (`diiwqbxyhtgvozhncoef`), schema `dash`. Email login; the site reads only the `dash_*` RPCs.
 - **Public repo:** no trade, theme or digest data here, ever. Tokens live in `dash.config`.
 
@@ -18,6 +18,7 @@ _Last updated: 2026-10-08._
 | Piece | What it does | Schedule |
 |---|---|---|
 | `scripts/apps_script/Code.gs` | Gmail + Drive feeder in the owner's Google account → `dash-ingest` | every 10 min |
+| `scripts/apps_script/Spec.gs` | applies a staged `trade_book_spec_edits` JSON (find/replace, each exactly once) to the spec Doc, archiving it first | every 10 min |
 | `dash-ingest` | raw payloads → `dash` tables (digests, trade books, feeds, questions) | on post |
 | `dash-mark` | live R per open trade, shadow outcomes in ATR(20) units | `7 * * * *` |
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rules inputs | `40 22 * * *` UTC |
@@ -55,34 +56,63 @@ Voices, Review, Positioning, Trend.
   static inputs; retire historical-equality claims explicitly; keep P3-null vs P5-fixed on the SAME
   fresh inputs as the real test of FIX-1..4; drop P6; freeze `included`/`exclusion_reason` per contract
   as a static input and leave xcheck correlation fields blank (they are full-period return stats).
-- **Event library Stage 1.1b (ChatGPT sandbox): failed pre-freeze HOLD (8 Oct ~12:06 SGT).** 4th
-  disposable synthetic dry run: Part 1 completed (6 s), Part 2 blocked before its worker started
-  (`ControllerOutcomeUnknown`; detached `Popen(start_new_session=True)` worker never wrote a start
-  marker). All 3 permitted restarts used. No freeze, no real run, no DB write, no results seen.
-  Untested: Parts 3–8, item 9 Part 4 fault test, item 14b for Parts 5–8, full fake-bootstrap workload
-  (26 assets × 1,000 draws × 999 reps). Registered hashes: spec `a338407b…`, event_library.py
-  `c42b8bea…`, harness `dd6f0106…`, decisions `d40b4ef6…`, input manifest `aa4c1471…`.
-  Likely cause (unconfirmed): the hosted sandbox kills detached processes between tool calls.
-  Proposed: re-run the dry run, code unchanged, on the MacBook under a new owner restart allowance.
-  8 Oct ~17:20 SGT: Astra delivered `run_stage1_1b_local.sh` (Docker Desktop, foreground shim,
-  not run). Found a registered-code defect: `harness_additions_checks.py` L124 looks for
-  `runtime_part_1_invocation_*.json`, the harness writes `runtime_part_1_ordinary_invocation_000001.json`
-  (branch label), so final dry-run PASS can't happen as registered. Astra's fix: launcher byte-copy
-  aliases; its deviation record says the owner authorised them (owner only asked to be shown one).
-  Review recommends a logged pre-freeze amendment of the validator lookup instead of aliases, a
-  lookup-vs-output table for Parts 1–8 and both branches, proof the foreground shim doesn't void the
-  item 9 fault test, the list of manifest inputs the ZIPs lack (and why a synthetic run needs them),
-  base image by digest, platform, hash-locked packages and a pre-flight install outside the restart
-  count. 8 Oct ~17:25 SGT, to stop the relay loop: one standing instruction drafted for Astra
-  (authority to fix process issues as logged DVs; reply only with final PASS/FAIL or a design
-  decision). Rulings in it: aliases not approved, fix the validator lookup as a DV and re-hash;
-  3 local restarts granted; foreground approved if the real run uses the same hashed launcher;
-  synthetic data only. Waiting on the owner to paste it and run Astra's one command on the Mac.
-- **Drivers pack (run locally in Astra):** ST6–ST12 auto-advance, 3 workers running; agent ETA for ST12
-  8 Oct 16:00–18:00 SGT, possibly overnight if a holdout stays open. Agent is silent until "status".
-  Open (8 Oct ~17:00 SGT): same reply says ST5 placebo throughput "makes the 2 p.m. hard cutoff
-  likely", already past in SGT. Unclear which clock, which stage, and whether a binding cutoff
-  truncates placebo units (would need a DV entry and a pre-registered rule). Queried via "status".
+- **Event library Stage 1.1b synthetic dry run (Claude-run in a cloud container; Astra paused):
+  attempt 4 of 4 FAILED 11 Oct 17:44 SGT at Part 6; comparator fixed; waiting on the owner for a
+  4th restart.** 8 Oct standing instruction: process fixes as logged DVs, no file aliases, synthetic
+  only, 3 restarts. Validator lookup fixed as a DV and re-hashed; package runs natively on Python
+  3.12.14 (no Docker). Attempt 2 killed by the 2 h tool cap; attempt 3 failed at Part 5 on a
+  comparator coverage check (`DV_CHECKPOINT_COVERAGE_BASELINE_IDENTICAL`, owner yes 9 Oct 07:21 SGT);
+  attempt 4 passed Parts 1–5, survived two container restarts (resumed in place as logged DVs, owner
+  yes 10 Oct 07:54 SGT), then failed the Part 6 kill-and-resume comparison: Part 6 is the first part
+  to archive clock-bearing timing files, and the comparator keyed their content-addressed archive
+  copies by raw hash. Fix `DV_CHECKPOINT_ARCHIVE_BLOB_PROJECTION` (11 Oct, under the standing
+  instruction): archive copies inherit the archived file's scope and identity; proven offline on the
+  saved Part 6 trees (34,631/34,631 equal; the original comparator reproduces the error) and on the
+  comparator fixtures. A changed comparator cannot be swapped into the failed attempt (pinned by its
+  harness setup and controller binding), so a fresh attempt from Part 1 (~3 days) is needed; the
+  ledger caps restarts at 3, so the extension is a logged DV on the owner's say-so. Untested so far:
+  Part 6 sigterm branch, Parts 7–8, packaging, final validation. No freeze, no real run, no results
+  seen.
+- **Drivers pack (local on MacBook, monitored by Claude): COMPLETE, package built 9 Oct.** Earlier history: 20-active-hour limit (pack §1.8, OF18/OF8) hit
+  8 Oct 14:00 SGT; ST5 placebo 5,235/9,405 units, logged `DEV-20261008T060022225612Z-35907` plus
+  pair exclusions; incomplete ST5 pairs excluded, incomplete L/T families NOT_EVALUATED, freeze
+  before holdout. ST5 advanced to ST6 at 14:06; all 3 workers stopped ~14:41 SGT on an ST6
+  unit-registry error. No ETA. Astra's earlier "verified all three workers running" (sent after the
+  stop) was wrong. Next (8 Oct ~17:15 SGT): diagnosis only, no restart; owner approves any fix and
+  restart as a logged deviation.
+  17:13 SGT diagnosis: root cause = ST6 registry cached before the cutoff exclusions (crash before any
+  unit was claimed). Proposed cache-only repair NOT approved yet: the cutoff excluded 21/21 pairs, so
+  ST6 would calibrate on an empty cohort, and 0/12 L/T families marked NOT_EVALUATED contradicts the
+  rule. Holdout caveat stands (ThaiBMA preview, `DEV-20261007T104126211568Z-29335`). Open decision:
+  extend ST5 to finish placebo units as an outcome-blind logged deviation vs a fresh run with
+  pair-by-pair scheduling. Earlier "don't extend ST5" assumed partial exclusions only.
+  17:30 SGT: cause = draw-major scheduling across pairs (every pair also lacks 54 non-placebo units);
+  ST5 10,677/15,989 units. No pre-registered all-pairs-excluded rule. Second raw preview (MAS DEV)
+  also on record in `data_exposure.json`. Two shared units failed terminally. Recommended to owner:
+  option (a), extend ST5 by up to 8 active h with pair-priority ordering, shift later cutoffs
+  (L/T, 26/30/31 h) by the extension used, one diagnosed retry per failed shared unit, standing
+  authority for process fixes as logged deviations. No defensible ST12 ETA.
+  18:07 SGT: owner approved; Astra confirms amendment logged, repairs validated, 3 workers running,
+  8 h ST5 cap, auto ST6–ST12, stop if no pair completes. 18:11 SGT check: pair-by-pair order yes,
+  later limits shifted yes. 19:56 SGT: final diagnostic hit the date-access guard in all 21 pairs;
+  guard correct (warmup dates presented as evaluation dates), diagnostic date range fixed and logged,
+  guard byte-identical. 20:30 SGT: ST5 extension cap raised 8 → 24 active h (final, completion-only
+  deviation, before any results); later limits shift by actual use; independent 48 h wall cap
+  unchanged, so check it isn't the binding limit. Workers use no ChatGPT credits.
+  ~21:00 SGT: monitoring moved from Astra to Claude (read-only on `~/drvpack`; Astra fallback only).
+  9 Oct 03:58 SGT: ST5 done (all runnable units); extension closed after 9.7/24 h
+  (`DEV-20261008T195758580044Z-5665`). 20/21 pairs eligible; AUDUSD excluded (7 ST5 units failed)
+  per §1.8. ST6–ST7 done. 07:25 SGT: ST8 72/485, 3 workers alive, projected finish ~36.4 active h,
+  inside the 48 h wall cap (18:00 SGT 9 Oct).
+  9 Oct: ST8 done; ST9 closed at its pre-registered active-hour cutoff. ST12 packaging stalled three
+  times on process issues, each fixed on the Mac as a packaging-only deviation: OF11 split timeout
+  (`DEV-20261009T071944640666Z-84648`); non-UTF-8 raw CSVs and the csv field limit
+  (`DEV-20261009T122543090708Z-11347`, `DEV-20261009T122543114953Z-11347`); Part01 over the size cap.
+  For the last one the owner approved excluding snapshot copies (path and sha256 kept in the
+  manifest) and limiting Part01 to the core ledgers (`DEV-20261009T132750628010Z-33237`,
+  `DEV-20261009T132750652688Z-33237`). ~22:00 SGT: final package of 20 parts, hash-verified
+  (target was 12 or fewer; nothing dropped). Run STOPPED cleanly. Results not yet opened.
+  Next: owner decides how to review the package.
 - **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
   run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
 
@@ -110,7 +140,18 @@ Voices, Review, Positioning, Trend.
    - NatGas/WTI 200d stretch differs from S2: likely futures vs ETF proxies, unconfirmed.
    - D2: no second price source yet, so the cross-check is always `XCHECK_NA`.
    - FRED fetch from inside Postgres failed (HTTP/2); retest from an edge function.
-8. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
+8. **Digest completeness: primary-source pages (10 Oct 2026).** Both Macro Takeaways runs on Sat 10 Oct
+   ran the completeness sweep (Opus footer: 14 searches, window to 07:53 SGT, "weekend: no Asia
+   session") and both missed the RBI's overnight rupee package (OMC dollar window, 20% FERR, $5m
+   no-underlying limit, rebooking ban). Cause: the sweep is search-only, and no outlet had written the
+   story up by ~07:30 SGT (first pickups ~08:40 SGT); only rbi.org.in had it. Fix live: section A0
+   of `completeness_sweep_spec` fetches 14 central-bank, ministry and regulator listing pages directly
+   every day, weekends included, with a stale-page fallback and a footer count. Text is in project file
+   `notes/completeness_sweep_A0_primary_sources.txt`. The Drive connector can't edit the Doc body and
+   `Spec.gs` only handles `trade_book_spec`, so the owner pasted A0 into the doc above "A. CHECKLIST" (verified 10 Oct 12:35 SGT; first run Sun 11 Oct 07:15 SGT, check its "Primary pages: F/14" footer).
+   No routine edit needed (Opus prompt is at 65,388 of 65,536 bytes). Note: cached readers (Exa)
+   still showed the RBI page without the 10 Oct items hours later, so A0 must use a live fetch.
+9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
 
@@ -136,6 +177,28 @@ Voices, Review, Positioning, Trend.
   invalidation; spot when a stop level is clear, options otherwise; tactical trades in a separate
   shadow book until ~30 signals are positive after costs; universe of 21 pairs; levels on daily
   closes; drivers fitted on changes and tested out of sample.
+- **Trade gate (8 Oct 2026):** the (c) expectancy gate is EV ≥ +0.30R only. The r/r ≥ 1.0 floor and
+  the 75% cap on p are dropped (a p above 75% must name its basis and is scored apart). The same goes
+  for R01 convexity cards (premium ≤ 50% and p ≤ 75% gone; the 10% premium minimum stays). Book caps
+  (10 thematic, 5 tactical) and test (g), the 60-day veto block, are retired; with no meaningful stop an
+  R01 option card (premium = 1R) satisfies test (b). The owner
+  updates `trade_book_spec` on Drive for both books; the Trades tab labels the old floor's rejections
+  as history.
+- **Thin edge (9 Oct 2026, spec v12):** test (c) is EV > 0, no longer ≥ +0.3R. Cards between 0 and +0.3R
+  are tagged "thin edge" and scored apart (SCORECARD, Trades tab). After 30 thin-edge closes, the weekly
+  review compares their realised R with zero; at or below zero, +0.3R returns. R01 updated to match.
+- **First-hour exits (11 Oct 2026, spec v13):** a VIEW CHANGED close (thesis dead, at a review or
+  between reviews) and a reader "close Pnn" exit at the close of the first hourly bar of the proxy
+  that starts after the decision, the same clock as entries, instead of the latest mark or the next
+  daily close. If that bar has not printed by the run, the trade shows "closing" and the next run
+  closes it at that bar. Trades already declared dead with a later planned exit switch on the first
+  v13 run. Applies to both books (they read the same spec). R01 EARLY CLOSE gets the same wording
+  (SQL handed to the owner, since R01 lives in `dash.rules`).
+- **Spec v11 drafted, not yet applied (8 Oct):** BOOK CHECK line (net factor exposure, LOPSIDED flag),
+  a HEDGE class at EV ≥ 0 when lopsided into an event, and test (d) accepting a distant event the
+  market trades now. Full v11 text is in the project files (`notes/trade_book_spec_v11_full.txt`);
+  v10 archived on Drive as `trade_book_spec_archive_v10_2026-10-08`. The Drive connector cannot edit
+  a Doc's body, so the owner pasted v11 over the doc (verified 8 Oct). Later edits go through `Spec.gs`. Once a hedge carries `class hedge`, the dashboard needs a hedge bucket.
 - **Research integrity:** pre-register, never peek at outcomes, log deviations (DV-nn); the portfolio
   side never sees out-of-sample results.
 - BigQuery daily query cap 1.5 TiB. No Google Cloud sign-in from a session: the owner runs BigQuery
@@ -152,6 +215,11 @@ Voices, Review, Positioning, Trend.
 ## Working conventions
 
 - One session per feature or per day; this file carries continuity.
+- To change `trade_book_spec`: create a JSON file titled `trade_book_spec_edits` in the spec folder
+  (Drive connector `create_file`, text/plain, no conversion) holding `[{"find","replace"}]`. Each find
+  must occur exactly once in the live text, and edits must not overlap. `Spec.gs` applies it within
+  10 minutes and archives the old version, or renames the file `_rejected_<date>` and logs why. The
+  Drive connector cannot edit a Doc's body directly.
 - Tests: `deno test supabase/functions/_shared/` (parse, convexity; no trend test file in the
   repo). Deno isn't preinstalled in cloud sessions.
 - New migrations are numbered after `013_trend_shadow.sql`.
