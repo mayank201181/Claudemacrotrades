@@ -49,6 +49,7 @@ STD_FLOOR = 0.15
 GKG_MIN_FILES = 12      # a day needs at least this many hourly files to count as valid
 GKG_MIN_ARTICLES = 3000
 DOC_MIN_NORM = 40000    # a DOC API day with fewer monitored articles is treated as an index gap
+MIN_SPIKE_COUNT = 5     # a SPIKE needs at least this many matching articles that day (not applied to Wikipedia views)
 
 
 def log(msg):
@@ -316,12 +317,14 @@ def score_series(days):
             std = max(statistics.pstdev(xs), STD_FLOOR)
             z = (x - mean) / std
             med = statistics.median(b[2] for b in base)
+            if med <= 0:  # sparse topic: most baseline days are zero, compare with the mean instead
+                med = statistics.fmean(b[2] for b in base)
             ratio = share / med if med > 0 else None
             last7 = [share] + [b[2] for b in hist[-6:]]
             prev28 = [b[2] for b in hist[-34:-6]] if len(hist) >= 34 else [b[2] for b in hist[:-6]]
             if prev28 and statistics.fmean(prev28) > 0:
                 trend = statistics.fmean(last7) / statistics.fmean(prev28)
-            if z >= 2 and (ratio or 0) >= 1.5:
+            if z >= 2 and (ratio or 0) >= 1.5 and (total is None or count >= MIN_SPIKE_COUNT):
                 flag = "SPIKE"
             elif z >= 1:
                 flag = "ELEVATED"
@@ -441,22 +444,23 @@ def cmd_compute(a):
         if s in notes:
             lines.append(f"- {notes[s]}")
     lines += ["", "z90 = today's log coverage share against its previous 90 days (standard deviations); x90 = share divided "
-              "by the 90-day median; trend = last 7 days against the 28 before. Media = GDELT GKG; Wiki = Wikipedia views. "
-              "SPIKE: z >= 2 and x90 >= 1.5. ELEVATED: z >= 1. QUIET: z <= -1.", ""]
+              "by the 90-day median; trend = last 7 days against the 28 before; n = matching articles in the day's sample. "
+              "Media = GDELT GKG; Wiki = Wikipedia views. SPIKE: z >= 2, x90 >= 1.5 and n >= 5. ELEVATED: z >= 1. QUIET: z <= -1.", ""]
 
     def row(i, s="gkg"):
         g = i.get(s, {})
-        return (f"| {i['label']} | {i['group']} | {fmt(g.get('z90'))} | {fmt(g.get('ratio90'), 1, 'x')} | {trend_word(g.get('trend'))} "
+        n = "" if g.get("count") is None else f"{g['count']:,}"
+        return (f"| {i['label']} | {i['group']} | {fmt(g.get('z90'))} | {fmt(g.get('ratio90'), 1, 'x')} | {trend_word(g.get('trend'))} | {n} "
                 f"| {fmt(i.get('wiki', {}).get('z90'))} | {fmt(i.get('doc', {}).get('z90'))} | {g.get('flag', '')} |")
 
-    hdr = ["| Topic | Group | Media z90 | x90 | Trend | Wiki z90 | DOC z90 | Flag |", "|---|---|---|---|---|---|---|---|"]
+    hdr = ["| Topic | Group | Media z90 | x90 | Trend | n | Wiki z90 | DOC z90 | Flag |", "|---|---|---|---|---|---|---|---|---|"]
     have = [i for i in latest if "gkg" in i and i["gkg"]["date"] == gkg_date]
     spikes = sorted([i for i in have if i["gkg"]["flag"] == "SPIKE"], key=lambda i: -i["gkg"]["z90"])
     elev = sorted([i for i in have if i["gkg"]["flag"] == "ELEVATED"], key=lambda i: -i["gkg"]["z90"])
     quiet = sorted([i for i in have if i["gkg"]["flag"] == "QUIET"], key=lambda i: i["gkg"]["z90"])
-    lines += [f"## Media spikes (GKG day {gkg_date})", ""] + hdr + [row(i) for i in spikes] + ([] if spikes else ["| none | | | | | | | |"]) + [""]
-    lines += ["## Elevated", ""] + hdr + [row(i) for i in elev] + ([] if elev else ["| none | | | | | | | |"]) + [""]
-    lines += ["## Quiet (coverage well below its norm)", ""] + hdr + [row(i) for i in quiet] + ([] if quiet else ["| none | | | | | | | |"]) + [""]
+    lines += [f"## Media spikes (GKG day {gkg_date})", ""] + hdr + [row(i) for i in spikes] + ([] if spikes else ["| none | | | | | | | | |"]) + [""]
+    lines += ["## Elevated", ""] + hdr + [row(i) for i in elev] + ([] if elev else ["| none | | | | | | | | |"]) + [""]
+    lines += ["## Quiet (coverage well below its norm)", ""] + hdr + [row(i) for i in quiet] + ([] if quiet else ["| none | | | | | | | | |"]) + [""]
     wsp = sorted([i for i in latest if "wiki" in i and i["wiki"]["flag"] in ("SPIKE", "ELEVATED")], key=lambda i: -i["wiki"]["z90"])[:12]
     lines += ["## Public attention (Wikipedia views) spikes and elevated, latest day", "", "| Topic | Group | Wiki z90 | x90 | Trend | Views | Date |", "|---|---|---|---|---|---|---|"]
     lines += [f"| {i['label']} | {i['group']} | {fmt(i['wiki']['z90'])} | {fmt(i['wiki']['ratio90'], 1, 'x')} | {trend_word(i['wiki']['trend'])} | {i['wiki']['count']:,} | {i['wiki']['date']} |" for i in wsp] or ["| none | | | | | | |"]
