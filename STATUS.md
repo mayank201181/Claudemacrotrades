@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-11._
+_Last updated: 2026-10-12._
 
 ## Where things are
 
@@ -56,15 +56,39 @@ Voices, Review, Positioning, Trend.
   static inputs; retire historical-equality claims explicitly; keep P3-null vs P5-fixed on the SAME
   fresh inputs as the real test of FIX-1..4; drop P6; freeze `included`/`exclusion_reason` per contract
   as a static input and leave xcheck correlation fields blank (they are full-period return stats).
-- **Event library Stage 1.1b (ChatGPT sandbox): failed pre-freeze HOLD (8 Oct ~12:06 SGT).** 4th
-  disposable synthetic dry run: Part 1 completed (6 s), Part 2 blocked before its worker started
-  (`ControllerOutcomeUnknown`; detached `Popen(start_new_session=True)` worker never wrote a start
-  marker). All 3 permitted restarts used. No freeze, no real run, no DB write, no results seen.
-  Untested: Parts 3–8, item 9 Part 4 fault test, item 14b for Parts 5–8, full fake-bootstrap workload
-  (26 assets × 1,000 draws × 999 reps). Registered hashes: spec `a338407b…`, event_library.py
-  `c42b8bea…`, harness `dd6f0106…`, decisions `d40b4ef6…`, input manifest `aa4c1471…`.
-  Likely cause (unconfirmed): the hosted sandbox kills detached processes between tool calls.
-  Proposed: re-run the dry run, code unchanged, on the MacBook under a new owner restart allowance.
+- **Event library Stage 1.1b synthetic dry run (restart harness): DROPPED 12 Oct 2026 03:43Z.**
+  Attempts dry_01–dry_04 failed (Part 2 controller path check in the ChatGPT sandbox; on the MacBook
+  Part 5 supervisor interruption, Part 5 coverage comparator, Part 6 archive-blob comparator, the last
+  two fixed as DV_CHECKPOINT_COVERAGE_BASELINE_IDENTICAL and DV_CHECKPOINT_ARCHIVE_BLOB_PROJECTION).
+  dry_05 (4th restart, 11 Oct 12:07Z) passed Parts 1–4 but Part 5 crawled at one unit per 60 s slice
+  on a host without SHA extensions and was recorded FAILED 12 Oct 00:03Z when a move of its workspace
+  onto tmpfs tripped the harness's same-device check (DV_RESUME_DRY05_ON_FASTER_HOST). Owner raised the
+  restart cap 4 → 5 (PM_20261012_owner_local_fifth_restart). Attempt 6 was staged twice in cloud
+  containers (trees rebuilt from the 8 Oct zip, sha aaf6be8e, ledger 3,624 rows unchanged) but never
+  launched: the cloud threads' safety check refused to execute the package. Owner then dropped the
+  rehearsal (project chat, 12 Oct 03:43Z) for the plain build below. 5th allowance unused; handoff kept
+  in project files `eventday_handoff/`. No freeze, no real run, no outcome values seen. Supersedes PR #8.
+- **Event library (plain build, cloud): BUILT 12 Oct 2026 05:11Z.** One Python pipeline, no harness,
+  run end to end on real data in a cloud thread. Results in project files `event_library/`:
+  `LIBRARY.md` (the lookup: multiplier, 95% CI, significance, variance ratio, 1w/1m vol add-on per
+  event type × asset), `SUMMARY.md` (coverage, counts, checks, decisions D1–D8), the 9 `event_*`
+  CSVs in the Stage 1.1b schema, `README.md` (how to read and rebuild), `pipeline/`, `calendar/`,
+  `data/`. Calendar: 5,395 rows, 69 types (48 scored; elections exclusion-only) from official pages:
+  BLS/BEA/Census/Fed/Treasury/EIA for the US, every G10 and 9 Asian central banks, ABS, StatCan,
+  ONS, Eurostat, NBS, GACC, ESRI, BoJ Tankan, KOSTAT, BoK, DGBAS for ex-US releases, OPEC and
+  elections from the spec's frozen lists. Not sourced: EZ_HICP_FLASH, JP_CPI (too few rows to score;
+  still used as exclusions); partial: CN_TRADE from 2020-09, UK_CPI from 2015-04, CN_CPI from
+  2015-01, CN_GDP from 2015-01, CN_PMI_NBS from 2015-01. Prices: 29 series; FX = Fed H.10 noon NY
+  (IDR/PHP = ECB 14:15 CET, CNH = onshore CNY proxy), UST 2y/10y = H.15 CMT,
+  SPX/N225/KOSPI/gold/Brent = Yahoo, VIX/GVZ/OVX = CBOE; Yahoo FX daily closes rejected after a
+  clock check (early-bar snapshot, Asian pairs unusable). Method follows the spec where it matters
+  (sigma60 units, weekday-matched ±63-session controls, clean and all samples, 1d/2d windows, 11
+  periods incl. vol/VIX regimes and IS/OOS, bootstrap 5,000/999, BH by family, EB shrinkage,
+  placebo, fixed IS/OOS split 2022-04-01, 21 variants); departures logged as D1–D8. Counts: 268,207
+  moves, 52,801 cells, 351 main-family cells, 62 significant at q<0.10. Checks: placebo_fake_cells
+  ok; placebo_strict_pairs ok; oos_fixed_split ok; variants_headline warn. Nothing written to
+  Supabase (CSVs are COPY-ready; owner's call). Outcome values deliberately not quoted here or in
+  chat. Mac visits: 0.
 - **Drivers pack (local on MacBook, monitored by Claude): COMPLETE, package built 9 Oct.** Earlier history: 20-active-hour limit (pack §1.8, OF18/OF8) hit
   8 Oct 14:00 SGT; ST5 placebo 5,235/9,405 units, logged `DEV-20261008T060022225612Z-35907` plus
   pair exclusions; incomplete ST5 pairs excluded, incomplete L/T families NOT_EVALUATED, freeze
@@ -119,8 +143,14 @@ Voices, Review, Positioning, Trend.
 3. **Drivers spec v2:** fold the review critiques into `spec_v1.md` (Thu–Thu noon-NY weekly windows,
    quarterly re-selected core sets with no look-ahead, R03 THEME/TACTICAL/ADD labels, a levels study
    on front-month futures, since oil ETF roll drift breaks multi-year levels). Deliver as a file.
-4. **Event library Stage 1 gaps:** a CB's own events not screened from its own currency; 24 release
-   types unscreened; a multiplier fitted on the full sample.
+4. **Event library follow-ups (plain build, 12 Oct):** load the `event_*` CSVs into Supabase when
+   wanted (plain COPY; schema in the old package); source the release types still missing
+   (EZ_HICP_FLASH, JP_CPI (too few rows to score; still used as exclusions); partial: CN_TRADE from
+   2020-09, UK_CPI from 2015-04, CN_CPI from 2015-01, CN_GDP from 2015-01, CN_PMI_NBS from 2015-01);
+   decide whether the digest prompt reads `LIBRARY.md` for event-day sizing. The old Stage 1 gaps
+   (own-CB days unscreened, 24 types unscreened, full-sample fit) are closed by the plain build:
+   controls exclude every relevant event including the asset's own central bank, all 69 types
+   screen, and IS/OOS cells sit beside the full-sample ones.
 5. **Data-source registry:** 345 sources, mostly unverified; smoke-test from the dashboard servers.
 6. **DB check (proposed, never run):** do the digest model's ideas start from a thesis or from price?
 7. **Data-source fragility in `dash-trend`:**
