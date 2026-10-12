@@ -33,31 +33,35 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
-- **S3 CFTC v3, DV-49 STOP:** 148/150 raw files recovered locally; the 2 missing can't be refetched
-  exactly. 8 Oct 09:48 SGT local report: DV-49 logged with `chosen_ex_ante=false`; no refetch tried
-  (original request code/params not recovered). P3 hashes every raw file into the manifest, receipts
-  and ledger, so the gap spreads: missing path/hash requirements A 16 (verified), B 3,336
-  (regenerable only after an authorised run-identity setup; 25 with unresolved readers), C 121.
-  Exact v3 restore is not possible. **Ruled (8 Oct): v3 closed, frozen read-only; fresh v4 from source
-  under v3's protocol.** Outcome-exposure check: none per recovered v3 logs, but missing history can't
-  be certified. v4 plan drafted and hash-sealed (12:02 SGT): request code, parameters, deviations,
-  hashing, estimates. Open before any fetch: 2 static-input exceptions and historical P1/P3/P6
-  requirements need a protocol ruling; dependency lock and SDK review are pre-fetch prerequisites.
-  13:15 SGT: env locked (Python 3.12.14, 28 pinned packages, dependency checks pass); decision memo,
-  SDK findings, exact changes delivered; plan re-sealed (`PLAN_SHA256SUMS.txt` sha256 `625fdffc…`).
-  Still pre-fetch blockers: SSL key-log controls, Yahoo auxiliary requests, env settings,
-  transformations; CFTC completeness checks have limits. **Flag:** a broad protocol read pulled
-  historical disclosure text into the agent's context (values not repeated; see its scope note).
-  Owner attestation still a placeholder.
-  16:16 SGT: disclosure text = section R of the PM's S3 GATE v3 instruction (design-only gate z values,
-  counts, OOS pass flags; already logged as R / DV-31..33). Plan re-sealed (manifest `a71aa56e…`).
-  Decision memo: S1 `s2_definition.txt` and S2 `s3_actual_release_dates.csv` (46 rows) are static PM
-  inputs; P1/P3/P6 historical-equality checks (v2 A7 486 hashes, stored-vs-rebuilt diffs, v1
-  reproduction <1e-10) are impossible without lost baselines; `s3_data_audit.csv` seed and
-  `s3_method_checks.csv` missing. Independent review (this repo's session) recommends: adopt S1/S2 as
-  static inputs; retire historical-equality claims explicitly; keep P3-null vs P5-fixed on the SAME
-  fresh inputs as the real test of FIX-1..4; drop P6; freeze `included`/`exclusion_reason` per contract
-  as a static input and leave xcheck correlation fields blank (they are full-period return stats).
+- **S3 CFTC: v4 CLOSED (9 Oct); v5 run 3 SEALED as a STOP package at step 15 (12 Oct).** v4 (fresh run from source
+  under v3's protocol, run `20261008T102913Z`): P1–P3 PASS; protocol stop at P4 on 9 Oct 17:14 SGT
+  because PR-5 could not be resolved for 20 Nikkei (NKD tff) test-period rows (NKD missing from 16 of
+  18 W3 files, so a 2019 delayed-report anchor reached into 2022–23). No results computed; package
+  sealed in `final_package_v4`, with two fixes noted for v5 (P4 timing split, compiler legacy-identity
+  bug). v5 (11 Oct, run by Claude on the Mac over Remote Control; owner ruling "go": drop NKD from the
+  test period only, `chosen_ex_ante=false`): pre-run fixes DV-87..92 (compiler index, P4 split per
+  contract with a chunked compile, legacy identity, acquisition reuse by hash), each proven
+  output-identical on the frozen v4 P3 tree. Run 1 (`20261011T140000Z`): P1–P5 PASS, STOP at step 13
+  (paired P3-vs-P5 comparison) on a comparator contract defect; repaired and re-executed (DV-93/94).
+  Run 2 (`20261011T200000Z`): steps 00–12 PASS, STOP at step 13 again on four classes of unmapped
+  P3→P5 differences (DV-96): two process defects (positioning-table key field, horizon key format),
+  fixed; two permission gaps in the P4 predictor (Friday timing counts for four contracts, row
+  presence on Brent T4 arrays), fixed generally and granted by the owner after the fact on 12 Oct
+  (DV-97, declared re-execution). Codes and counts only; no outcome value was seen by anyone.
+  Run 3 (`20261012T072000Z`): launched 12 Oct 07:16Z from P1 after two pre-P1 stops (DV-98 verifier
+  history table, DV-99 journal numbering) and one step-02 receipt re-pin (DV-100). Steps 00–14 PASS,
+  including the step 13 paired comparison at 11:44Z under the sealed comparator. Step 15 (P5
+  independent checks) could not finish in the day: 4,339 bounded check calls at about 3.4 min each
+  (23 s of kernel time, the rest per-call preflight that re-verifies the growing receipt chain), about
+  250 h; 27 were receipted at seal time. Under the owner's 12 Oct finish-today order the run was
+  sealed at 13:33Z as a STOP package (`final_package_v5`, final status INCOMPLETE, 51 deviation
+  receipts DV-51..101) with the gap stated in the receipt (DV-101; the per-call preflight cost is the
+  open process defect). P7 not run, gate decision absent, Phase 3 locked. No outcome value was
+  computed or seen by anyone.
+  Next: fix the P5-checks per-call cost (batch tasks per bounded call, verify receipts incrementally;
+  DV-101), then resume at step 15 on run 3's frozen P5 outputs when the owner authorises it; nothing
+  before step 15 needs re-running. The detached check loop on the Mac is to be stopped (one `kill`
+  of the runner process).
 - **Event library Stage 1.1b synthetic dry run (restart harness): DROPPED 12 Oct 2026 03:43Z.**
   Attempts dry_01–dry_04 failed (Part 2 controller path check in the ChatGPT sandbox; on the MacBook
   Part 5 supervisor interruption, Part 5 coverage comparator, Part 6 archive-blob comparator, the last
@@ -264,6 +268,9 @@ Voices, Review, Positioning, Trend, Drivers.
 ## Working conventions
 
 - One session per feature or per day; this file carries continuity.
+- Owner rule (12 Oct 2026): finish each workstream in the day, suboptimal is acceptable, then run
+  the book and change things only when a trade shows something; no cards or questions mid-run,
+  threads pick the sensible default and journal it.
 - To change `trade_book_spec`: create a JSON file titled `trade_book_spec_edits` in the spec folder
   (Drive connector `create_file`, text/plain, no conversion) holding `[{"find","replace"}]`. Each find
   must occur exactly once in the live text, and edits must not overlap. `Spec.gs` applies it within
