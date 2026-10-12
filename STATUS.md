@@ -24,7 +24,7 @@ _Last updated: 2026-10-12._
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rules inputs | `40 22 * * *` UTC |
 | `dash-trend` (TM1) | 38-asset trend monitor, events, FX one-touch board | 00:30 UTC Tue–Sat |
 | `dash-trend` shadow (TM1.1) | 15 FX pairs on 17:00 NY closes, beside TM1 | 00:40 UTC Tue–Sat |
-| `dash.put_drivers(jsonb)` | loads one snapshot of the FX drivers engine (`dash-ingest` kind `drivers`, or `execute_sql`); the Drivers tab reads `dash_drivers`, the digests `dash.drivers_brief()` | on post (daily refresh not yet wired) |
+| `dash.put_drivers(jsonb)` | loads one snapshot of the FX drivers engine (`dash-ingest` kind `drivers`, or `execute_sql`); the Drivers tab reads `dash_drivers`, the digests `dash.drivers_brief()` | on post (daily refresh parked: no part passed the holdout) |
 | `dash-history`, `dash-gdelt` | research relays (Yahoo daily/hourly bars, GDELT DOC API) | on call |
 | `scripts/gdelt/attention.py` | media-attention table (GDELT GKG hourly sample, DOC API, Wikipedia views) → project files `gdelt/` | daily routine, before 07:15 SGT |
 
@@ -155,15 +155,22 @@ Voices, Review, Positioning, Trend, Drivers.
    decide whether TM1's FX moves to the 17:00 NY clock (D6 in `_shared/trend.ts`). Before switching,
    check USDINR/USDIDR: their realised vol at the NY close is much lower (likely thin quotes).
 2. **Drivers engine + Drivers tab** (21 FX pairs: what drives each pair now, rich/cheap, waking-up).
-   12 Oct: holdout rerun r2 finished on a cloud VM (metadata only in this file; the package and its
-   report stay on the owner's Mac). Drivers tab live (`015_drivers.sql`, `site/drivers.js`): one
-   snapshot per as-of date, loaded as JSON through `dash.put_drivers`; only parts with a passing
-   holdout verdict are shown, the rest listed with their verdict; the digests read
-   `dash.drivers_brief()` under a rule in force (see Decisions). Still open: the daily refresh. The
-   pack defines the entry point (`code/update_engine.py --cadence daily` on the Mac, 23:20 UTC
-   Mon–Fri); wire a launchd job that runs it and posts the snapshot to `dash-ingest` (kind
-   `drivers`, token from the Mac keychain, never from the repo). Hard requirement kept: incremental
-   D/W/M/Q updates with a test that they equal a full rebuild. Later: rates, APAC indices, energy.
+   12 Oct: holdout rerun r2 on a cloud VM. The holdout stage closed at 00:38 UTC; verdicts: what's
+   driving now FAIL, waking-up FAIL, rich/cheap UNTESTED, levels and tactical DEV-only (metadata
+   only in this file; the run archive and its report stay on the owner's Mac). The production-spec
+   stage then stopped by itself at 11:35 UTC (its levels phase does not skip the sealed levels
+   ledger). The owner closed the run as incomplete the same evening ("Close it", 12:32 UTC): the
+   whole run root archived to the Mac (22.9 GB, sha256 verified), VM deleted 14:11 UTC; no sealed
+   package. Drivers tab live
+   (`015_drivers.sql`, `site/drivers.js`): one snapshot per as-of date, loaded as JSON through
+   `dash.put_drivers`; only parts with a passing holdout verdict are shown, the rest listed with
+   their verdict; the digests read `dash.drivers_brief()` under a rule in force (see Decisions).
+   Loaded 12 Oct: one snapshot as of 2024-09-30 (the dev end), 20 pairs; no part passed, so the tab
+   shows the verdict table and no per-pair read, and the digests get the same. Parked: the daily
+   refresh (a launchd job posting to `dash-ingest` kind `drivers`, token from the Mac keychain,
+   never from the repo) is moot while no part is in production. A revival means rerunning the
+   production-spec and packaging stages on the Mac from the archive with the levels phase skipped
+   under option B, then fixing what the holdout failed. Later: rates, APAC indices, energy.
 3. **Drivers spec v2:** fold the review critiques into `spec_v1.md` (Thu–Thu noon-NY weekly windows,
    quarterly re-selected core sets with no look-ahead, R03 THEME/TACTICAL/ADD labels, a levels study
    on front-month futures, since oil ETF roll drift breaks multi-year levels). Deliver as a file.
@@ -217,6 +224,10 @@ Voices, Review, Positioning, Trend, Drivers.
   only parts whose holdout verdict passed; "what's driving now" is the only part expected to pass
   (review of 10 Oct). The digests read the engine through one rule put in force the same day,
   revertible like any rule. The daily refresh is deferred, not dropped.
+- **12 Oct 2026, Drivers close-out.** Holdout r2 passed no part and the production-spec stage failed
+  on the VM. Closed incomplete on the owner's word rather than patched and rerun (no long runs after
+  12 Oct). The dev-end snapshot stands as the final one; the engine stays out of production and out
+  of the digests' per-pair reads until a rerun passes a part.
 
 - Trend Monitor design choices D1–D6: header of `supabase/functions/_shared/trend.ts`.
 - Ingest moved from a Claude routine to Apps Script because auto-mode blocks posting email content
