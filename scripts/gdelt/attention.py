@@ -11,9 +11,10 @@ Three free sources, no credentials:
   wiki  Wikimedia pageviews API: daily user views of an English Wikipedia article (UTC days).
 
 Score per topic and source: share = count / total * 10,000 (views for wiki); x = log(1 + share);
-z90 = (x - mean of x over the previous 90 valid days) / std (floor 0.15); ratio90 = share / median share over
-those days; trend = mean share of the last 7 days / mean of the 28 days before that.
-Flags: SPIKE z >= 2 and ratio >= 1.5; ELEVATED z >= 1; QUIET z <= -1; else NORMAL; NA when no baseline.
+z90 = (x - mean of x over the previous 90 valid weekdays, or 26 weekend days for a weekend) / std (floor 0.15);
+ratio90 = share / median share over those days; trend = mean share of the last 7 days / mean of the 28 days before.
+Flags: SPIKE z >= 2, ratio >= 1.5 and n >= 5; ELEVATED z >= 1; QUIET z <= -1; else NORMAL; THIN when the topic's
+baseline median is under 20 articles (z too noisy); NA when no baseline.
 
 Usage (DIR holds topics.json and all outputs):
   attention.py gkg     --out DIR [--start YYYY-MM-DD] [--end YYYY-MM-DD] [--include-today] [--workers 8]
@@ -43,8 +44,11 @@ SGT = dt.timezone(dt.timedelta(hours=8))
 GKG_BASE = "https://data.gdeltproject.org/gdeltv2/"
 DOC_BASE = "https://api.gdeltproject.org/api/v2/doc/doc"
 WIKI_BASE = "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/"
-BASE_DAYS = 90          # baseline window (valid days)
-MIN_BASE = 30           # minimum valid days before a z-score is printed
+BASE_DAYS = 90          # baseline window for weekdays (valid days of the same class)
+BASE_DAYS_WE = 26       # baseline window for weekend days (Saturdays and Sundays are compared with weekends only)
+MIN_BASE = 30           # minimum weekday history before a z-score is printed
+MIN_BASE_WE = 12        # minimum weekend history
+THIN_COUNT = 20         # baseline median below this many matching articles: z is printed but flagged THIN
 STD_FLOOR = 0.15
 GKG_MIN_FILES = 12      # a day needs at least this many hourly files to count as valid
 GKG_MIN_ARTICLES = 3000
@@ -298,9 +302,12 @@ def cmd_wiki(a):
 
 # ----------------------------------------------------------------------------------------------------------- scoring
 def score_series(days):
-    """days: sorted list of (date, count, total, valid). Returns rows with share, z90, ratio90, trend, flag."""
+    """days: sorted list of (date, count, total, valid). Returns rows with share, z90, ratio90, trend, flag.
+
+    Weekend days are scored against earlier weekend days and weekdays against weekdays, because market topics get far
+    less coverage on Saturdays and Sundays and a mixed baseline would print QUIET every weekend."""
     rows = []
-    hist = []   # (date, x, share) for valid days, in order
+    hist = []   # (date, x, share, count, cls) for valid days, in order
     for date, count, total, valid in days:
         if not valid:
             rows.append({"date": date, "count": count, "total": total, "share": None, "z90": None, "ratio90": None,
@@ -308,13 +315,18 @@ def score_series(days):
             continue
         share = count / total * 10000 if total else float(count)
         x = math.log1p(share)
-        base = hist[-BASE_DAYS:]
+        cls = "we" if dt.date.fromisoformat(date).weekday() >= 5 else "wd"
+        window, need = (BASE_DAYS_WE, MIN_BASE_WE) if cls == "we" else (BASE_DAYS, MIN_BASE)
+        base = [b for b in hist if b[4] == cls][-window:]
         z = ratio = trend = None
         flag = "NA"
-        if len(base) >= MIN_BASE:
+        if len(base) >= need:
             xs = [b[1] for b in base]
             mean = statistics.fmean(xs)
-            std = max(statistics.pstdev(xs), STD_FLOOR)
+            med_count = statistics.median(b[3] for b in base)
+            # floor the spread at the sampling noise of the count itself (sd of log n is about 1/sqrt(n))
+            floor = STD_FLOOR if total is None else max(STD_FLOOR, 1.2 / math.sqrt(max(med_count, 1)))
+            std = max(statistics.pstdev(xs), floor)
             z = (x - mean) / std
             med = statistics.median(b[2] for b in base)
             if med <= 0:  # sparse topic: most baseline days are zero, compare with the mean instead
@@ -324,7 +336,10 @@ def score_series(days):
             prev28 = [b[2] for b in hist[-34:-6]] if len(hist) >= 34 else [b[2] for b in hist[:-6]]
             if prev28 and statistics.fmean(prev28) > 0:
                 trend = statistics.fmean(last7) / statistics.fmean(prev28)
-            if z >= 2 and (ratio or 0) >= 1.5 and (total is None or count >= MIN_SPIKE_COUNT):
+            thin = total is not None and med_count < THIN_COUNT
+            if thin:
+                flag = "THIN"
+            elif z >= 2 and (ratio or 0) >= 1.5 and (total is None or count >= MIN_SPIKE_COUNT):
                 flag = "SPIKE"
             elif z >= 1:
                 flag = "ELEVATED"
@@ -334,7 +349,7 @@ def score_series(days):
                 flag = "NORMAL"
         rows.append({"date": date, "count": count, "total": total, "share": share, "z90": z, "ratio90": ratio,
                      "trend": trend, "flag": flag})
-        hist.append((date, x, share))
+        hist.append((date, x, share, count, cls))
     return rows
 
 
@@ -445,7 +460,9 @@ def cmd_compute(a):
             lines.append(f"- {notes[s]}")
     lines += ["", "z90 = today's log coverage share against its previous 90 days (standard deviations); x90 = share divided "
               "by the 90-day median; trend = last 7 days against the 28 before; n = matching articles in the day's sample. "
-              "Media = GDELT GKG; Wiki = Wikipedia views. SPIKE: z >= 2, x90 >= 1.5 and n >= 5. ELEVATED: z >= 1. QUIET: z <= -1.", ""]
+              "Media = GDELT GKG; Wiki = Wikipedia views. Weekend days are compared with weekends, weekdays with weekdays. "
+              "SPIKE: z >= 2, x90 >= 1.5 and n >= 5. ELEVATED: z >= 1. QUIET: z <= -1. THIN: the topic's normal day has "
+              "under 20 matching articles in the day's sample, so its z is noisy (see the DOC and Wiki columns instead).", ""]
 
     def row(i, s="gkg"):
         g = i.get(s, {})
@@ -465,7 +482,12 @@ def cmd_compute(a):
     lines += ["## Public attention (Wikipedia views) spikes and elevated, latest day", "", "| Topic | Group | Wiki z90 | x90 | Trend | Views | Date |", "|---|---|---|---|---|---|---|"]
     lines += [f"| {i['label']} | {i['group']} | {fmt(i['wiki']['z90'])} | {fmt(i['wiki']['ratio90'], 1, 'x')} | {trend_word(i['wiki']['trend'])} | {i['wiki']['count']:,} | {i['wiki']['date']} |" for i in wsp] or ["| none | | | | | | |"]
     lines += ["", "## All topics (sorted by media z90)", ""] + hdr
-    lines += [row(i) for i in sorted(latest, key=lambda i: -(i.get("gkg", {}).get("z90") if i.get("gkg", {}).get("z90") is not None else -99))]
+    def sort_key(i):
+        g = i.get("gkg", {})
+        z = g.get("z90")
+        return (1 if g.get("flag") == "THIN" else 0, -(z if z is not None else -99))
+
+    lines += [row(i) for i in sorted(latest, key=sort_key)]
     with open(os.path.join(a.out, "attention_latest.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     log(f"compute done: {len(spikes)} spikes, {len(elev)} elevated, {len(quiet)} quiet on GKG day {gkg_date}; "
