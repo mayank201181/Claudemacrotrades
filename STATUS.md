@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-11._
+_Last updated: 2026-10-12._
 
 ## Where things are
 
@@ -24,10 +24,11 @@ _Last updated: 2026-10-11._
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rules inputs | `40 22 * * *` UTC |
 | `dash-trend` (TM1) | 38-asset trend monitor, events, FX one-touch board | 00:30 UTC Tue–Sat |
 | `dash-trend` shadow (TM1.1) | 15 FX pairs on 17:00 NY closes, beside TM1 | 00:40 UTC Tue–Sat |
+| `dash.put_drivers(jsonb)` | loads one snapshot of the FX drivers engine (`dash-ingest` kind `drivers`, or `execute_sql`); the Drivers tab reads `dash_drivers`, the digests `dash.drivers_brief()` | on post (daily refresh not yet wired) |
 | `dash-history`, `dash-gdelt` | research relays (Yahoo daily/hourly bars, GDELT DOC API) | on call |
 
 Site tabs: Themes, Trades (linear + convexity cards), YouTube, Podcast, Grok, Substack, Questions,
-Voices, Review, Positioning, Trend.
+Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
@@ -114,7 +115,14 @@ Voices, Review, Positioning, Trend.
    decide whether TM1's FX moves to the 17:00 NY clock (D6 in `_shared/trend.ts`). Before switching,
    check USDINR/USDIDR: their realised vol at the NY close is much lower (likely thin quotes).
 2. **Drivers engine + Drivers tab** (21 FX pairs: what drives each pair now, rich/cheap, waking-up).
-   Port the daily part to an edge function in the morning refresh. Hard requirement: incremental
+   12 Oct: holdout rerun r2 finished on a cloud VM (metadata only in this file; the package and its
+   report stay on the owner's Mac). Drivers tab live (`015_drivers.sql`, `site/drivers.js`): one
+   snapshot per as-of date, loaded as JSON through `dash.put_drivers`; only parts with a passing
+   holdout verdict are shown, the rest listed with their verdict; the digests read
+   `dash.drivers_brief()` under a rule in force (see Decisions). Still open: the daily refresh. The
+   pack defines the entry point (`code/update_engine.py --cadence daily` on the Mac, 23:20 UTC
+   Mon–Fri); wire a launchd job that runs it and posts the snapshot to `dash-ingest` (kind
+   `drivers`, token from the Mac keychain, never from the repo). Hard requirement kept: incremental
    D/W/M/Q updates with a test that they equal a full rebuild. Later: rates, APAC indices, energy.
 3. **Drivers spec v2:** fold the review critiques into `spec_v1.md` (Thu–Thu noon-NY weekly windows,
    quarterly re-selected core sets with no look-ahead, R03 THEME/TACTICAL/ADD labels, a levels study
@@ -158,6 +166,11 @@ Voices, Review, Positioning, Trend.
 - Taken as yes without an explicit reply: post-2014 carry rates; event-library defaults.
 
 ## Decisions on record
+
+- **12 Oct 2026, Drivers Stage 2–3 (owner: finish today, suboptimal is fine).** The Drivers tab shows
+  only parts whose holdout verdict passed; "what's driving now" is the only part expected to pass
+  (review of 10 Oct). The digests read the engine through one rule put in force the same day,
+  revertible like any rule. The daily refresh is deferred, not dropped.
 
 - Trend Monitor design choices D1–D6: header of `supabase/functions/_shared/trend.ts`.
 - Ingest moved from a Claude routine to Apps Script because auto-mode blocks posting email content
@@ -214,4 +227,5 @@ Voices, Review, Positioning, Trend.
   Drive connector cannot edit a Doc's body directly.
 - Tests: `deno test supabase/functions/_shared/` (parse, convexity; no trend test file in the
   repo). Deno isn't preinstalled in cloud sessions.
-- New migrations are numbered after `013_trend_shadow.sql`.
+- New migrations are numbered after `015_drivers.sql` (the database also holds a `014_grok_crowding`
+  applied without a repo file).
