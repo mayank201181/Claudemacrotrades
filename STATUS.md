@@ -141,8 +141,8 @@ Voices, Review, Positioning, Trend, Drivers.
   Outputs in the project files under `gdelt/` (`attention_latest.md` / `.json`, `attention_daily.csv`, `topics.json`,
   README). A daily routine refreshes it before the 07:15 SGT digests and writes a Drive copy
   `gdelt_attention_latest` in the digest folder. Both Macro Takeaways digests read that copy through dashboard
-  rule R04 (proposed 12 Oct, source owner): in force from Sun 18 Oct 2026 20:10 SGT via the apply-rules routine,
-  or earlier once the owner runs `gdelt/r04_in_force.sql` (project files) in the Supabase SQL editor.
+  rule R04 (source owner, in force since 12 Oct 2026 08:45Z; `revert R04` in a reply to the weekly review email
+  removes it).
   Not in the repo: topic list and data.
 
 ## Open items
@@ -196,10 +196,6 @@ Voices, Review, Positioning, Trend, Drivers.
 9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
-
-10. **GDELT rule R04 (12 Oct 2026):** goes in force by itself Sun 18 Oct 20:10 SGT unless opposed. To have the
-    digests read the attention table sooner, the owner runs the 3-statement `gdelt/r04_in_force.sql` (project files)
-    in the Supabase SQL editor; the thread's own UPDATE was blocked by the auto-mode classifier.
 
 ## Questions still unanswered
 
