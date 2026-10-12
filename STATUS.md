@@ -26,6 +26,7 @@ _Last updated: 2026-10-12._
 | `dash-trend` shadow (TM1.1) | 15 FX pairs on 17:00 NY closes, beside TM1 | 00:40 UTC Tue–Sat |
 | `dash.put_drivers(jsonb)` | loads one snapshot of the FX drivers engine (`dash-ingest` kind `drivers`, or `execute_sql`); the Drivers tab reads `dash_drivers`, the digests `dash.drivers_brief()` | on post (daily refresh not yet wired) |
 | `dash-history`, `dash-gdelt` | research relays (Yahoo daily/hourly bars, GDELT DOC API) | on call |
+| `scripts/gdelt/attention.py` | media-attention table (GDELT GKG hourly sample, DOC API, Wikipedia views) → project files `gdelt/` | daily routine, before 07:15 SGT |
 
 Site tabs: Themes, Trades (linear + convexity cards), YouTube, Podcast, Grok, Substack, Questions,
 Voices, Review, Positioning, Trend, Drivers.
@@ -106,8 +107,19 @@ Voices, Review, Positioning, Trend, Drivers.
   `DEV-20261009T132750652688Z-33237`). ~22:00 SGT: final package of 20 parts, hash-verified
   (target was 12 or fewer; nothing dropped). Run STOPPED cleanly. Results not yet opened.
   Next: owner decides how to review the package.
-- **Attention/GDELT on BigQuery:** v7 failed its ID-collision check; v8.1 amendment verified and its
-  run script delivered. Owner runs the pilot in Cloud Shell, then the post-pilot steps.
+- **Attention/GDELT: live from 12 Oct 2026, no BigQuery.** The v8.1 Cloud Shell pilot was dropped (owner, 12 Oct:
+  finish today, rough is fine). `scripts/gdelt/attention.py` builds a daily media-attention table for 109 topics
+  (countries, central banks and currencies, rates, equity indices, energy and commodities, macro themes) from
+  GDELT's free files: the GKG English edition sampled hourly since 1 Oct 2025 (Singapore days, primary gauge),
+  the DOC 2.0 API since Jan 2024 (all languages, UTC days; its index has gaps since mid-Sept 2026, so only days
+  with a full index count) and English Wikipedia pageviews as a public-attention check. Score: log coverage share
+  against the previous 90 days (z90, x90, 7d-vs-28d trend); flags SPIKE (z >= 2 and x90 >= 1.5), ELEVATED, QUIET.
+  Outputs in the project files under `gdelt/` (`attention_latest.md` / `.json`, `attention_daily.csv`, `topics.json`,
+  README). A daily routine refreshes it before the 07:15 SGT digests and writes a Drive copy
+  `gdelt_attention_latest` in the digest folder. Both Macro Takeaways digests read that copy through dashboard
+  rule R04 (proposed 12 Oct, source owner): in force from Sun 18 Oct 2026 20:10 SGT via the apply-rules routine,
+  or earlier once the owner runs `gdelt/r04_in_force.sql` (project files) in the Supabase SQL editor.
+  Not in the repo: topic list and data.
 
 ## Open items
 
@@ -154,6 +166,10 @@ Voices, Review, Positioning, Trend, Drivers.
 9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
+
+10. **GDELT rule R04 (12 Oct 2026):** goes in force by itself Sun 18 Oct 20:10 SGT unless opposed. To have the
+    digests read the attention table sooner, the owner runs the 3-statement `gdelt/r04_in_force.sql` (project files)
+    in the Supabase SQL editor; the thread's own UPDATE was blocked by the auto-mode classifier.
 
 ## Questions still unanswered
 
@@ -207,7 +223,9 @@ Voices, Review, Positioning, Trend, Drivers.
 - **Research integrity:** pre-register, never peek at outcomes, log deviations (DV-nn); the portfolio
   side never sees out-of-sample results.
 - BigQuery daily query cap 1.5 TiB. No Google Cloud sign-in from a session: the owner runs BigQuery
-  in Cloud Shell. GDELT DOC API is throttled, so heavy GDELT work goes through BigQuery.
+  in Cloud Shell. GDELT DOC API is throttled (one request per 5 s, and the limiter counts other users of shared
+  cloud addresses), so heavy GDELT work reads the raw 15-minute GKG files on data.gdeltproject.org instead
+  (12 Oct 2026: attention signal built that way; BigQuery route dropped).
 
 ## Guardrails
 

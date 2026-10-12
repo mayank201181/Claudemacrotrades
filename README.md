@@ -45,6 +45,10 @@ proposed and in force, weekly lessons).
   2 months), each on its own clock and only for the horizons it was stated for; a "logged live" scope rebuilt
   without backfilled entries; crowding per scope with ONE-SIDED (5+ voices, 80%+ on one side) and EXTREME (also
   top-decile participation); and the rules and weekly-review inputs that read the same figures.
+- `scripts/gdelt/attention.py` — the media-attention signal: daily coverage counts for the book's topics from GDELT's free
+  files (GKG English edition sampled hourly, Singapore days; DOC 2.0 API since 2024; English Wikipedia pageviews), scored
+  against the previous 90 days (z90, x90, trend) with SPIKE / ELEVATED / QUIET flags. Topics, caches and outputs live in the
+  project files folder `gdelt/` (not in this repo); `refresh` runs daily before the digests. Stdlib only, no credentials.
 - `supabase/migrations/` — the `dash` schema (in `macro-state-db`; never touches the routines' own tables).
 - `scripts/apps_script/Code.gs` — feeder that runs in the owner's Google account every 10 minutes and posts new
   emails and trade books to `dash-ingest`. The Gmail searches come from `dash.config.feeds`, so a new tab is a
