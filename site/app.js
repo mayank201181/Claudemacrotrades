@@ -117,9 +117,9 @@
     document.querySelectorAll('#tradeSeg button').forEach((b) => b.classList.toggle('active', b.dataset.sub === state.sub));
     $('#view-themes').hidden = state.tab !== 'themes';
     $('#view-trades').hidden = state.tab !== 'trades';
-    $('#view-scores').hidden = !SCORES[state.tab] && !['positioning', 'trend'].includes(state.tab);
+    $('#view-scores').hidden = !SCORES[state.tab] && !['positioning', 'trend', 'drivers'].includes(state.tab);
     $('#view-feed').hidden = !FEEDS[state.tab];
-    $('#modelSeg').hidden = !!FEEDS[state.tab] || ['voices', 'review', 'positioning', 'trend'].includes(state.tab);
+    $('#modelSeg').hidden = !!FEEDS[state.tab] || ['voices', 'review', 'positioning', 'trend', 'drivers'].includes(state.tab);
     const bk = state.index?.book?.[state.model];
     $('#freshness').textContent = bk ? `book ${bk.updated || ''} · synced ${ago(bk.ingested_at)}` : '';
   }
@@ -134,6 +134,8 @@
     if (state.tab === 'positioning') return window.MacroDeskPositioning.render($('#scoresBody'), { rpc, esc, store, active: () => state.tab === 'positioning' });
     // Trend lives in trend.js and draws into the same panel.
     if (state.tab === 'trend') return window.MacroDeskTrend.render($('#scoresBody'), { rpc, esc, store, active: () => state.tab === 'trend' });
+    // Drivers lives in drivers.js and draws into the same panel.
+    if (state.tab === 'drivers') return window.MacroDeskDrivers.render($('#scoresBody'), { rpc, esc, store, active: () => state.tab === 'drivers' });
     return state.tab === 'themes' ? renderThemes() : renderTrades();
   }
 
