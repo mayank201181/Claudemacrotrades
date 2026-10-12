@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash /mnt/project-files/eventday_handoff/tools/launch_attempt6.sh)",
+      "Bash(bash /mnt/project-files/eventday_handoff/tools/keepalive_attempt6.sh:*)",
+      "Bash(bash /mnt/project-files/eventday_handoff/tools/resume_attempt6.sh)"
+    ]
+  }
+}
