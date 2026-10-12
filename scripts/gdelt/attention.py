@@ -225,7 +225,7 @@ def cmd_doc(a):
         wait = max(0.0, a.spacing - (time.time() - last_start))
         time.sleep(wait)
         last_start = time.time()
-        status, body = http_get(url)
+        status, body = http_get(url, tries=7, backoff=(15, 30, 60, 120, 180, 240))  # the limiter also counts other users of the address
         if status != 200:
             log(f"doc {t['key']}: FAILED status {status} {body[:80]!r}")
             continue
@@ -278,7 +278,7 @@ def cmd_wiki(a):
         art = t["wiki"] if "%" in t["wiki"] else urllib.parse.quote(t["wiki"], safe="")
         url = f"{WIKI_BASE}{art}/daily/{start}00/{end}00"
         time.sleep(a.spacing)
-        status, body = http_get(url, timeout=60, backoff=(5, 10, 20, 40, 60))
+        status, body = http_get(url, timeout=60, tries=7, backoff=(5, 10, 20, 40, 80, 120))
         if status != 200:
             log(f"wiki {t['key']}: FAILED status {status} {body[:80]!r}")
             continue
