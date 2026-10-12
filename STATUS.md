@@ -27,6 +27,7 @@ _Last updated: 2026-10-12._
 | `dash.put_drivers(jsonb)` | loads one snapshot of the FX drivers engine (`dash-ingest` kind `drivers`, or `execute_sql`); the Drivers tab reads `dash_drivers`, the digests `dash.drivers_brief()` | on post (daily refresh parked: no part passed the holdout) |
 | `dash-history`, `dash-gdelt` | research relays (Yahoo daily/hourly bars, GDELT DOC API) | on call |
 | `scripts/gdelt/attention.py` | media-attention table (GDELT GKG hourly sample, DOC API, Wikipedia views) → project files `gdelt/` | daily routine, before 07:15 SGT |
+| `016_event_library.sql` | event library in the database: `dash.event_cell` / `event_cal` (plus type and asset tables), loaders `dash.put_event_cells` / `put_event_cal` (compact text from `scripts/event_library/to_sql.py`); the digests read `dash.event_brief()` and `dash.event_lookup(release, asset)` | on load (library rebuilt by hand; calendar to Jan 2027) |
 
 Site tabs: Themes, Trades (linear + convexity cards), YouTube, Podcast, Grok, Substack, Questions,
 Voices, Review, Positioning, Trend, Drivers.
@@ -95,6 +96,21 @@ Voices, Review, Positioning, Trend, Drivers.
   ok; placebo_strict_pairs ok; oos_fixed_split ok; variants_headline warn. Nothing written to
   Supabase (CSVs are COPY-ready; owner's call). Outcome values deliberately not quoted here or in
   chat. Mac visits: 0.
+- **Event library into both digests: LIVE, rule R05 in force since 12 Oct 2026 14:35Z.** Owner said
+  yes (13:54Z) to trade ideas near a scheduled release citing how the asset typically moves on it.
+  Route: the library lives in the database, not in the prompt. `016_event_library.sql` (tables
+  `dash.event_type`, `event_asset`, `event_cell`, `event_cal`; loaders; `dash.event_brief()` = how to
+  read it, the types and assets covered, the releases due in 21 days with their significant cells;
+  `dash.event_lookup(release, asset)` = any cell, plain words accepted) was applied from the cloud
+  thread, but every further database write there raised an approval prompt, so the rest is one
+  tested file, project files `event_library/016_event_library_and_rule.sql`: the migration again
+  (rerun-safe), 743 cells (period ALL, clean sample, 1d and 2d windows), 219 calendar rows (Jul 2026
+  to 8 Jan 2027, 10 rule-derived dates flagged), rule R05 (scope both, source owner, in force on run,
+  review due 23 Nov 2026) and a final check that must print ok = true on every line. Ran clean twice
+  on a local Postgres 16; the owner ran it at 14:35Z, every check line ok: 743 cells and 219
+  calendar rows loaded, R05 in force, so both digests read the brief from the 13 Oct 07:15 SGT run
+  on. `revert R05` removes it later. Not in the repo: the cells and calendar. Mac visits: 1 (the
+  file).
 - **Drivers pack (local on MacBook, monitored by Claude): COMPLETE, package built 9 Oct.** Earlier history: 20-active-hour limit (pack §1.8, OF18/OF8) hit
   8 Oct 14:00 SGT; ST5 placebo 5,235/9,405 units, logged `DEV-20261008T060022225612Z-35907` plus
   pair exclusions; incomplete ST5 pairs excluded, incomplete L/T families NOT_EVALUATED, freeze
@@ -174,11 +190,11 @@ Voices, Review, Positioning, Trend, Drivers.
 3. **Drivers spec v2:** fold the review critiques into `spec_v1.md` (Thu–Thu noon-NY weekly windows,
    quarterly re-selected core sets with no look-ahead, R03 THEME/TACTICAL/ADD labels, a levels study
    on front-month futures, since oil ETF roll drift breaks multi-year levels). Deliver as a file.
-4. **Event library follow-ups (plain build, 12 Oct):** load the `event_*` CSVs into Supabase when
-   wanted (plain COPY; schema in the old package); source the release types still missing
+4. **Event library follow-ups (plain build, 12 Oct):** source the release types still missing
    (EZ_HICP_FLASH, JP_CPI (too few rows to score; still used as exclusions); partial: CN_TRADE from
    2020-09, UK_CPI from 2015-04, CN_CPI from 2015-01, CN_GDP from 2015-01, CN_PMI_NBS from 2015-01);
-   decide whether the digest prompt reads `LIBRARY.md` for event-day sizing. The old Stage 1 gaps
+   extend the database calendar before it runs out on 8 Jan 2027 (rebuild, rerun `to_sql.py`, load
+   with the same rerun-safe file `event_library/016_event_library_and_rule.sql`). The old Stage 1 gaps
    (own-CB days unscreened, 24 types unscreened, full-sample fit) are closed by the plain build:
    controls exclude every relevant event including the asset's own central bank, all 69 types
    screen, and IS/OOS cells sit beside the full-sample ones.
@@ -220,6 +236,12 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
+- **12 Oct 2026, event library into the digests (owner: yes, 13:54Z).** Both digests read
+  `dash.event_brief()` under rule R05 (scope both, source owner, review due 23 Nov 2026) and cite the
+  cell on any trade card whose catalyst or horizon holds a library release: multiplier, CI,
+  significance, typical move in sigma; non-significant or n<15 cells are "no significant read" and
+  never sized on; option cards compare implied vol with the add-on. Delivered as one SQL file the
+  owner ran (12 Oct 14:35Z), because every database write from a cloud thread raised its own approval prompt.
 - **12 Oct 2026, Drivers Stage 2–3 (owner: finish today, suboptimal is fine).** The Drivers tab shows
   only parts whose holdout verdict passed; "what's driving now" is the only part expected to pass
   (review of 10 Oct). The digests read the engine through one rule put in force the same day,
@@ -289,5 +311,5 @@ Voices, Review, Positioning, Trend, Drivers.
   Drive connector cannot edit a Doc's body directly.
 - Tests: `deno test supabase/functions/_shared/` (parse, convexity; no trend test file in the
   repo). Deno isn't preinstalled in cloud sessions.
-- New migrations are numbered after `015_drivers.sql` (the database also holds a `014_grok_crowding`
+- New migrations are numbered after `016_event_library.sql` (the database also holds a `014_grok_crowding`
   applied without a repo file).
