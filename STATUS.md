@@ -155,8 +155,9 @@ Voices, Review, Positioning, Trend, Drivers.
    driving now FAIL, waking-up FAIL, rich/cheap UNTESTED, levels and tactical DEV-only (metadata
    only in this file; the run archive and its report stay on the owner's Mac). The production-spec
    stage then stopped by itself at 11:35 UTC (its levels phase does not skip the sealed levels
-   ledger). The owner closed the run as incomplete the same evening ("Close it", 12:32 UTC): one
-   card archives the whole run root to the Mac, then deletes the VM; no sealed package. Drivers tab live
+   ledger). The owner closed the run as incomplete the same evening ("Close it", 12:32 UTC): the
+   whole run root archived to the Mac (22.9 GB, sha256 verified), VM deleted 14:11 UTC; no sealed
+   package. Drivers tab live
    (`015_drivers.sql`, `site/drivers.js`): one snapshot per as-of date, loaded as JSON through
    `dash.put_drivers`; only parts with a passing holdout verdict are shown, the rest listed with
    their verdict; the digests read `dash.drivers_brief()` under a rule in force (see Decisions).
