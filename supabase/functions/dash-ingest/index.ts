@@ -1,5 +1,6 @@
 // dash-ingest: receives raw digest emails (Gmail get_thread JSON) and trade_book_current
-// Drive docs, stores them verbatim in dash.raw, and parses them into the dash tables.
+// Drive docs, stores them verbatim in dash.raw, and parses them into the dash tables; also loads
+// drivers-engine snapshots (kind 'drivers') through dash.put_drivers.
 // Auth: body.token must equal dash.config.ingest_token. {kind:'reparse'} replays dash.raw.
 import postgres from 'npm:postgres@3.4.4';
 import { parseDigest, parseEmailTested, parseTradeBook, setPrivateTerms, type Tested } from '../_shared/parse.ts';
@@ -200,6 +201,11 @@ Deno.serve(async (req) => {
       const text = row?.payload?.text ?? body.text;
       if (!['fable', 'opus'].includes(model) || typeof text !== 'string') return new Response('bad brief_state', { status: 400 });
       out = await ingestBriefState(model, text);
+    }
+    else if (body.kind === 'drivers') {
+      // One snapshot of the FX drivers engine (see migrations/015_drivers.sql for the shape); replaces the same as_of.
+      const [{ put }] = await sql`select dash.put_drivers(${sql.json(body.data as Json)}) as put`;
+      out = [`drivers ${put.as_of}: ${put.pairs} pairs, ${put.drivers} driver rows, ${put.parts} parts, ${put.items} items`];
     }
     else if (body.kind === 'reparse') {
       const rows = await sql`select kind, model, payload from dash.raw order by kind desc, received_at`;
