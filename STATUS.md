@@ -224,12 +224,12 @@ Voices, Review, Positioning, Trend, Drivers.
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
 
-10. **Fable 5.1 YouTube and Podcast digests moving to a second claude.ai account (owner, 17 Oct 2026).** Handover
-    pack in project files `handover_fable_digests/` (README with the one-sitting setup, both prompts with key
-    placeholders and a RUN MODE paragraph: shadow copies to a separate inbox until a switch date, live from it).
-    Open: the switch date; on that morning the two originals here (Daily YouTube Digest [Fable 5.1], Daily Podcast
-    Digest [Fable 5.1]) are disabled at 04:30 SGT. Everything else (Macro Takeaways, Opus digests, ledger writer)
-    stays on the first account. Not in the repo: the prompts and keys.
+10. **Fable 5.1 YouTube and Podcast digests to a second claude.ai account: PARKED (owner, 17 Oct 2026, "let it be
+    for now").** Nothing changed on the live routines. The handover pack stays in project files
+    `handover_fable_digests/` for whenever he picks it up: README with the one-sitting setup, both prompts (17 Oct
+    text, accuracy gate included) with key placeholders and a RUN MODE paragraph (shadow copies to a separate inbox
+    until a switch date, live from it); the two originals here would be disabled at 04:30 SGT on that date. The
+    prompts will need refreshing from the live routines if they change before then. Not in the repo: prompts, keys.
 
 ## Questions still unanswered
 
