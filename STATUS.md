@@ -224,6 +224,13 @@ Voices, Review, Positioning, Trend, Drivers.
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
 
+10. **Fable 5.1 YouTube and Podcast digests moving to a second claude.ai account (owner, 17 Oct 2026).** Handover
+    pack in project files `handover_fable_digests/` (README with the one-sitting setup, both prompts with key
+    placeholders and a RUN MODE paragraph: shadow copies to a separate inbox until a switch date, live from it).
+    Open: the switch date; on that morning the two originals here (Daily YouTube Digest [Fable 5.1], Daily Podcast
+    Digest [Fable 5.1]) are disabled at 04:30 SGT. Everything else (Macro Takeaways, Opus digests, ledger writer)
+    stays on the first account. Not in the repo: the prompts and keys.
+
 ## Questions still unanswered
 
 - The office "~90%" figure: daily or weekly changes, and were FX series among its 9 drivers?
