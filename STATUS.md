@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-15._
+_Last updated: 2026-10-17._
 
 ## Where things are
 
@@ -236,6 +236,25 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
+- **17 Oct 2026, cash FX cards are forwards (owner).** Both digests write, fill and score every cash FX card (any
+  `=X` proxy or FX cross; thematic, tactical or hedge) as an outright forward for the planned hold, never at spot.
+  The tenor is the shortest of 1W, 2W, 1M, 2M, 3M that reaches the card's review date or boundary (typically 2W);
+  the card prints spot, the points with their source and time, the outright forward, the value date and the carry
+  in pips and as a share of 1R; r/r, EV, 1R and the fill use the forward (stop and target stay spot levels and exits
+  stay on daily closes), so a lean that clears EV > 0 at spot can fail at the forward. Points: the pair's
+  Investing.com forward-rates page (FXEmpire second), else an estimate from SOFR and the other currency's 1-month or
+  policy rate in `msd.observations`, labelled est.; never a guess. A roll adds the new points to the entry; at the
+  first run every open cash FX card is converted (CHANGES line) and flagged "carry kills the edge" when its restated
+  EV is 0 or below, but not closed on that alone. Trigger: Opus P10 short USDJPY (16 Oct) carded at spot with EV
+  +0.14R; at the 2W forward (-18.7 pips, Investing.com 16 Oct) EV is -0.02R, at 1M (-38.9) -0.14R. Rule R07 (scope
+  both, source owner, review due 28 Nov 2026), proposed 17 Oct 01:44Z through `dash.propose_rule` from a cloud thread
+  (no approval prompt), goes in force at the Sun 18 Oct 20:00 SGT window with R06, so both digests follow it from the
+  Mon 19 Oct 07:15 SGT run unless he replies `oppose R07` to the weekly review email; the one-line early-apply SQL is
+  in `supabase/rules/R07_fx_forward_carry.sql`. The spec's CARRY clause (printed, never scored) is retired for
+  these cards; `dash-mark` needs no change (it reads META entry, now the forward). Source check 17 Oct: the
+  digests' page reader got the Investing.com tables for USDJPY, USDINR, USDTWD, USDSGD, EURGBP (USDIDR rows were
+  stale, dated June; USDCNH and USDKRW came back without the table on one reader), hence the labelled estimate as
+  the fallback. Mac visits: 0.
 - **15 Oct 2026, PBOC fix read (owner).** Both digests judge the USD/CNY fix by the day-on-day change in
   the gap between the fix and the survey estimate, not by the gap's level: narrowing = CNY-positive,
   widening = CNY-negative, a change under 50 pips = unchanged lean (150 or more = strong, name the cause);
