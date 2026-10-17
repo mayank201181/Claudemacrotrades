@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-12._
+_Last updated: 2026-10-15._
 
 ## Where things are
 
@@ -236,6 +236,18 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
+- **15 Oct 2026, PBOC fix read (owner).** Both digests judge the USD/CNY fix by the day-on-day change in
+  the gap between the fix and the survey estimate, not by the gap's level: narrowing = CNY-positive,
+  widening = CNY-negative, a change under 50 pips = unchanged lean (150 or more = strong, name the cause);
+  one printed line with fix, estimate, gap, prior gap, change, the 5-session run and the signal; a
+  weak-side level alone never cards, sizes or rejects a CNY trade. Rule R06 (scope both, source owner,
+  review due 23 Nov 2026), proposed 15 Oct 06:02Z through `dash.propose_rule` from a cloud thread (no
+  approval prompt), so it goes in force at the Sunday 18 Oct 20:00 SGT window and both digests follow it
+  from the Mon 19 Oct 07:15 SGT run unless he replies `oppose R06` to the weekly review email. Text in
+  `supabase/rules/R06_pboc_fix_gap.sql`. Data: the CFETS fix is in the database daily (`msd.observations`,
+  series `FX_USDCNH.CFETS_FIX`, loaded about 05:20 SGT, so the 07:15 run sees the previous session's fix);
+  the in-house estimate series `FX_USDCNH.FIX_MODEL` is empty, so the estimate is the Reuters survey figure
+  the digests already find on the web. Mac visits: 0.
 - **12 Oct 2026, event library into the digests (owner: yes, 13:54Z).** Both digests read
   `dash.event_brief()` under rule R05 (scope both, source owner, review due 23 Nov 2026) and cite the
   cell on any trade card whose catalyst or horizon holds a library release: multiplier, CI,
@@ -304,6 +316,11 @@ Voices, Review, Positioning, Trend, Drivers.
 - Owner rule (12 Oct 2026): finish each workstream in the day, suboptimal is acceptable, then run
   the book and change things only when a trade shows something; no cards or questions mid-run,
   threads pick the sensible default and journal it.
+- To add a digest rule without a Mac visit (15 Oct 2026): `select dash.propose_rule($j${...}$j$::jsonb);`
+  through the Supabase connector raises no approval prompt in a cloud thread; the rule applies at the next
+  Sunday 20:00 SGT window (`dash.next_apply_window()`), where the Sunday apply-rules task puts it in force
+  and emails him. Immediate in-force needs an `update dash.rules …`, which is a write (an approval prompt
+  from a cloud thread, or one line he runs in the SQL editor).
 - To change `trade_book_spec`: create a JSON file titled `trade_book_spec_edits` in the spec folder
   (Drive connector `create_file`, text/plain, no conversion) holding `[{"find","replace"}]`. Each find
   must occur exactly once in the live text, and edits must not overlap. `Spec.gs` applies it within
