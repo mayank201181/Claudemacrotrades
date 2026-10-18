@@ -227,6 +227,13 @@ Voices, Review, Positioning, Trend, Drivers.
     lines in the Fable digests (leads chosen, how many confirmed at a primary source, tests confirmed or killed)
     and decide keep, drop, or port to Opus (which needs room in that prompt, or a rule).
 
+10. **Fable 5.1 YouTube and Podcast digests to a second claude.ai account: PARKED (owner, 17 Oct 2026, "let it be
+    for now").** Nothing changed on the live routines. The handover pack stays in project files
+    `handover_fable_digests/` for whenever he picks it up: README with the one-sitting setup, both prompts (17 Oct
+    text, accuracy gate included) with key placeholders and a RUN MODE paragraph (shadow copies to a separate inbox
+    until a switch date, live from it); the two originals here would be disabled at 04:30 SGT on that date. The
+    prompts will need refreshing from the live routines if they change before then. Not in the repo: prompts, keys.
+
 ## Questions still unanswered
 
 - The office "~90%" figure: daily or weekly changes, and were FX series among its 9 drivers?
