@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-17._
+_Last updated: 2026-10-18._
 
 ## Where things are
 
@@ -223,6 +223,9 @@ Voices, Review, Positioning, Trend, Drivers.
 9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
+10. **Flow check trial (Fable, 19–31 Oct 2026):** at the month-end Opus vs Fable scorecard, read the FLOW CHECK
+    lines in the Fable digests (leads chosen, how many confirmed at a primary source, tests confirmed or killed)
+    and decide keep, drop, or port to Opus (which needs room in that prompt, or a rule).
 
 ## Questions still unanswered
 
@@ -236,6 +239,21 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
+- **18 Oct 2026, flow check in the Fable digest (owner: yes, 11:20Z).** Prompted by a KRW note from the owner's
+  other assistant, which took a digest lead to the primary source (Yonhap, then the BoK) and turned it into a
+  dated test. The Fable Macro Takeaways routine (STEP 2 item 9, live from the Mon 19 Oct 07:15 SGT run) picks up
+  to two FX or rates flow leads a day from the feeds (exporter or importer conversion, lifer or pension or
+  reserve-manager hedging, Japanese or Taiwanese outflows, fixing and month-end flows, portfolio flows,
+  intervention; none when the feeds carry no flow story), chases each to the primary source (the article
+  quoted, then the official data), says what the source is (a quote from one economist is a story about flows,
+  not proof), names the mechanism and the caveat that stops it reaching spot, and sets a test in named data
+  within two weeks with what would confirm or kill it. Printed as a bold "FLOW CHECK:" line (≤70 words, no
+  colour) in the theme's Positioning line or as a LEDGER one-liner, plus a footer count. It is evidence a card
+  may cite, never a card, tag or numbered item; no new data feeds, no new state (each day's check stands
+  alone). Fable only: the Opus prompt is at its 65,536-byte cap. Trial to 31 Oct, judged with the month-end
+  Opus vs Fable scorecard. Route: prompt edit through the scheduled-task API from a cloud thread, stored copy
+  verified byte for byte; the Fable prompt is now 65,349 of 65,536 bytes, so further Fable changes go through
+  `dash.rules`. Text in `docs/fable_flow_check.md`. Mac visits: 0.
 - **17 Oct 2026, cash FX cards are forwards (owner).** Both digests write, fill and score every cash FX card (any
   `=X` proxy or FX cross; thematic, tactical or hedge) as an outright forward for the planned hold, never at spot.
   The tenor is the shortest of 1W, 2W, 1M, 2M, 3M that reaches the card's review date or boundary (typically 2W);
