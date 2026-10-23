@@ -2,7 +2,7 @@
 // proxy, writes dash.bars, then computes
 //   - dash.live_marks: latest hourly mark of each open trade in R, intraday touches since fill,
 //     the latest complete daily close with close-breaches (the exit basis up to spec v13), and the
-//     hourly-close stop breach spec v14 uses (target on touch, stop on hourly close);
+//     hourly-close stop breach spec v15 uses (target on touch, stop on hourly close);
 //   - convexity cards (rule R01): the model value V as a share of the payout, R = V / p0fill − 1,
 //     touches on live hourly bars after the fill (which freeze the card) and settlement at the cut;
 //   - dash.idea_outcomes: forward move of every tested idea in its own direction, in ATR(20) units,
