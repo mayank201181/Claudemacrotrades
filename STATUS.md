@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-18._
+_Last updated: 2026-10-23._
 
 ## Where things are
 
@@ -226,6 +226,10 @@ Voices, Review, Positioning, Trend, Drivers.
 10. **Flow check trial (Fable, 19–31 Oct 2026):** at the month-end Opus vs Fable scorecard, read the FLOW CHECK
     lines in the Fable digests (leads chosen, how many confirmed at a primary source, tests confirmed or killed)
     and decide keep, drop, or port to Opus (which needs room in that prompt, or a rule).
+11. **Multi-source copies in the Fable digest (from 24 Oct 2026):** over the first few runs check the footer's
+    copies-read line and the dedupe (one item per story across copies, no double sightings in the stance ledger),
+    and that a day with the Fable YouTube or Podcast digest paused still runs clean. Known: no ChatGPT YouTube
+    digest since 16 Oct; a Gemini copy can arrive with an empty body.
 
 ## Questions still unanswered
 
@@ -239,6 +243,25 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
+- **23 Oct 2026, the Fable digest reads every copy of the YouTube, Podcast and Email digests (owner, 08:47Z).** The
+  owner may pause the Fable YouTube and Podcast digests on any day to save Fable credits, so the Fable Macro Takeaways
+  routine (07:15 SGT, live from the Sat 24 Oct run) now ingests every same-day copy of those feeds whatever the model
+  tag: Claude Fable and Opus, Gemini (earlier tagged Argon) and ChatGPT, instead of the Fable copies alone (the 24 Sep
+  A/B rule, under which it excluded the Opus copies and did not read the Gemini ones, is withdrawn). A feed is present
+  when any copy is; all copies of one feed are one feed for breadth tags; the Claude copies rank first and the Gemini
+  and ChatGPT copies are lower-trust evidence (a figure carried only by them is verified or printed as unverified;
+  copies agreeing is not independent confirmation); the same story, number, quote or speaker across copies is one item
+  and one sighting, the highest-trust copy's version kept and only what it lacks taken from the others; anything cited
+  from a lower-trust copy alone is named as such. STANCES blocks are lifted from every copy that carries one and
+  deduped on (speaker, date, topic); ChatGPT copies carry none. The footer lists the copies read per feed. Email
+  Digest: the Fable copy has not run since 3 Oct, so the Claude copy present (Fable, else Opus) is now primary and the
+  ChatGPT and Gemini copies second reads (the Gemini copy often lands after 07:15 and is never waited for); until now
+  the routine built that feed from the ChatGPT copy alone. Also fixed: the Slack feed match ("Slack" and "Digest";
+  the ChatGPT subject is "Slack Daily Digest", which the old substring missed, so the routine had reported the feed
+  missing). Inbox check: every YouTube and Podcast copy lands 05:25–06:42 SGT; no ChatGPT YouTube digest since
+  16 Oct; a Gemini copy can arrive empty (22 Oct). Route: prompt rewrite through the scheduled-task API from a cloud
+  thread, stored copy verified byte for byte; the edit trimmed the Fable prompt to 65,263 of 65,536 bytes. Opus Macro
+  Takeaways unchanged. Text in `docs/fable_source_copies.md`. Mac visits: 0.
 - **18 Oct 2026, flow check in the Fable digest (owner: yes, 11:20Z).** Prompted by a KRW note from the owner's
   other assistant, which took a digest lead to the primary source (Yonhap, then the BoK) and turned it into a
   dated test. The Fable Macro Takeaways routine (STEP 2 item 9, live from the Mon 19 Oct 07:15 SGT run) picks up
@@ -358,6 +381,10 @@ Voices, Review, Positioning, Trend, Drivers.
   Sunday 20:00 SGT window (`dash.next_apply_window()`), where the Sunday apply-rules task puts it in force
   and emails him. Immediate in-force needs an `update dash.rules …`, which is a write (an approval prompt
   from a cloud thread, or one line he runs in the SQL editor).
+- To change a digest prompt without a Mac visit (18 and 23 Oct 2026): read it through the scheduled-task API, apply
+  the edit by script with each find asserted to occur exactly once, write the whole prompt back and byte-compare the
+  stored copy. Both Macro Takeaways prompts sit at the 65,536-byte cap, so an addition is paid for by a trim in the
+  same edit (the Fable prompt is 65,263 bytes after 23 Oct).
 - To change `trade_book_spec`: create a JSON file titled `trade_book_spec_edits` in the spec folder
   (Drive connector `create_file`, text/plain, no conversion) holding `[{"find","replace"}]`. Each find
   must occur exactly once in the live text, and edits must not overlap. `Spec.gs` applies it within
