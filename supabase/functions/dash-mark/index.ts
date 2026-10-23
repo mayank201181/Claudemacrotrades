@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
       const lo = since.length ? Math.min(...since.map((b) => b.l)) : null;
       const stopTouched = since.length ? (dir > 0 ? lo! <= stop : hi! >= stop) : null;
       const targetTouched = since.length && target != null ? (dir > 0 ? hi! >= target : lo! <= target) : null;
-      // Spec v14: the stop fires on an hourly CLOSE at or beyond the level (a wick through it does not).
+      // Spec v15: the stop fires on an hourly CLOSE at or beyond the level (a wick through it does not).
       const closedH = since.filter((b) => barClosedH(b.ts, now));
       const stopBarH = closedH.find((b) => (dir > 0 ? b.c <= stop : b.c >= stop)) ?? null;
       const stopClosedH = closedH.length ? stopBarH != null : null;
