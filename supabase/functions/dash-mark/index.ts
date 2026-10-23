@@ -1,7 +1,8 @@
 // dash-mark: hourly. Pulls Yahoo bars for every open trade's proxy and every tested idea's
 // proxy, writes dash.bars, then computes
 //   - dash.live_marks: latest hourly mark of each open trade in R, intraday touches since fill,
-//     and the latest complete daily close (the book's official exit basis) with close-breaches;
+//     the latest complete daily close with close-breaches (the exit basis up to spec v13), and the
+//     hourly-close stop breach spec v14 uses (target on touch, stop on hourly close);
 //   - convexity cards (rule R01): the model value V as a share of the payout, R = V / p0fill − 1,
 //     touches on live hourly bars after the fill (which freeze the card) and settlement at the cut;
 //   - dash.idea_outcomes: forward move of every tested idea in its own direction, in ATR(20) units,
@@ -56,6 +57,7 @@ const sgtDate = (t: number) => new Date(t + SGT).toISOString().slice(0, 10);
 const barDate = (t: number) => new Date(t + 12 * HOUR).toISOString().slice(0, 10);
 // A daily bar is final once its session is over: about 22h after its stamp (17:00 ET for NY).
 const barClosed = (t: number, now: number) => now - t > 22 * HOUR;
+const barClosedH = (t: number, now: number) => now - t >= HOUR; // a 60m bar is complete once its hour has passed
 const barCloseTime = (t: number) => t + 21 * HOUR;
 
 function parseFill(s: string | null): number | null {
@@ -170,6 +172,10 @@ Deno.serve(async (req) => {
       const lo = since.length ? Math.min(...since.map((b) => b.l)) : null;
       const stopTouched = since.length ? (dir > 0 ? lo! <= stop : hi! >= stop) : null;
       const targetTouched = since.length && target != null ? (dir > 0 ? hi! >= target : lo! <= target) : null;
+      // Spec v14: the stop fires on an hourly CLOSE at or beyond the level (a wick through it does not).
+      const closedH = since.filter((b) => barClosedH(b.ts, now));
+      const stopBarH = closedH.find((b) => (dir > 0 ? b.c <= stop : b.c >= stop)) ?? null;
+      const stopClosedH = closedH.length ? stopBarH != null : null;
       const d = completeDaily(series(t.proxy, true));
       const dSince = fillTs ? d.filter((b) => barCloseTime(b.ts) > fillTs) : [];
       const dl = d[d.length - 1];
@@ -180,12 +186,14 @@ Deno.serve(async (req) => {
         hi_since_fill: hi, lo_since_fill: lo, stop_touched: stopTouched, target_touched: targetTouched,
         daily_close: dl?.c ?? null, daily_close_d: dl ? barDate(dl.ts) : null,
         daily_r: dl ? (dir * (dl.c - entry)) / oneR : null, stop_closed: stopClosed, target_closed: targetClosed,
+        stop_closed_h: stopClosedH, stop_closed_h_px: stopBarH?.c ?? null, stop_closed_h_at: stopBarH ? new Date(stopBarH.ts + HOUR) : null,
       };
       await sql`insert into dash.live_marks ${sql(row)} on conflict (model, pid) do update set
         as_of = excluded.as_of, price = excluded.price, r = excluded.r, hi_since_fill = excluded.hi_since_fill,
         lo_since_fill = excluded.lo_since_fill, stop_touched = excluded.stop_touched, target_touched = excluded.target_touched,
         daily_close = excluded.daily_close, daily_close_d = excluded.daily_close_d, daily_r = excluded.daily_r,
-        stop_closed = excluded.stop_closed, target_closed = excluded.target_closed`;
+        stop_closed = excluded.stop_closed, target_closed = excluded.target_closed, stop_closed_h = excluded.stop_closed_h,
+        stop_closed_h_px = excluded.stop_closed_h_px, stop_closed_h_at = excluded.stop_closed_h_at`;
       nLive++;
     }
 
