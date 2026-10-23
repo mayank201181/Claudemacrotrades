@@ -359,7 +359,7 @@
     const rows = ordered.map((t) => {
       if (isConvex(t)) return convexRow(t);
       const r = curR(t); const lv = t.live;
-      const flags = lv && t.status === 'open' ? [lv.stop_closed ? '<span class="neg">stop closed</span>' : lv.stop_touched ? '<span class="warn">stop touched intraday</span>' : '', lv.target_closed ? '<span class="pos">target closed</span>' : lv.target_touched ? '<span class="pos">target touched intraday</span>' : ''].filter(Boolean).join(' · ') : '';
+      const flags = lv && t.status === 'open' ? [lv.stop_closed_h ? '<span class="neg">stop closed (hourly)</span>' : lv.stop_closed ? '<span class="neg">stop closed (daily)</span>' : lv.stop_touched ? '<span class="warn">stop touched intraday</span>' : '', lv.target_touched ? '<span class="pos">target touched</span>' : lv.target_closed ? '<span class="pos">target closed</span>' : ''].filter(Boolean).join(' · ') : '';
       const id = `${t.model}-${t.pid}`; const isOpen = state.open.has(id);
       return `<tr class="click" data-id="${id}">
           <td class="mono">${esc(t.pid)}</td>

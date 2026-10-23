@@ -227,18 +227,45 @@ Voices, Review, Positioning, Trend, Drivers.
     lines in the Fable digests (leads chosen, how many confirmed at a primary source, tests confirmed or killed)
     and decide keep, drop, or port to Opus (which needs room in that prompt, or a rule).
 
+11. **Exit basis v15 follow-through (23 Oct 2026).** (a) Confirm Spec.gs applied `trade_book_spec_edits` (header
+    reads version 15, archive `trade_book_spec_archive_v14_2026-10-23` exists): DONE 01:55Z, all four edits verified.
+    (b) DONE 23 Oct: the owner ran `017_exit_basis.sql` in the SQL editor 08:47Z (first paste was the file path, a
+    wording slip in the thread); dash-mark v6 deployed 08:51Z from the cloud thread through the Supabase deploy
+    tool (the migration tool was denied, the deploy tool was not). (c) Watch the first week of closes from Mon
+    26 Oct: LOG lines must say "(touch)" or "(hourly close)"; at the month-end scorecard, note that touch targets
+    with hourly-close stops flatter realised R a little against a symmetric book.
+
 ## Questions still unanswered
 
 - The office "~90%" figure: daily or weekly changes, and were FX series among its 9 drivers?
   (Partial: "on changes, 20y, 9 drivers".)
 - Sign-off on the Asia list and the FX clock (noon NY vs 17:00 NY).
 - Go-ahead to register free data keys and run the ALFRED pull.
-- R03 defaults: early entries full size, 10-session flip lookback, stops on daily closes?
+- R03 defaults: early entries full size, 10-session flip lookback, stops on daily closes? (The trade books' own
+  exit basis was decided 23 Oct: target on touch, stop on hourly close; see Decisions on record.)
 - What Astra's 20-year dataset actually holds.
 - Taken as yes without an explicit reply: post-2014 carry rates; event-library defaults.
 
 ## Decisions on record
 
+- **23 Oct 2026, exit basis: target on touch, stop on hourly close (owner: yes, 01:51Z; spec v15).** Until now
+  both books judged stop and target on the daily close only (spec EXITS, since v4 on 28 Sep): exit price = that
+  close, so a gap through the stop scored worse than -1R and a close through the target better than r/r; the only
+  hourly exits were the v13 first-hour closes. From the run of Mon 26 Oct 2026: the target is hit on a TOUCH of an
+  hourly high/low and exits at the target level itself (a resting limit; result exactly +r/r); the stop fires on
+  an hourly CLOSE at or beyond it and exits at that close (a gap through the stop still scores the real loss; a
+  wick that closes back inside does not stop the trade); a bar that does both closes at the stop. Daily marks,
+  tactical time-stops and R01 option cards (already touch-based) are unchanged. Closed trades keep their scores;
+  LOG lines carry "(touch)" or "(hourly close)" so the scorecard can be read by basis. Why this pair: a
+  daily-close stop lets a trade sit a whole NY session beyond the stop before the 08:00 SGT verdict, a touch stop
+  would fire on Yahoo FX hourly wicks (indicative data); the asymmetry flatters realised R slightly against a
+  touch/touch book, to be noted at the month-end scorecard. Route: `notes/trade_book_spec_v15_edits.json`
+  (project files) dropped on Drive as `trade_book_spec_edits` at 01:54Z for Spec.gs (both books read the spec).
+  Found on the way: the spec was already at version 14 (16 Oct, edited directly on Drive, not through this repo:
+  EV > 0 restated, R:R floor removed, tested-trades table in the email), so this is v15. Dashboard side (cosmetic,
+  the rule runs in the digests): dash-mark gains an hourly-close stop flag and the app labels flags by basis; it
+  needed `017_exit_basis.sql` run FIRST (owner, SQL editor, 08:47Z) and then a dash-mark deploy (v6, 08:51Z, from the
+  cloud thread). Owner visits: 1 (the SQL paste); the cloud migration call was denied by the permission classifier.
 - **18 Oct 2026, flow check in the Fable digest (owner: yes, 11:20Z).** Prompted by a KRW note from the owner's
   other assistant, which took a digest lead to the primary source (Yonhap, then the BoK) and turned it into a
   dated test. The Fable Macro Takeaways routine (STEP 2 item 9, live from the Mon 19 Oct 07:15 SGT run) picks up
