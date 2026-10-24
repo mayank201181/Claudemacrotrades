@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-23._
+_Last updated: 2026-10-24._
 
 ## Where things are
 
@@ -230,6 +230,11 @@ Voices, Review, Positioning, Trend, Drivers.
     copies-read line and the dedupe (one item per story across copies, no double sightings in the stance ledger),
     and that a day with the Fable YouTube or Podcast digest paused still runs clean. Known: no ChatGPT YouTube
     digest since 16 Oct; a Gemini copy can arrive with an empty body.
+12. **Crowd asymmetry calibration (R09, both books, from the Mon 26 Oct 2026 run):** the ×0.75 payoff and ×1.5 loss
+    defaults on crowd = with cards are a judgement. Check the first runs print the crowd evidence and the two EVs
+    on every card and TESTED line, and that "least long" reads and spent extremes are not treated as with. The
+    weekly review reads the new SCORECARD "crowd:" line; after 20 closed with cards, compare realised R with the
+    adjusted-gate EV (revert thresholds in the rule's revert_if). Later split by bucket if the sample allows.
 
 ## Questions still unanswered
 
@@ -243,6 +248,26 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
+- **24 Oct 2026, crowd asymmetry at the gate (owner: yes, 11:40Z, defaults as proposed; rule R09 applies at the Sun
+  25 Oct 20:00 SGT window).** From a clip of Ying Hua (ex-Balyasny): pod-shop investing at a weeks-to-months horizon is poker, not
+  blackjack; when everyone is on the same side the group is right 60-70% of the time but paid less (everyone sells to
+  monetise), and when wrong, maybe 20% of the time, hit hard (everyone exits together). Both digests now set every
+  candidate's crowd field (with / against / none, already on every card) from evidence they already read, strongest
+  first: `dash.positioning_extremes()` (R02; never the Treasury basis trade or implied vol; "least long" is trimming,
+  not an extreme; an extreme the market has moved 2 ATR against since its as-of date is spent), then B7 saturation or
+  capitulation, the Grok crowding check, or one web statistic for an uncovered series, printed on the card and the
+  TESTED line. On crowd = with only, test (c) becomes EV = p × r/r × 0.75 − (1 − p) × 1.5 (break-even 2/(r/r + 2):
+  50% at r/r 2.0, was 33%); p stays the thesis probability and is not lowered again for the crowd; against and none
+  are unchanged and the asymmetry in an against card's favour is never credited. Cards print both EVs, META ev holds
+  the adjusted one (no dashboard change), a lean rejected only by the adjustment goes on the WASHOUT WATCH line the
+  other way as the pain trade (still subject to the washout screen), with cards name the bought-option expression
+  that caps the loss leg, R01 cards take only the payoff haircut, and the SCORECARD gains a "crowd: with n/R ·
+  against n/R" line for calibration. Own-data check: 8 with cards to date (2 closed, both losers) against 30 against
+  cards, too few to set the defaults; the voices crowd was followed 53-58% of the time over the next 10 sessions, so
+  the rule adjusts payoffs and never direction. Route: `dash.propose_rule` from a cloud thread (no approval prompt),
+  text in `supabase/rules/R09_crowd_asymmetry.sql`, note in `docs/crowd_asymmetry.md`; no prompt or spec edit (the
+  rule wins over the spec's test (c) under STEP 1f). Both digests follow it from the Mon 26 Oct 07:15 SGT run, the
+  same run as spec v15's hourly-close stops. Mac visits: 0.
 - **23 Oct 2026, the Fable digest reads every copy of the YouTube, Podcast and Email digests (owner, 08:47Z).** The
   owner may pause the Fable YouTube and Podcast digests on any day to save Fable credits, so the Fable Macro Takeaways
   routine (07:15 SGT, live from the Sat 24 Oct run) now ingests every same-day copy of those feeds whatever the model
