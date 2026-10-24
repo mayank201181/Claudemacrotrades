@@ -1,6 +1,6 @@
 # Crowd asymmetry at the gate (rule R09)
 
-Proposed 24 Oct 2026 at the owner's request, after a clip of Ying Hua (ex-Balyasny) on pod-shop investing as poker,
+Proposed 24 Oct 2026 at the owner's request (defaults confirmed by him the same day), after a clip of Ying Hua (ex-Balyasny) on pod-shop investing as poker,
 not blackjack: at a horizon of weeks to months everyone works from similar processes and data, so everyone ends up on
 the same side of the boat; the group is right maybe 60-70% of the time but is paid less than it expects, because
 everyone sells to monetise the same catalyst, and when it is wrong, maybe 20% of the time, it is hit hard, because
@@ -53,7 +53,7 @@ Rule R09 (`supabase/rules/R09_crowd_asymmetry.sql`, scope both, source owner) ap
 ## Route and timing
 
 Proposed through `dash.propose_rule` from a cloud thread (no approval prompt); applies at the Sun 25 Oct 2026 20:00 SGT
-window (with R08) unless the owner replies `oppose R09` to the weekly review email or says no in the thread, so both
-Macro Takeaways digests follow it from the Mon 26 Oct 07:15 SGT run. No prompt edit (both prompts are at the
+window (with R08); the owner confirmed the defaults on 24 Oct, so both Macro Takeaways digests follow it from the
+Mon 26 Oct 07:15 SGT run (`revert R09` in a reply to the weekly review email removes it later). No prompt edit (both prompts are at the
 65,536-byte cap) and no spec edit: on this point the rule wins over the spec's test (c), as the prompts' STEP 1f says.
 Mac visits: 0.

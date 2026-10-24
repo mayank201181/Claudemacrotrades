@@ -248,8 +248,8 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
-- **24 Oct 2026, crowd asymmetry at the gate (owner's ask; rule R09 proposed, applies Sun 25 Oct 20:00 SGT unless
-  opposed).** From a clip of Ying Hua (ex-Balyasny): pod-shop investing at a weeks-to-months horizon is poker, not
+- **24 Oct 2026, crowd asymmetry at the gate (owner: yes, 11:40Z, defaults as proposed; rule R09 applies at the Sun
+  25 Oct 20:00 SGT window).** From a clip of Ying Hua (ex-Balyasny): pod-shop investing at a weeks-to-months horizon is poker, not
   blackjack; when everyone is on the same side the group is right 60-70% of the time but paid less (everyone sells to
   monetise), and when wrong, maybe 20% of the time, hit hard (everyone exits together). Both digests now set every
   candidate's crowd field (with / against / none, already on every card) from evidence they already read, strongest
@@ -267,7 +267,7 @@ Voices, Review, Positioning, Trend, Drivers.
   the rule adjusts payoffs and never direction. Route: `dash.propose_rule` from a cloud thread (no approval prompt),
   text in `supabase/rules/R09_crowd_asymmetry.sql`, note in `docs/crowd_asymmetry.md`; no prompt or spec edit (the
   rule wins over the spec's test (c) under STEP 1f). Both digests follow it from the Mon 26 Oct 07:15 SGT run, the
-  same run as spec v15's hourly-close stops, unless he replies `oppose R09` or says no in the thread. Mac visits: 0.
+  same run as spec v15's hourly-close stops. Mac visits: 0.
 - **23 Oct 2026, the Fable digest reads every copy of the YouTube, Podcast and Email digests (owner, 08:47Z).** The
   owner may pause the Fable YouTube and Podcast digests on any day to save Fable credits, so the Fable Macro Takeaways
   routine (07:15 SGT, live from the Sat 24 Oct run) now ingests every same-day copy of those feeds whatever the model
