@@ -49,6 +49,10 @@ proposed and in force, weekly lessons).
   files (GKG English edition sampled hourly, Singapore days; DOC 2.0 API since 2024; English Wikipedia pageviews), scored
   against the previous 90 days (z90, x90, trend) with SPIKE / ELEVATED / QUIET flags. Topics, caches and outputs live in the
   project files folder `gdelt/` (not in this repo); `refresh` runs daily before the digests. Stdlib only, no credentials.
+- `supabase/functions/_shared/forecast.ts` — Carver forecasts (EWMAC trend at four speeds, FX carry from BIS policy rates,
+  -20..+20) appended by `dash-trend` to the Trend Monitor's report after `END_TREND_MONITOR`; see `docs/carver_and_fxopt.md`.
+- `scripts/fxopt/` — FX option pricer for the digests (stdlib Python: vanillas, digitals, touches, barriers, delta
+  conventions, vanna-volga smile), with `test_fxopt.py` cross-checking it against QuantLib-Python.
 - `supabase/migrations/` — the `dash` schema (in `macro-state-db`; never touches the routines' own tables).
 - `scripts/apps_script/Code.gs` — feeder that runs in the owner's Google account every 10 minutes and posts new
   emails and trade books to `dash-ingest`. The Gmail searches come from `dash.config.feeds`, so a new tab is a

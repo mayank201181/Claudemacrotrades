@@ -34,6 +34,15 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
+- **Carver forecasts + FX option pricer (25 Oct 2026, owner "do both"; thread "Find open-source code for macro workflows").**
+  Code done and tested on branch `claude/project-thread-e80nxd`: `scripts/fxopt/` (stdlib FX option pricer: barriers,
+  touches, digitals, delta conventions, vanna-volga smile; every formula checked against QuantLib 1.44) and
+  `_shared/forecast.ts` (Carver EWMAC trend at four speeds + FX carry from BIS policy rates, appended to the dash-trend
+  report). Side finding: the dashboard's R01 digital / one-touch / spread maths equals QuantLib to 4e-15. Note:
+  `docs/carver_and_fxopt.md`; rule text `supabase/rules/R10_carver_and_fxopt.sql`. NOT LIVE YET: the cloud thread's
+  safety check refused the production steps (dash-trend redeploy, Drive upload of fxopt.py, proposing R10) without an
+  explicit owner go-ahead. On his yes: deploy dash-trend at the PR's commit, upload fxopt.py to the Opus Drive folder,
+  propose R10 (applies at the next Sunday 20:00 SGT window), check the next 08:30 SGT trend run carries the block.
 - **S3 CFTC: v4 CLOSED (9 Oct); v5 run 3 SEALED as a STOP package at step 15 (12 Oct).** v4 (fresh run from source
   under v3's protocol, run `20261008T102913Z`): P1–P3 PASS; protocol stop at P4 on 9 Oct 17:14 SGT
   because PR-5 could not be resolved for 20 Nikkei (NKD tff) test-period rows (NKD missing from 16 of

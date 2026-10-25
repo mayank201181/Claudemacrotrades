@@ -1,0 +1,61 @@
+# Carver forecasts and the FX option pricer (25 Oct 2026)
+
+Owner's ask: take openly licensed quant code and put it to work in the book. From a shortlist he said
+"do both" to the two below. No vendor or proprietary code is used; both are written from published
+methods and checked against the reference library.
+
+## 1. FX option pricer — `scripts/fxopt/`
+
+`fxopt.py` is Python standard library only, so a digest run can execute it without installing anything.
+It prices, in Garman-Kohlhagen:
+
+- vanillas with greeks; strike from delta and delta from strike in the four FX conventions (spot, forward,
+  premium-adjusted spot, premium-adjusted forward); ATM delta-neutral strike;
+- European digitals paid in the terms or the base currency;
+- one-touch (paid at expiry or at hit) and no-touch;
+- single knock-out and knock-in barriers (no rebate);
+- a vanna-volga smile from ATM / 25d RR / 25d BF (vanillas, digitals including the skew term, and barriers
+  with QuantLib's `VannaVolgaBarrierEngine` recipe). Touches stay at ATM vol and say so.
+
+Rates and vols are in percent. Run `python3 -I fxopt.py '{"pair":"USDJPY","type":"call",...}'`; the usage is
+at the top of the file. `test_fxopt.py` cross-checks everything against QuantLib-Python (`pip install
+QuantLib`): worst differences are below 3e-11 of spot, and 3.3e-7 of spot for vanna-volga barriers
+(finite-difference bumps on both sides). The same harness found the dashboard's R01 digital, one-touch and
+spread formulas (`_shared/convexity.ts`) equal to QuantLib to 4e-15.
+
+What it does not have: a market vol surface. A digest passes an implied vol it found (with source), or the
+trend monitor's realised rv20 labelled as such.
+
+## 2. Carver forecasts — `supabase/functions/_shared/forecast.ts`
+
+After the Trend Monitor computes its run, `dash-trend` appends a `CARVER FORECASTS` block to the stored
+report, after `END_TREND_MONITOR` (the monitor's machine block and self-check are untouched; any failure only
+drops the block). Per asset, on Carver's -20..+20 scale (|10| = average conviction):
+
+- EWMAC 8/32, 16/64, 32/128, 64/256: (fast EWMA - slow EWMA) / robust vol (EW std of daily price changes,
+  span 35, 5th-percentile floor), times the published scalars 5.3 / 3.75 / 2.65 / 1.87, capped at 20;
+- trend: the four speeds equally weighted times the FDM, computed each run from the pooled correlation of
+  the speeds over the last five years (1.13 on 25 Oct 2026);
+- carry, FX only: the base-minus-terms policy-rate gap (BIS WS_CBPOL, fetched each run) over annualised
+  vol, times 30. SGD and TWD have no BIS policy rate (NA); for CNH, INR, IDR and KRW a policy rate is a proxy
+  for NDF-implied carry;
+- combined: 60/40 trend/carry times 1.39, capped; trend alone where carry is NA.
+
+Rates use -100 x yield as the price, so + means long bonds. With Carver's scalars the average |forecast| on
+this universe is about 7.8 rather than 10, so a 10 here is a stronger-than-average signal.
+
+Machine lines: `FORECAST|run_date|asset|last_date|f8|f16|f32|f64|trend|carry|combined` between
+`BEGIN_FORECASTS|v1` and `END_FORECASTS`. Tests: `npx -y tsx --test supabase/functions/_shared/forecast.test.ts`.
+
+## 3. How the digests use them — rule R10 (`supabase/rules/R10_carver_and_fxopt.sql`)
+
+A CARVER line on every card and tested line on a monitor asset (evidence, never a gate), and a PRICER line
+for every R01 card and named option expression, run from the Drive copy of `fxopt.py`. R01's MARK SCRIPT
+premium stays the card's p0; the pricer is a cross-check. Model probabilities are never printed as market
+odds.
+
+## Going live (owner's yes needed, 25 Oct 2026)
+
+The cloud thread's safety check refused the production steps without an explicit owner go-ahead: the
+`dash-trend` redeploy, the Drive upload of `fxopt.py` and proposing R10. The code is in the PR; the steps are
+listed in STATUS.md.
