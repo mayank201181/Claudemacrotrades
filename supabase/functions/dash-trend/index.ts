@@ -27,8 +27,13 @@
 // 17:00 New York price (D6 in _shared/trend.ts; parseYahooHourlyNy, redateDaily), stored in
 // dash.trend_shadow by run_date and params_version beside the TM1 run, never in its tables.
 // diag adds the per-pair splice statistics to the reply.
+// Carver forecasts (_shared/forecast.ts, added 25 Oct 2026): after the monitor, the main run appends a
+// CARVER FORECASTS block (EWMAC trend at four speeds, FX carry from BIS policy rates) to the report,
+// after END_TREND_MONITOR, so the monitor's machine block and its self-check are unchanged. A failed
+// BIS download leaves carry NA and is noted in fetch_errors._bis; the TM1.1 shadow has no block.
 import postgres from 'npm:postgres@3.4.4';
 import { type AssetDef, type Bar, type Fetched, type Params, TM1_ASSETS, TM1_PARAMS, computeMonitor } from '../_shared/trend.ts';
+import { BIS_POLICY_URL, type PolicyRate, computeForecasts, parseBisPolicy } from '../_shared/forecast.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
 type Json = Record<string, unknown>;
@@ -412,7 +417,13 @@ async function run(body: Body, runMs: number) {
       got.set(a.asset_id, g);
     } catch (e) { fail(a, e); }
   }));
-  await Promise.all([yahooLoop, others]);
+  // BIS policy rates for the FX carry forecast; a failure only leaves carry NA.
+  let policy: Record<string, PolicyRate> = {};
+  const bis = (async () => {
+    try { policy = parseBisPolicy(await retry(async () => (await get(BIS_POLICY_URL)).text(), deadline)); }
+    catch (e) { errors._bis = (e as Error)?.message ?? String(e); }
+  })();
+  await Promise.all([yahooLoop, others, bis]);
 
   // An hourly-built series reaches back only as far as Yahoo keeps hourly bars (a rolling window);
   // the closes that earlier runs stored from the same source and symbol extend it backwards.
@@ -434,6 +445,10 @@ async function run(body: Body, runMs: number) {
   });
   const fetchMs = Date.now() - t0;
   const m = computeMonitor(assets, data, params, { run_utc: new Date(runMs).toISOString() });
+  if (m.meta.status !== 'NO_DATA') {
+    try { m.report += '\n' + computeForecasts(assets, data, m.states, policy, m.meta.run_date).text; }
+    catch (e) { errors._forecasts = (e as Error)?.message ?? String(e); }
+  }
   const summary: Record<string, unknown> = {
     ok: true, run_date: m.meta.run_date, run_utc: m.meta.run_utc, status: m.meta.status, params_version: m.meta.params_version,
     n_assets: m.meta.n_assets, n_ok: m.meta.n_ok, n_stale: m.meta.n_stale, n_suspect: m.meta.n_suspect, n_events: m.meta.n_events,
