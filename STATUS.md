@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-24._
+_Last updated: 2026-10-25._
 
 ## Where things are
 
@@ -17,7 +17,7 @@ _Last updated: 2026-10-24._
 
 | Piece | What it does | Schedule |
 |---|---|---|
-| `scripts/apps_script/Code.gs` | Gmail + Drive feeder in the owner's Google account → `dash-ingest` | every 10 min |
+| `scripts/apps_script/Code.gs` | Gmail + Drive feeder in the owner's Google account → `dash-ingest` (opens the trade book with DocumentApp, so a plain-text `trade_book_current` is skipped) | every 10 min |
 | `scripts/apps_script/Spec.gs` | applies a staged `trade_book_spec_edits` JSON (find/replace, each exactly once) to the spec Doc, archiving it first | every 10 min |
 | `dash-ingest` | raw payloads → `dash` tables (digests, trade books, feeds, questions) | on post |
 | `dash-mark` | live R per open trade, shadow outcomes in ATR(20) units | `7 * * * *` |
@@ -235,6 +235,12 @@ Voices, Review, Positioning, Trend, Drivers.
     on every card and TESTED line, and that "least long" reads and spent extremes are not treated as with. The
     weekly review reads the new SCORECARD "crowd:" line; after 20 closed with cards, compare realised R with the
     adjusted-gate EV (revert thresholds in the rule's revert_if). Later split by bucket if the sample allows.
+13. **Trade book retention v16 (both books, from the Mon 26 Oct 2026 run):** check the first footers' size line (well
+    under 60,000 characters, no CAP FLAG), that the RULES line was rewritten at or under 600 characters, that T lines
+    cover only today and the previous run, and that `dash.tested` keeps its rows for older days (the ingest replaces a
+    day's ledger set only for days present in the book). Confirm the 26 Oct file converted to a Google Doc: the 23 and
+    25 Oct files stayed plain text and `Code.gs` could not read them. The one-off clean-up SQL for the 25 Oct wrong
+    upload (project file `notes/cleanup_fable_dashboard_25oct2026.sql`) must have run; see Decisions.
 
 ## Questions still unanswered
 
@@ -247,6 +253,27 @@ Voices, Review, Positioning, Trend, Drivers.
 - Taken as yes without an explicit reply: post-2014 carry rates; event-library defaults.
 
 ## Decisions on record
+
+- **25 Oct 2026, trade book retention v16 (owner asked how to resolve the CAP FLAG; the thread took the option that
+  needed him least).** The Fable book's 25 Oct footer flagged 72,822 characters against the 60,000 cap after the full
+  ladder (24 Oct: 63,661). Breakdown of the 25 Oct file: trade blocks 34.5k, SECTION LOG Pnn lines 17.9k, T lines
+  14.8k, RULES line 4.4k. Decision: the cap stays at 60,000 and the file keeps less history (`trade_book_spec` v16,
+  applied by `Spec.gs` 25 Oct 01:25Z, v15 archived; both books read it): T lines two days (today and the previous
+  run), Pnn LOG lines 14 days, closed, missed, vetoed and void blocks compressed to header, META, fill and closing
+  marks when they close and dropped 14 days after the close date, at most 5 marks per open trade, RULES line at most
+  600 characters, tighter ladder (T lines today only, 3 marks, 7-day LOG, 7-day closed blocks). Nothing is lost: every
+  T line is in `dash.tested`, every mark in `dash.trade_marks`, every LOG line in `dash.trade_log`, and the Drive
+  archives keep each day's book. The Opus book was 11.7k. Found on the way: the files the Fable run wrote on 23 and
+  25 Oct stayed plain text (68k and 76k bytes) instead of converting to a Google Doc, so `Code.gs` failed on them and
+  the dashboard missed those books; the 24 Oct file converted. Size is not the whole cause (a 72,822-character manual
+  upload converted), so watch the 26 Oct file. Incident: while restoring the 25 Oct book as a Doc, a wrong file
+  (content reconstructed from memory after a context reset, not the real book) was uploaded first and ingested at
+  01:19Z (`dash.raw` 663); the real book was then uploaded, verified by read-back diff and ingested at 01:49Z (664),
+  which replaced the 22-25 Oct ledger sets, trades and book state. Residue to clean with one SQL (project file
+  `notes/cleanup_fable_dashboard_25oct2026.sql`, owner runs or approves it): 4 overwritten marks restored from earlier
+  copies and 1 deleted, the 15 Oct ledger set (16 rows) re-inserted from the 18 Oct copy, 99 LOG lines, 32 orphan
+  `idea_outcomes` rows and raw 663 deleted. Lesson: never write Drive or database content from memory; generate it
+  from the file and verify by read-back diff before renaming it into place. Note: `docs/trade_book_retention.md`.
 
 - **24 Oct 2026, crowd asymmetry at the gate (owner: yes, 11:40Z, defaults as proposed; rule R09 applies at the Sun
   25 Oct 20:00 SGT window).** From a clip of Ying Hua (ex-Balyasny): pod-shop investing at a weeks-to-months horizon is poker, not
@@ -415,6 +442,9 @@ Voices, Review, Positioning, Trend, Drivers.
   must occur exactly once in the live text, and edits must not overlap. `Spec.gs` applies it within
   10 minutes and archives the old version, or renames the file `_rejected_<date>` and logs why. The
   Drive connector cannot edit a Doc's body directly.
+- Never write Drive or database content from memory (25 Oct 2026 incident): regenerate it from the source file, verify
+  it by a read-back diff, and only then rename it into place; `Code.gs` ingests any `trade_book_current` within
+  10 minutes, and a wrong book replaces the dashboard's ledger sets for every day it mentions.
 - Tests: `deno test supabase/functions/_shared/` (parse, convexity; no trend test file in the
   repo). Deno isn't preinstalled in cloud sessions.
 - New migrations are numbered after `016_event_library.sql` (the database also holds a `014_grok_crowding`
