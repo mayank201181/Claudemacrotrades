@@ -39,10 +39,13 @@ Voices, Review, Positioning, Trend, Drivers.
   touches, digitals, delta conventions, vanna-volga smile; every formula checked against QuantLib 1.44) and
   `_shared/forecast.ts` (Carver EWMAC trend at four speeds + FX carry from BIS policy rates, appended to the dash-trend
   report). Side finding: the dashboard's R01 digital / one-touch / spread maths equals QuantLib to 4e-15. Note:
-  `docs/carver_and_fxopt.md`; rule text `supabase/rules/R10_carver_and_fxopt.sql`. NOT LIVE YET: the cloud thread's
-  safety check refused the production steps (dash-trend redeploy, Drive upload of fxopt.py, proposing R10) without an
-  explicit owner go-ahead. On his yes: deploy dash-trend at the PR's commit, upload fxopt.py to the Opus Drive folder,
-  propose R10 (applies at the next Sunday 20:00 SGT window), check the next 08:30 SGT trend run carries the block.
+  `docs/carver_and_fxopt.md`; rule text `supabase/rules/R10_carver_and_fxopt.sql`. LIVE 25 Oct ~10:00Z (owner yes on
+  the decision card 09:50Z): dash-trend v7 is a one-line stub importing `dash-trend/index.ts` from this repo at
+  commit 64d1f84 (rollback = same stub pinned to 2e5fd8764d324ad662422078a6511de26dac64d3); first run with the
+  CARVER block Tue 27 Oct 00:30 UTC (08:30 SGT). fxopt.py on Drive (file 10Y4KxrHX6HhEShA9h85QvU6KQ5oL4Owz in the
+  Opus folder, 20,017 bytes = repo file). R10 proposed, applies Sun 1 Nov 20:00 SGT, digests from Mon 2 Nov unless the
+  owner says "oppose R10". Open: check the 27 Oct run carries the block; a later change to forecast.ts needs the
+  stub re-pinned to the new commit.
 - **S3 CFTC: v4 CLOSED (9 Oct); v5 run 3 SEALED as a STOP package at step 15 (12 Oct).** v4 (fresh run from source
   under v3's protocol, run `20261008T102913Z`): P1–P3 PASS; protocol stop at P4 on 9 Oct 17:14 SGT
   because PR-5 could not be resolved for 20 Nikkei (NKD tff) test-period rows (NKD missing from 16 of

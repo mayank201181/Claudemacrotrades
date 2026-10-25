@@ -54,8 +54,9 @@ for every R01 card and named option expression, run from the Drive copy of `fxop
 premium stays the card's p0; the pricer is a cross-check. Model probabilities are never printed as market
 odds.
 
-## Going live (owner's yes needed, 25 Oct 2026)
+## Live (25 Oct 2026)
 
-The cloud thread's safety check refused the production steps without an explicit owner go-ahead: the
-`dash-trend` redeploy, the Drive upload of `fxopt.py` and proposing R10. The code is in the PR; the steps are
-listed in STATUS.md.
+On the owner's yes: `dash-trend` v7 is a one-line stub that imports `supabase/functions/dash-trend/index.ts` from
+this public repo at commit 64d1f84, so the running code is exactly the reviewed files (re-pin the stub after any
+change; rollback = pin to 2e5fd87). `fxopt.py` is on Drive in the Opus folder (byte size checked against this
+file). R10 was proposed through `dash.propose_rule` and applies at the Sun 1 Nov 20:00 SGT window.
