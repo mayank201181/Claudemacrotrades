@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-24._
+_Last updated: 2026-10-26._
 
 ## Where things are
 
@@ -247,6 +247,16 @@ Voices, Review, Positioning, Trend, Drivers.
     on every card and TESTED line, and that "least long" reads and spent extremes are not treated as with. The
     weekly review reads the new SCORECARD "crowd:" line; after 20 closed with cards, compare realised R with the
     adjusted-gate EV (revert thresholds in the rule's revert_if). Later split by bucket if the sample allows.
+13. **FOMC presser reversal (study done 26 Oct 2026, thread "Test FOMC presser reversal for FX"):** SF Fed USMPD
+    (public, update 17 Sep 2026), 85 clean meetings 2013-Sep 2026. Since 2019 the presser reverses the statement move
+    about half the time (EUR/USD 46%, USD/JPY 52%, 2y 48%, 10y 46%), with no significant continuation either way,
+    and it is the bigger move; at non-SEP meetings since 2022, 87-89% of the 100-min variance is the presser.
+    2013-18 showed continuation (beta about 0.4), so don't use the full sample. Exit line for FOMC-day cards: take profit or halve at the
+    statement close (14:20 ET); statement moves at non-SEP meetings are not confirmation. Note and tables:
+    project files `notes/fomc_presser_reversal_26oct2026.md`; code `scripts/fomc_presser/`. R11 IN FORCE 26 Oct 11:50Z
+    (owner "Yes", proposed 11:35Z, put in force early by the owner's one-line update so it covers the 28 Oct FOMC;
+    `supabase/rules/R11_fomc_presser_exit.sql`). Check the Wed 28 and Thu 29 Oct digests print FOMC EXIT lines. Recheck the 3 post-May-2026 pressers (all continued) as the
+    new chair's sample grows. The v15 hourly-close stop lands on the 15:00 ET bar, which is mid-presser.
 
 ## Questions still unanswered
 
