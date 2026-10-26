@@ -241,6 +241,11 @@ Voices, Review, Positioning, Trend, Drivers.
     day's ledger set only for days present in the book). Confirm the 26 Oct file converted to a Google Doc: the 23 and
     25 Oct files stayed plain text and `Code.gs` could not read them. The one-off clean-up SQL for the 25 Oct wrong
     upload (project file `notes/cleanup_fable_dashboard_25oct2026.sql`) must have run; see Decisions.
+    Checked 26 Oct 09:30 SGT: PASS. The run wrote a Google Doc (56,821 characters, no CAP FLAG, RULES line 598
+    characters, closed blocks compressed, at most 5 marks per open trade, LOG 12–26 Oct); the ladder's first step dropped
+    the 25 Oct T lines, so the file carries today's only; `Code.gs` ingested it at 09:09 SGT and `dash.tested` kept its
+    older days. The clean-up SQL was run by the owner on 25 Oct 10:35 SGT and verified. Still open: the Opus book has not
+    been written since 23 Oct (no Opus digest on 24–26 Oct), raised with the coordinator for its own thread.
 
 ## Questions still unanswered
 
