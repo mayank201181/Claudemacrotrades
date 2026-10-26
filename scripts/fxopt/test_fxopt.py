@@ -86,6 +86,19 @@ for pair, S, rd, rf, vol, days in CASES:
                         o.setPricingEngine(eng)
                         van = m.vanilla(phi, K, sm.vol(K))
                         rec('vanna-volga barrier', sm.vv_barrier(phi, K, H, bt, van), o.NPV(), S)
+    # double no-touch: terms pay against AnalyticDoubleBarrierBinaryEngine; base pay against
+    # E[S_T 1{inside}] built from AnalyticDoubleBarrierEngine knock-out call - put + K x terms DNT
+    for lo_, hi_ in ((0.97, 1.03), (0.94, 1.05), (0.99, 1.012)):
+        L, U = S * lo_, S * hi_
+        def dko(payoff, engine):
+            o = ql.DoubleBarrierOption(ql.DoubleBarrier.KnockOut, L, U, 0.0, payoff, ql.EuropeanExercise(ex))
+            o.setPricingEngine(engine(p)); return o.NPV()
+        dnt = dko(ql.CashOrNothingPayoff(ql.Option.Call, 0.0, 1.0), ql.AnalyticDoubleBarrierBinaryEngine)
+        rec('double no-touch, terms', m.double_no_touch(L, U, vol, 'terms'), dnt)
+        K = S
+        base = (dko(ql.PlainVanillaPayoff(ql.Option.Call, K), ql.AnalyticDoubleBarrierEngine)
+                - dko(ql.PlainVanillaPayoff(ql.Option.Put, K), ql.AnalyticDoubleBarrierEngine) + K * dnt) / S
+        rec('double no-touch, base', m.double_no_touch(L, U, vol, 'base'), base)
 
 # a flat smile (rr = bf = 0) must give back plain Garman-Kohlhagen digitals in both pay currencies
 for pay in ('terms', 'base'):
