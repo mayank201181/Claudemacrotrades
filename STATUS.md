@@ -46,6 +46,12 @@ Voices, Review, Positioning, Trend, Drivers.
   Opus folder, 20,017 bytes = repo file). R10 proposed, applies Sun 1 Nov 20:00 SGT, digests from Mon 2 Nov unless the
   owner says "oppose R10". Open: check the 27 Oct run carries the block; a later change to forecast.ts needs the
   stub re-pinned to the new commit.
+- **17 quant libraries (@pyquantnews list) reviewed, 26 Oct 2026 (thread "Review 17 quant Python libraries").**
+  Verdict: none replaces QuantLib + fxopt.py; FinancePy kept as a test-only second reference. Two gaps found and
+  closed in `scripts/fxopt/`: double no-touch / double one-touch (QuantLib-exact) and reading a quoted 25d BF as a
+  broker market strangle (now the default; USDJPY 3M 25d-wing premiums about 10% higher than the old reading).
+  Tests pass. Open: re-upload fxopt.py to the Drive copy R10 reads (file 10Y4KxrHX6HhEShA9h85QvU6KQ5oL4Owz) on
+  the owner's yes; no rule change needed. Note: project files `notes/quant_libraries_review_26oct2026.md`.
 - **S3 CFTC: v4 CLOSED (9 Oct); v5 run 3 SEALED as a STOP package at step 15 (12 Oct).** v4 (fresh run from source
   under v3's protocol, run `20261008T102913Z`): P1–P3 PASS; protocol stop at P4 on 9 Oct 17:14 SGT
   because PR-5 could not be resolved for 20 Nikkei (NKD tff) test-period rows (NKD missing from 16 of
