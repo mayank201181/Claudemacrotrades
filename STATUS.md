@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-24._
+_Last updated: 2026-10-26._
 
 ## Where things are
 
@@ -34,6 +34,23 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
+- **Opus Macro Takeaways PAUSED since Fri 23 Oct 2026 (owner's toggle on the scheduled-tasks page; thread "Fix missing
+  Opus Macro Takeaways digest", 26 Oct).** No "[Opus 5.5]" digest or trade book since the 23 Oct 07:15 SGT run (finished
+  08:31 SGT, status succeeded). Cause: the scheduled task `Daily Macro Takeaways` (Opus) was switched off at 17:28:06 SGT on
+  23 Oct, 14 s after `Daily YouTube Digest [Fable 5.1]` and `Daily Podcast Digest [Fable 5.1]` (17:27:52 and 17:27:55) and
+  24 s after the owner's "Merge" in the thread "Multi-source digests for Fable takeaways"; no failed run, no credit
+  suspension, no ended reason. No thread or routine issued the change (that thread's transcript holds only the PR #35
+  merge calls at those seconds), so the three toggles came from the owner's account outside any thread, which matches the
+  pause he had announced that afternoon for the two Fable digests. Not re-enabled from the cloud: a thread does not undo
+  the owner's pause (yes/no card sent 26 Oct, recommendation: leave it paused). Consequences: the Opus book is frozen at
+  the 23 Oct run with 5 open trades (P03 short EURUSD, P04 long distillate crack, P10 short USDJPY, P11 long NQ, P13 long
+  AUDUSD); `dash-mark` keeps marking them hourly but nothing books an exit. P04 closed through its stop on the Fri 23 Oct
+  daily close (live mark -1.59R; stop basis -1.0R) and the Sat 24 Oct run that would have booked it never ran; P11 touched
+  its stop intraday on 23 Oct without a close through it; P10 marks +1.12R. Month-end Opus-vs-Fable review (31 Oct): the
+  Opus record covers 24 Sep to 23 Oct; settle the frozen Opus book there from the marks (P04 at its stop, -1.0R; the rest
+  at the latest mark) unless the owner re-enables the task first (one toggle on the scheduled-tasks page, or
+  `update_trigger enabled=true` from a thread on his yes; the next 07:15 SGT run then books P04 and reviews the rest).
+  The Fable Macro Takeaways is unaffected: it reads the Opus YouTube and Podcast copies, both still running. Mac visits: 0.
 - **Carver forecasts + FX option pricer (25 Oct 2026, owner "do both"; thread "Find open-source code for macro workflows").**
   Code done and tested on branch `claude/project-thread-e80nxd`: `scripts/fxopt/` (stdlib FX option pricer: barriers,
   touches, digitals, delta conventions, vanna-volga smile; every formula checked against QuantLib 1.44) and
@@ -237,7 +254,9 @@ Voices, Review, Positioning, Trend, Drivers.
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
 10. **Flow check trial (Fable, 19–31 Oct 2026):** at the month-end Opus vs Fable scorecard, read the FLOW CHECK
     lines in the Fable digests (leads chosen, how many confirmed at a primary source, tests confirmed or killed)
-    and decide keep, drop, or port to Opus (which needs room in that prompt, or a rule).
+    and decide keep, drop, or port to Opus (which needs room in that prompt, or a rule). Note (26 Oct): the Opus
+    digest has been paused since 23 Oct (see Live now), so the Opus side of that scorecard ends 23 Oct and its frozen
+    book is settled from the marks.
 11. **Multi-source copies in the Fable digest (from 24 Oct 2026):** over the first few runs check the footer's
     copies-read line and the dedupe (one item per story across copies, no double sightings in the stance ledger),
     and that a day with the Fable YouTube or Podcast digest paused still runs clean. Known: no ChatGPT YouTube
@@ -247,6 +266,10 @@ Voices, Review, Positioning, Trend, Drivers.
     on every card and TESTED line, and that "least long" reads and spent extremes are not treated as with. The
     weekly review reads the new SCORECARD "crowd:" line; after 20 closed with cards, compare realised R with the
     adjusted-gate EV (revert thresholds in the rule's revert_if). Later split by bucket if the sample allows.
+13. **Frozen Opus book (from 24 Oct 2026):** while the Opus Macro Takeaways stays paused, nothing books exits for its 5
+    open trades; P04 is already through its stop. Either the owner re-enables the task (then its next run books P04 at the
+    stop and reviews the rest) or the 31 Oct review settles the book from `dash.live_marks` as described under Live now.
+    Decide at the 31 Oct review at the latest; record the outcome here.
 
 ## Questions still unanswered
 
