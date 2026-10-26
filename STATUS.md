@@ -253,9 +253,9 @@ Voices, Review, Positioning, Trend, Drivers.
     and it is the bigger move; at non-SEP meetings since 2022, 87-89% of the 100-min variance is the presser.
     2013-18 showed continuation (beta about 0.4), so don't use the full sample. Exit line for FOMC-day cards: take profit or halve at the
     statement close (14:20 ET); statement moves at non-SEP meetings are not confirmation. Note and tables:
-    project files `notes/fomc_presser_reversal_26oct2026.md`; code `scripts/fomc_presser/`. R11 PROPOSED 26 Oct 11:35Z on
-    the owner's "Yes" (`supabase/rules/R11_fomc_presser_exit.sql`; applies Sun 1 Nov 20:00 SGT, after this FOMC, unless the
-    owner runs the one-line early in-force update in that file before the Wed 28 Oct 07:15 SGT digests). Recheck the 3 post-May-2026 pressers (all continued) as the
+    project files `notes/fomc_presser_reversal_26oct2026.md`; code `scripts/fomc_presser/`. R11 IN FORCE 26 Oct 11:50Z
+    (owner "Yes", proposed 11:35Z, put in force early by the owner's one-line update so it covers the 28 Oct FOMC;
+    `supabase/rules/R11_fomc_presser_exit.sql`). Check the Wed 28 and Thu 29 Oct digests print FOMC EXIT lines. Recheck the 3 post-May-2026 pressers (all continued) as the
     new chair's sample grows. The v15 hourly-close stop lands on the 15:00 ET bar, which is mid-presser.
 
 ## Questions still unanswered
