@@ -23,6 +23,13 @@ QuantLib`): worst differences are below 3e-11 of spot, and 3.3e-7 of spot for va
 (finite-difference bumps on both sides). The same harness found the dashboard's R01 digital, one-touch and
 spread formulas (`_shared/convexity.ts`) equal to QuantLib to 4e-15.
 
+Added 26 Oct 2026 (review of the 17 @pyquantnews libraries): double no-touch / double one-touch paid at expiry
+(Hui series; QuantLib `AnalyticDoubleBarrierBinaryEngine` to 5e-16), and `bf_type` (default `market`): a quoted
+25d butterfly is read as a broker market strangle and the smile strangle is solved so the market-strangle strikes
+reprice; `smile` keeps the old reading. `test_fxopt_financepy.py` checks that smile against FinancePy's
+`FXVolSurface` (GPL-3, test only; 25d vols agree to 0.004 vol). Of the other libraries none added anything
+QuantLib and fxopt do not already cover (verdicts in the project note `notes/quant_libraries_review_26oct2026.md`).
+
 What it does not have: a market vol surface. A digest passes an implied vol it found (with source), or the
 trend monitor's realised rv20 labelled as such.
 

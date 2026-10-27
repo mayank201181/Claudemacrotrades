@@ -10,13 +10,18 @@ QuantLib-Python (BSD-3; https://github.com/lballabio/QuantLib); no QuantLib code
 
 Usage: python3 fxopt.py '<json>'   (or the JSON on stdin; a JSON list prices several legs)
   pair        "USDJPY" (base then terms; prices are in terms currency per 1 unit of base)
-  type        call | put | digital_call | digital_put | one_touch | no_touch | strike (strike from delta)
+  type        call | put | digital_call | digital_put | one_touch | no_touch | double_no_touch |
+              double_one_touch | strike (strike from delta)
   spot        spot rate
   days        calendar days to expiry (or "expiry": "YYYY-MM-DD" with optional "today")
   rates       either rd and rf (terms and base ccy rates, PERCENT, continuous), or fwd (outright
               for the expiry) plus rd; fwd alone assumes rd = 0 and says so
-  vol         PERCENT (9.5 = 9.5%); or atm, rr25, bf25 in percent for the smile (25d call vol =
-              atm + bf25 + rr25/2, put = atm + bf25 - rr25/2; rr25 > 0 = calls over)
+  vol         PERCENT (9.5 = 9.5%); or atm, rr25, bf25 in percent for the smile (rr25 > 0 = calls
+              over; how bf25 is read: bf_type)
+  bf_type     market (default: bf25 is a broker market strangle, as quoted;
+              the smile strangle is solved so the market-strangle strikes reprice; Clark / Reiswich-Wystup)
+              | smile (bf25 is already the smile strangle: 25d call vol = atm + bf25 + rr25/2)
+  lower, upper  double touches (paid at expiry; pay terms | base)
   strike      for vanillas and digitals; barrier for touches; barrier + barrier_type
               (up_out | up_in | down_out | down_in) turns a call / put into a barrier option
   delta       with type "strike": 0.25 (call) or -0.25 (put); delta_type spot | fwd | spot_pa | fwd_pa
@@ -151,6 +156,29 @@ class Mkt:
         v = (H / S) ** (mu + lam) * N(eta * z) + (H / S) ** (mu - lam) * N(eta * z - 2 * eta * lam * vol * math.sqrt(T))
         return v * (H / S if pay == 'base' else 1.0)
 
+    # ---- double touches (Hui 1996 series, as in Haug's Complete Guide), paid at expiry
+    def double_no_touch(self, L, U, vol, pay='terms'):
+        """Value, per unit of payout in the pay currency, of a payout at expiry if spot stays inside (L, U)."""
+        S, T = self.S, self.T
+        if not L < S < U:
+            return 0.0
+        # terms pay: domestic measure, discount rd; base pay: base measure (drift + vol^2), discount rf
+        b = self.rd - self.rf + (vol * vol if pay == 'base' else 0.0)
+        r = self.rf if pay == 'base' else self.rd
+        s2, Z = vol * vol, math.log(U / L)
+        a = -0.5 * (2 * b / s2 - 1)
+        be = -0.25 * (2 * b / s2 - 1) ** 2 - 2 * r / s2
+        xl, xu, lsl = (S / L) ** a, (S / U) ** a, math.log(S / L)
+        v = 0.0
+        for i in range(1, 100001):
+            w = i * math.pi / Z
+            t = 2 * math.pi * i / (Z * Z) * (xl - (-1) ** i * xu) / (a * a + w * w) \
+                * math.sin(w * lsl) * math.exp(-0.5 * (w * w - be) * s2 * T)
+            v += t
+            if 0.5 * w * w * s2 * T > 40 and abs(t) < 1e-16:
+                break
+        return min(max(v, 0.0), self.dff if pay == 'base' else self.dfd)
+
     # ---- single barriers, no rebate (Reiner-Rubinstein, as in Haug's Complete Guide)
     def barrier(self, phi, K, H, btype, vol):
         S, T, r, b = self.S, self.T, self.rd, self.rd - self.rf
@@ -195,6 +223,7 @@ class Smile:
     def __init__(self, m, atm, rr25, bf25, delta_type, atm_type):
         self.m = m
         self.atm = atm
+        self.bf = bf25
         self.vc = atm + bf25 + 0.5 * rr25
         self.vp = atm + bf25 - 0.5 * rr25
         pa = delta_type.endswith('_pa')
@@ -256,6 +285,31 @@ class Smile:
         p_touch = N(h2p) + pw * N(-h2) if up else N(-h2p) + pw * N(h2)
         outp = max(0.0, min(vanilla_smile, p0 + (1 - p_touch) * adj))
         return outp if btype.endswith('out') else vanilla_smile - outp
+
+
+def market_strangle_smile(m, atm, rr25, bf_ms, delta_type, atm_type):
+    """Smile whose 25d strangle, struck at the market-strangle strikes (25d strikes at the single vol
+    atm + bf_ms) and priced on the smile, is worth the same as both legs at atm + bf_ms: the broker
+    (market) strangle convention. Returns the vanna-volga Smile with the solved smile strangle."""
+    v = atm + bf_ms
+    kc = m.strike_from_delta(1, 0.25, v, delta_type)
+    kp = m.strike_from_delta(-1, -0.25, v, delta_type)
+    target = m.vanilla(1, kc, v) + m.vanilla(-1, kp, v)
+    def f(bf):
+        sm = Smile(m, atm, rr25, bf, delta_type, atm_type)
+        return m.vanilla(1, kc, sm.vol(kc)) + m.vanilla(-1, kp, sm.vol(kp)) - target, sm
+    lo, hi = bf_ms - 0.02, bf_ms + 0.02
+    while f(lo)[0] > 0:
+        lo -= 0.02
+    while f(hi)[0] < 0:
+        hi += 0.02
+    for _ in range(60):
+        mid = 0.5 * (lo + hi)
+        if f(mid)[0] > 0:
+            hi = mid
+        else:
+            lo = mid
+    return f(0.5 * (lo + hi))[1]
 
 
 def implied_vol(m, K, c):
@@ -326,7 +380,12 @@ def price(leg):
     atm_type = leg.get('atm_type', 'dns')
     smile = None
     if leg.get('atm') is not None:
-        smile = Smile(m, _pct(leg['atm']), _pct(leg.get('rr25', 0)), _pct(leg.get('bf25', 0)), dtype, atm_type)
+        args = (m, _pct(leg['atm']), _pct(leg.get('rr25', 0)), _pct(leg.get('bf25', 0)), dtype, atm_type)
+        if leg.get('bf_type', 'market') == 'market':
+            smile = market_strangle_smile(*args)
+            notes.append('bf25 read as a market (broker) strangle; smile strangle %.4f%%' % (100 * smile.bf))
+        else:
+            smile = Smile(*args)
     vol_in = _pct(leg.get('vol'))
     if vol_in is None and smile is None:
         raise ValueError('give vol, or atm/rr25/bf25')
@@ -380,6 +439,21 @@ def price(leg):
         def reprice(s, v):
             return Mkt(s, T, rd, rf).digital(phi, K, v, pay)
         out.update(strike=K, vol=vol, pay=pay, payout=notional)
+    elif typ in ('double_no_touch', 'double_one_touch'):
+        L, U = float(leg['lower']), float(leg['upper'])
+        pay = leg.get('pay', 'terms')
+        vol = smile.atm if smile else vol_in
+        dfp = m.dfd if pay == 'terms' else m.dff
+        dnt = m.double_no_touch(L, U, vol, pay)
+        px = dnt if typ == 'double_no_touch' else dfp - dnt
+        if smile:
+            notes.append('double touch priced at ATM vol; smile not applied to touches')
+        def reprice(s, v):
+            mm = Mkt(s, T, rd, rf)
+            d = mm.double_no_touch(L, U, v, pay)
+            return d if typ == 'double_no_touch' else (mm.dfd if pay == 'terms' else mm.dff) - d
+        out.update(lower=L, upper=U, vol=vol, pay=pay, when='expiry', payout=notional,
+                   p_stay_inside=m.double_no_touch(L, U, vol, 'terms') / m.dfd)
     elif typ in ('one_touch', 'no_touch'):
         H = float(leg['barrier'])
         pay, when = leg.get('pay', 'terms'), leg.get('when', 'expiry')
@@ -417,7 +491,8 @@ def price(leg):
         out['delta_payccy_per_1pct'] = (up_ - dn_) / (2 * dS) * S * 0.01 * notional
         out['vega_per_volpt_payccy'] = (reprice(S, v0 + e) - reprice(S, v0 - e)) / (2 * e) * 0.01 * notional
     out['price'] = px
-    out['model'] = 'vanna-volga' if smile and typ != 'one_touch' and typ != 'no_touch' else 'Garman-Kohlhagen'
+    touch = typ in ('one_touch', 'no_touch', 'double_no_touch', 'double_one_touch')
+    out['model'] = 'vanna-volga' if smile and not touch else 'Garman-Kohlhagen'
     out['vol_source'] = vsrc if not smile else 'smile ATM/RR25/BF25 (' + vsrc + ')'
     out['notes'] = notes
     return out

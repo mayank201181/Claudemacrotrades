@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-24._
+_Last updated: 2026-10-26._
 
 ## Where things are
 
@@ -42,10 +42,18 @@ Voices, Review, Positioning, Trend, Drivers.
   `docs/carver_and_fxopt.md`; rule text `supabase/rules/R10_carver_and_fxopt.sql`. LIVE 25 Oct ~10:00Z (owner yes on
   the decision card 09:50Z): dash-trend v7 is a one-line stub importing `dash-trend/index.ts` from this repo at
   commit 64d1f84 (rollback = same stub pinned to 2e5fd8764d324ad662422078a6511de26dac64d3); first run with the
-  CARVER block Tue 27 Oct 00:30 UTC (08:30 SGT). fxopt.py on Drive (file 10Y4KxrHX6HhEShA9h85QvU6KQ5oL4Owz in the
+  CARVER block Tue 27 Oct 00:30 UTC (08:30 SGT). fxopt.py on Drive (file 10Y4KxrHX6HhEShA9h85QvU6KQ5oL4Owz, superseded 26 Oct, see below, in the
   Opus folder, 20,017 bytes = repo file). R10 proposed, applies Sun 1 Nov 20:00 SGT, digests from Mon 2 Nov unless the
-  owner says "oppose R10". Open: check the 27 Oct run carries the block; a later change to forecast.ts needs the
-  stub re-pinned to the new commit.
+  owner says "oppose R10". Checked 27 Oct 00:50Z: the 27 Oct run carries the
+  block (38 FORECAST lines, no fetch errors, BIS carry filled for FX). A later change to forecast.ts needs the stub
+  re-pinned to the new commit.
+- **17 quant libraries (@pyquantnews list) reviewed, 26 Oct 2026 (thread "Review 17 quant Python libraries").**
+  Verdict: none replaces QuantLib + fxopt.py; FinancePy kept as a test-only second reference. Two gaps found and
+  closed in `scripts/fxopt/`: double no-touch / double one-touch (QuantLib-exact) and reading a quoted 25d BF as a
+  broker market strangle (now the default; USDJPY 3M 25d-wing premiums about 10% higher than the old reading).
+  Tests pass. LIVE 26 Oct 12:11Z (owner yes on the card): Drive "fxopt.py" is now file
+  1D7aDF6fO2Ckew1hyXHUuljgzouXzMxoF (23,738 bytes, read-back byte-identical); the 25 Oct copy was renamed
+  fxopt_v1_25oct_superseded.py (rollback = swap the two titles). No rule change needed. Note: project files `notes/quant_libraries_review_26oct2026.md`.
 - **S3 CFTC: v4 CLOSED (9 Oct); v5 run 3 SEALED as a STOP package at step 15 (12 Oct).** v4 (fresh run from source
   under v3's protocol, run `20261008T102913Z`): P1–P3 PASS; protocol stop at P4 on 9 Oct 17:14 SGT
   because PR-5 could not be resolved for 20 Nikkei (NKD tff) test-period rows (NKD missing from 16 of
@@ -247,6 +255,16 @@ Voices, Review, Positioning, Trend, Drivers.
     on every card and TESTED line, and that "least long" reads and spent extremes are not treated as with. The
     weekly review reads the new SCORECARD "crowd:" line; after 20 closed with cards, compare realised R with the
     adjusted-gate EV (revert thresholds in the rule's revert_if). Later split by bucket if the sample allows.
+13. **FOMC presser reversal (study done 26 Oct 2026, thread "Test FOMC presser reversal for FX"):** SF Fed USMPD
+    (public, update 17 Sep 2026), 85 clean meetings 2013-Sep 2026. Since 2019 the presser reverses the statement move
+    about half the time (EUR/USD 46%, USD/JPY 52%, 2y 48%, 10y 46%), with no significant continuation either way,
+    and it is the bigger move; at non-SEP meetings since 2022, 87-89% of the 100-min variance is the presser.
+    2013-18 showed continuation (beta about 0.4), so don't use the full sample. Exit line for FOMC-day cards: take profit or halve at the
+    statement close (14:20 ET); statement moves at non-SEP meetings are not confirmation. Note and tables:
+    project files `notes/fomc_presser_reversal_26oct2026.md`; code `scripts/fomc_presser/`. R11 IN FORCE 26 Oct 11:50Z
+    (owner "Yes", proposed 11:35Z, put in force early by the owner's one-line update so it covers the 28 Oct FOMC;
+    `supabase/rules/R11_fomc_presser_exit.sql`). Check the Wed 28 and Thu 29 Oct digests print FOMC EXIT lines. Recheck the 3 post-May-2026 pressers (all continued) as the
+    new chair's sample grows. The v15 hourly-close stop lands on the 15:00 ET bar, which is mid-presser.
 
 ## Questions still unanswered
 
