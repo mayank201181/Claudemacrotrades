@@ -44,8 +44,9 @@ Voices, Review, Positioning, Trend, Drivers.
   commit 64d1f84 (rollback = same stub pinned to 2e5fd8764d324ad662422078a6511de26dac64d3); first run with the
   CARVER block Tue 27 Oct 00:30 UTC (08:30 SGT). fxopt.py on Drive (file 10Y4KxrHX6HhEShA9h85QvU6KQ5oL4Owz, superseded 26 Oct, see below, in the
   Opus folder, 20,017 bytes = repo file). R10 proposed, applies Sun 1 Nov 20:00 SGT, digests from Mon 2 Nov unless the
-  owner says "oppose R10". Open: check the 27 Oct run carries the block; a later change to forecast.ts needs the
-  stub re-pinned to the new commit.
+  owner says "oppose R10". Checked 27 Oct 00:50Z: the 27 Oct run carries the
+  block (38 FORECAST lines, no fetch errors, BIS carry filled for FX). A later change to forecast.ts needs the stub
+  re-pinned to the new commit.
 - **17 quant libraries (@pyquantnews list) reviewed, 26 Oct 2026 (thread "Review 17 quant Python libraries").**
   Verdict: none replaces QuantLib + fxopt.py; FinancePy kept as a test-only second reference. Two gaps found and
   closed in `scripts/fxopt/`: double no-touch / double one-touch (QuantLib-exact) and reading a quoted 25d BF as a
