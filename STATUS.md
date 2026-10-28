@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-26._
+_Last updated: 2026-10-28._
 
 ## Where things are
 
@@ -27,6 +27,7 @@ _Last updated: 2026-10-26._
 | `dash.put_drivers(jsonb)` | loads one snapshot of the FX drivers engine (`dash-ingest` kind `drivers`, or `execute_sql`); the Drivers tab reads `dash_drivers`, the digests `dash.drivers_brief()` | on post (daily refresh parked: no part passed the holdout) |
 | `dash-history`, `dash-gdelt` | research relays (Yahoo daily/hourly bars, GDELT DOC API) | on call |
 | `scripts/gdelt/attention.py` | media-attention table (GDELT GKG hourly sample, DOC API, Wikipedia views) → project files `gdelt/` | daily routine, before 07:15 SGT |
+| `scripts/predmkt/predmkt.py` | prediction-market odds (Polymarket Gamma + Kalshi public APIs, no keys): macro contracts, data ladders with implied medians → project files `predmkt/` and Drive `predmkt_latest`; digests read it under R12 | daily 06:38 SGT (scheduled task "Prediction-market odds daily refresh") |
 | `016_event_library.sql` | event library in the database: `dash.event_cell` / `event_cal` (plus type and asset tables), loaders `dash.put_event_cells` / `put_event_cal` (compact text from `scripts/event_library/to_sql.py`); the digests read `dash.event_brief()` and `dash.event_lookup(release, asset)` | on load (library rebuilt by hand; calendar to Jan 2027) |
 
 Site tabs: Themes, Trades (linear + convexity cards), YouTube, Podcast, Grok, Substack, Questions,
@@ -34,6 +35,18 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
+- **Prediction-market odds in both Macro Takeaways digests (28 Oct 2026, thread "Add prediction market odds to takeaways").**
+  Owner ask after the Bloomberg/Millennium story. `scripts/predmkt/predmkt.py` (stdlib, ~40 s) pulls ~45 Polymarket macro events
+  (tags fed-rates, Global-Rates, economy, inflation, oil, commodities, japan, china, geopolitics, tariffs, middle-east, ukraine,
+  taiwan, europe; sports/crypto/AI/local races dropped; liquidity >= $25k) and 22 Kalshi series picked from 1,957 by open interest
+  (Fed decision / funds rate / cut count, CPI, core CPI, y/y, U3, payrolls, GDP, recession, ECB/BoJ/BoC/RBA, UST and DXY ranges,
+  gasoline). Output: a 13 KB table `predmkt_latest.md` (p, d1/d7 in pp, 24h volume, liquidity; 'Above X' ladders with the implied
+  median), `.json`, and a daily history `predmkt_daily.csv` for a later lead/lag test. Scheduled task fires 06:38 SGT into the
+  thread's own session (Opus; a fresh-session routine ran on Fable and was deleted), runs the script and writes Drive
+  `predmkt_latest` in the digest folder. Rule R12 (`supabase/rules/R12_prediction_markets.sql`, proposed 28 Oct 06:3xZ, applies
+  Sun 1 Nov 20:00 SGT unless "oppose R12"): cite PM odds for dated catalysts, a >=80% priced outcome fails the not-already-priced
+  gate unless the card rests on the residual, 'PM gap' line when PM odds differ from rates/survey-implied by >=10pp (or ladder
+  median vs consensus), d7 >=15pp moves into BOOK CHECK; never raises p by itself (R03). Review due 30 Nov. Mac visits: 0.
 - **Carver forecasts + FX option pricer (25 Oct 2026, owner "do both"; thread "Find open-source code for macro workflows").**
   Code done and tested on branch `claude/project-thread-e80nxd`: `scripts/fxopt/` (stdlib FX option pricer: barriers,
   touches, digitals, delta conventions, vanna-volga smile; every formula checked against QuantLib 1.44) and
