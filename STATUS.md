@@ -285,8 +285,9 @@ Voices, Review, Positioning, Trend, Drivers.
     US$0.81 in total, 3-5 min per episode. Text and numbers are on par with Podwise (Nemotron spells numbers out), and
     names are a draw. Gap: no speaker labels on DeepInfra (Podwise names speakers), and no prompt hints. YouTube audio
     cannot be fetched from the cloud, so YouTube stays on Podwise. Lean: hybrid (podcasts on Nemotron, Podwise kept for
-    YouTube with a lower cap); owner to choose. Note: project files `notes/nemotron_vs_podwise_29oct2026.md`.
-    The DeepInfra key was shared in chat; move it to env var DEEPINFRA_API_KEY and rotate before any cutover.
+    YouTube with a lower cap). OWNER DECIDED 29 Oct 10:04Z: leave as is (Podwise unchanged, no routine edited). CLOSED.
+    Note: project files `notes/nemotron_vs_podwise_29oct2026.md`. The DeepInfra account (US$10 credit, ~US$9 left) and its key
+    (shared in chat) are unused; delete or rotate that key if it is ever reused.
 
 ## Questions still unanswered
 
