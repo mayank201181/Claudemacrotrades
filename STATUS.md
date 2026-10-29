@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-28._
+_Last updated: 2026-10-29._
 
 ## Where things are
 
@@ -278,6 +278,16 @@ Voices, Review, Positioning, Trend, Drivers.
     (owner "Yes", proposed 11:35Z, put in force early by the owner's one-line update so it covers the 28 Oct FOMC;
     `supabase/rules/R11_fomc_presser_exit.sql`). Check the Wed 28 and Thu 29 Oct digests print FOMC EXIT lines. Recheck the 3 post-May-2026 pressers (all continued) as the
     new chair's sample grows. The v15 hourly-close stop lands on the 15:00 ET bar, which is mid-presser.
+
+14. **Podwise vs Nvidia Nemotron 3.5 Transcribe (29 Oct 2026, thread "Test Nvidia transcription to replace Podwise"):**
+    Podwise costs about S$360/month (Pro annual plus "100 Extra Quotas" packs, 10 packs in the last 30 days, rising).
+    Tested Nemotron through DeepInfra (US$0.002/audio minute) on 7 market episodes Podwise had already transcribed:
+    US$0.81 in total, 3-5 min per episode. Text and numbers are on par with Podwise (Nemotron spells numbers out), and
+    names are a draw. Gap: no speaker labels on DeepInfra (Podwise names speakers), and no prompt hints. YouTube audio
+    cannot be fetched from the cloud, so YouTube stays on Podwise. Lean: hybrid (podcasts on Nemotron, Podwise kept for
+    YouTube with a lower cap). OWNER DECIDED 29 Oct 10:04Z: leave as is (Podwise unchanged, no routine edited). CLOSED.
+    Note: project files `notes/nemotron_vs_podwise_29oct2026.md`. The DeepInfra account (US$10 credit, ~US$9 left) and its key
+    (shared in chat) are unused; delete or rotate that key if it is ever reused.
 
 ## Questions still unanswered
 
