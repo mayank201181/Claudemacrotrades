@@ -19,7 +19,7 @@
 //    its bar dated D is the 17:00 New York price on D, final once the run is 30 minutes past that
 //    close, and expected on the most recent New York business day that has closed (the US-listed
 //    rule). TM1's FX assets carry no exch_close, so TM1 keeps the spec's UTC-date rules unchanged.
-import { normCdf } from './convexity.ts';
+import { normCdf } from './normal.ts';
 
 export type AssetClass = 'fx' | 'rates' | 'commodities' | 'equities';
 export type AssetDef = {
