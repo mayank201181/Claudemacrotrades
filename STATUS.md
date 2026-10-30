@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-28._
+_Last updated: 2026-10-30._
 
 ## Where things are
 
@@ -279,6 +279,11 @@ Voices, Review, Positioning, Trend, Drivers.
     `supabase/rules/R11_fomc_presser_exit.sql`). Check the Wed 28 and Thu 29 Oct digests print FOMC EXIT lines. Recheck the 3 post-May-2026 pressers (all continued) as the
     new chair's sample grows. The v15 hourly-close stop lands on the 15:00 ET bar, which is mid-presser.
 
+14. **R08 and R14 check (from 2 Nov 2026):** at the month-end scorecard count the CONFLICT lines, the closes made under
+    R08 or R14 and whether they were premature (their revert tests), the replacement-fill delays under R14, and the NET
+    lines on cross-proxy pairs. Fold the spec's TACTICAL WASHOUT sentence into the next spec version (a
+    `trade_book_spec_edits` file) so the Doc and the rules agree.
+
 ## Questions still unanswered
 
 - The office "~90%" figure: daily or weekly changes, and were FX series among its 9 drivers?
@@ -291,6 +296,24 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
+- **30 Oct 2026, one direction per underlying (owner: yes, 01:22Z).** "I thought we agreed not to have long and short
+  trades of same thing at same time": the Opus digest of 30 Oct closed P03 short EURUSD under R08 (CONFLICT weakened, view
+  changed at 08:15 SGT, exit at the 09:00 bar close) while its replacement P19 long EURUSD filled at that bar's open, one hour
+  both ways; and R08's allowance for an intact card beside an opposite tactical or hedge would still have let a long Jan-27
+  Brent tactical sit against P15 short Feb-27 Brent (the thematic version was refused as "nets to a close"). Rule R14 (scope
+  both, source owner, review due 11 Dec 2026) tightens R08 for the same underlying: the same proxy, the same instrument in
+  another wrapper, or the same commodity, index, bond or pair in another contract month or tenor count as one underlying (a
+  spread carded as a spread with both legs named is its own); the book never holds a long and a short of one underlying at
+  the same time, open or pending, in any class; an opposite lean either closes the open card (R08 review: dead, or weakened
+  by the lean's own evidence; first-hour exit, a pending card vetoed) and is then carded on its own numbers, or is refused
+  "thesis intact, one direction per underlying"; a replacement fills at the open of the bar after the old card's exit bar
+  has closed (decision 08:15 SGT: exit at the 09:00 bar close, fill at the 10:00 open), stays pending over a weekend or
+  holiday until that bar prints, and prints "fills after Pnn exits"; the NET line survives only for R08's cross-proxy pairs
+  (different underlyings, same factor label or correlation 0.7 and beyond), where R08 stands as it is. Proposed 30 Oct 2026
+  through `dash.propose_rule` from a cloud thread (no approval prompt); in force at the Sun 1 Nov 20:00 SGT window unless he
+  replies `oppose R14` to the weekly review email, so both digests follow it from the Mon 2 Nov 07:15 SGT run, whose first
+  pass clears any pair already held both ways. Text and the one-line early-apply SQL in
+  `supabase/rules/R14_one_direction_per_underlying.sql`. Mac visits: 0.
 - **24 Oct 2026, crowd asymmetry at the gate (owner: yes, 11:40Z, defaults as proposed; rule R09 applies at the Sun
   25 Oct 20:00 SGT window).** From a clip of Ying Hua (ex-Balyasny): pod-shop investing at a weeks-to-months horizon is poker, not
   blackjack; when everyone is on the same side the group is right 60-70% of the time but paid less (everyone sells to
@@ -330,6 +353,26 @@ Voices, Review, Positioning, Trend, Drivers.
   16 Oct; a Gemini copy can arrive empty (22 Oct). Route: prompt rewrite through the scheduled-task API from a cloud
   thread, stored copy verified byte for byte; the edit trimmed the Fable prompt to 65,263 of 65,536 bytes. Opus Macro
   Takeaways unchanged. Text in `docs/fable_source_copies.md`. Mac visits: 0.
+- **22 Oct 2026, opposite-side leans: review the open card first (owner).** Prompted by the Fable digest of 22 Oct, which
+  carded P23 long NQZ26 (tactical, into the FOMC, exit 27 Oct close) while P13 short NQZ26 (thematic, AI unwind) was open,
+  reviewed P13 the same morning as "weakened (positioning washed out; P23 opened against it)" and kept both. The spec's
+  TACTICAL WASHOUT sentence allowed an opposite-direction tactical against a thematic on the same proxy whenever the
+  tactical named a reconciling exit, so a change of view was booked as an offsetting card with no decision on the open one
+  and no net exposure printed (stops 500.5 and 867.5 points away left the book net long NQ about +0.25R per 1% while it
+  counted two trades). Rule R08 (scope both, source owner, review due 4 Dec 2026): a lean opposite to an open or pending
+  card on the same proxy or underlying, the same factor label with the opposite sign, or a proxy correlated at 0.7 or
+  beyond is first an out-of-cycle review of that card, printed as one CONFLICT line; dead, or weakened by the same evidence
+  that drives the lean, closes it (VIEW CHANGED, first-hour exit; a pending card is vetoed) and the lean is then tested off
+  the flat book on its own numbers; only an intact verdict lets the old card stay, and then an opposite card must be a
+  tactical washout or a hedge with its exit before the old card's next review and a NET line (R per 1% move per card and
+  net, repeated on both rows); when intact cannot be said with a reason the default is to close the old card and card
+  nothing new; a thematic lean against an intact thematic card is never carded ("nets to a close"). Proposed 22 Oct 2026
+  through `dash.propose_rule` from a cloud thread (no approval prompt), unopposed, IN FORCE since the Sun 25 Oct 20:12 SGT
+  apply window; both digests follow it from the Mon 26 Oct run (the 30 Oct Opus digest printed its first CONFLICT lines).
+  Tightened for the same underlying by R14 on 30 Oct (above). Text and the one-line early-apply SQL in
+  `supabase/rules/R08_opposite_side_exit_check.sql`. Both prompts were full (Opus at 65,536 bytes, Fable at 65,349), so no
+  prompt edit; STEP 1f in both prompts makes a rule win over the prompt and the spec on the point it covers, so the spec
+  sentence is superseded without a Drive edit. Mac visits: 0.
 - **18 Oct 2026, flow check in the Fable digest (owner: yes, 11:20Z).** Prompted by a KRW note from the owner's
   other assistant, which took a digest lead to the primary source (Yonhap, then the BoK) and turned it into a
   dated test. The Fable Macro Takeaways routine (STEP 2 item 9, live from the Mon 19 Oct 07:15 SGT run) picks up
