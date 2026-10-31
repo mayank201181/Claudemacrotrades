@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-28._
+_Last updated: 2026-10-31._
 
 ## Where things are
 
@@ -256,9 +256,12 @@ Voices, Review, Positioning, Trend, Drivers.
 9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
-10. **Flow check trial (Fable, 19–31 Oct 2026):** at the month-end Opus vs Fable scorecard, read the FLOW CHECK
-    lines in the Fable digests (leads chosen, how many confirmed at a primary source, tests confirmed or killed)
-    and decide keep, drop, or port to Opus (which needs room in that prompt, or a rule).
+10. **Opus vs Fable month-end review (31 Oct 2026), waiting on the owner's yes/no.** Recommendation: keep Fable
+    Macro Takeaways, pause Opus Macro Takeaways (Opus YouTube, Podcast and Email digests keep running as feeds).
+    The two tie on questions, gate discrimination and the accuracy gate; the trade scorecard favours Fable on a
+    thin sample; Fable missed one run (28 Oct), Opus was paused by the owner 23–26 Oct; Fable costs about three
+    times Opus per run. Flow check stays in Fable, judged again end Nov. No routine changed until he says yes.
+    Figures are kept out of this public repo: project files `notes/opus_vs_fable_review_31oct2026.md`.
 11. **Multi-source copies in the Fable digest (from 24 Oct 2026):** over the first few runs check the footer's
     copies-read line and the dedupe (one item per story across copies, no double sightings in the stance ledger),
     and that a day with the Fable YouTube or Podcast digest paused still runs clean. Known: no ChatGPT YouTube
