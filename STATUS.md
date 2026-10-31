@@ -256,11 +256,12 @@ Voices, Review, Positioning, Trend, Drivers.
 9. **Small fixes:** pre-existing TypeScript error in `convexity.ts`; run-notes counter off by one
    (27 vs 28 rows), fix at the next conclusions write; clean up quarantined local S3 outcome files;
    the msd-owner list and event-library retry (from ~5 Oct, details thin).
-10. **Opus vs Fable month-end review (31 Oct 2026), waiting on the owner's yes/no.** Recommendation: keep Fable
-    Macro Takeaways, pause Opus Macro Takeaways (Opus YouTube, Podcast and Email digests keep running as feeds).
+10. **Opus vs Fable month-end review (31 Oct 2026): DONE, owner chose Fable (09:52Z).** Opus Macro Takeaways
+    paused 31 Oct ~09:55Z (last Opus run 31 Oct; re-enable = one `update_trigger enabled=true`). Kept Fable
+    Macro Takeaways (Opus YouTube, Podcast and Email digests keep running as feeds).
     The two tie on questions, gate discrimination and the accuracy gate; the trade scorecard favours Fable on a
     thin sample; Fable missed one run (28 Oct), Opus was paused by the owner 23–26 Oct; Fable costs about three
-    times Opus per run. Flow check stays in Fable, judged again end Nov. No routine changed until he says yes.
+    times Opus per run. Flow check stays in Fable, judged again end Nov.
     Figures are kept out of this public repo: project files `notes/opus_vs_fable_review_31oct2026.md`.
 11. **Multi-source copies in the Fable digest (from 24 Oct 2026):** over the first few runs check the footer's
     copies-read line and the dedupe (one item per story across copies, no double sightings in the stance ledger),
