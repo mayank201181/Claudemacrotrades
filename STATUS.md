@@ -47,6 +47,14 @@ Voices, Review, Positioning, Trend, Drivers.
   same pass: R03 reverted (drivers data as of 2024-09-30), flow check kept, the paused Opus Email Digest left off (Gemini
   copy covers the 05:30-06:45 SGT newsletter window). OI day-on-day history starts 1 Nov; DTCC is US-reported trades only
   ("DTCC sample"). LSEG 25-delta risk reversals need the owner's connector sign-in; not done. Mac visits: 0.
+- **Desk inputs from Gemini, ChatGPT and Grok (1 Nov 2026, same thread; owner has spare capacity in those apps).**
+  The Fable Macro Takeaways PEER TAKEAWAYS line now reads every email whose subject starts "DESK INPUT" as a second read
+  (prompt 65,511 bytes, verified byte-identical; backup `notes/fable_mt_prompt_after_deskinputs_1nov2026.txt`). Scheduled in
+  the owner's apps (prompts in project files `notes/desk_inputs_prompts_1nov2026.md` and `notes/gemini_extra_prompts_1nov2026.md`):
+  Grok crowding check now daily 06:20 SGT (subject unchanged); ChatGPT red team on open cards daily 06:15; Gemini Fed & Asia
+  wire daily ~06:40 with native-language Japanese/Chinese/Korean sources; Gemini central bank document diffs daily ~06:30,
+  sends only when a listed document came out; ChatGPT flows brief Saturdays 09:00; Gemini retail crowding Sundays 10:00
+  (Gemini cannot pull Google Trends on a schedule, so it uses published retail data instead). Mac visits: 0.
 - **Prediction-market odds in both Macro Takeaways digests (28 Oct 2026, thread "Add prediction market odds to takeaways").**
   Owner ask after the Bloomberg/Millennium story. `scripts/predmkt/predmkt.py` (stdlib, ~40 s) pulls ~45 Polymarket macro events
   (tags fed-rates, Global-Rates, economy, inflation, oil, commodities, japan, china, geopolitics, tariffs, middle-east, ukraine,
