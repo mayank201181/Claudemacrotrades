@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-10-28._
+_Last updated: 2026-11-01._
 
 ## Where things are
 
@@ -268,6 +268,9 @@ Voices, Review, Positioning, Trend, Drivers.
     on every card and TESTED line, and that "least long" reads and spent extremes are not treated as with. The
     weekly review reads the new SCORECARD "crowd:" line; after 20 closed with cards, compare realised R with the
     adjusted-gate EV (revert thresholds in the rule's revert_if). Later split by bucket if the sample allows.
+13. **Fable start gate (from Mon 2 Nov 2026):** check the first runs' footer "Late at start" line and the
+    "(Gemini MT)" / "(ChatGPT MT)" citations. If Gemini's Macro Takeaways still lands after 07:45, either accept it or
+    push the gate later (one cron and one prompt edit).
 13. **FOMC presser reversal (study done 26 Oct 2026, thread "Test FOMC presser reversal for FX"):** SF Fed USMPD
     (public, update 17 Sep 2026), 85 clean meetings 2013-Sep 2026. Since 2019 the presser reverses the statement move
     about half the time (EUR/USD 46%, USD/JPY 52%, 2y 48%, 10y 46%), with no significant continuation either way,
@@ -291,6 +294,23 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
+- **1 Nov 2026, Fable Macro Takeaways moved to 07:30 SGT with a wait gate, and reads the ChatGPT and Gemini
+  Macro Takeaways (owner).** He wants every digest in before Fable starts, including the ChatGPT and Gemini Macro
+  Takeaways (he moved Gemini's to 07:30). Inbox check 27 Oct–1 Nov (SGT): Slack 04:30; ChatGPT Email 05:31–05:37;
+  YouTube Gemini 05:13–06:28, ChatGPT 05:33–06:18 (back since at least 29 Oct), Opus 05:44–06:13; Podcast ChatGPT
+  06:03–06:24, Gemini 06:14–06:46, Opus 06:14–06:35; Grok consolidated 06:42–06:59 (Grok Bot once 08:09); Gemini
+  Email 07:04–07:19; ChatGPT Macro Takeaways 07:35–07:46; Gemini Macro Takeaways 08:37–08:52 on its old schedule; no
+  Opus Email copy in that window. Scheduled task trig_01QdRhfbBYeBiyYzmgCguhSE now `CRON_TZ=Asia/Singapore 30 7 * * *`
+  (the scheduler set the first fire at 07:35:51 SGT, Mon 2 Nov). New START GATE in the prompt: search for all
+  expected copies, start at once if all are in, else re-check every 150 s until 07:45 SGT, then start with what is
+  in and print "Late at start: …" in the footer. New PEER TAKEAWAYS line: today's ChatGPT and Gemini Macro Takeaways
+  are second reads, not a feed (not in "N of 5"), lower trust, cited "(Gemini MT)" / "(ChatGPT MT)", verified per
+  STEP 2 item 7, their cards and questions never booked; the old exclusion of all other models' Macro Takeaways now
+  covers only Fable, Opus and prior-day ones. The Grok `sleep 300` retry and the Gemini Email "never wait" note were
+  removed (the gate covers them); ten "at Mayank's request" tags and two history notes were trimmed to pay for it.
+  Prompt 65,407 of 65,536 bytes, stored copy byte-identical. Runs take 45–100 min (emails landed 08:02–08:57
+  when starting 07:15), so the Fable email now lands roughly 20–30 min later. Backups of the old and new prompts:
+  project files `notes/fable_mt_prompt_*_1nov2026.txt`. Mac visits: 0.
 - **24 Oct 2026, crowd asymmetry at the gate (owner: yes, 11:40Z, defaults as proposed; rule R09 applies at the Sun
   25 Oct 20:00 SGT window).** From a clip of Ying Hua (ex-Balyasny): pod-shop investing at a weeks-to-months horizon is poker, not
   blackjack; when everyone is on the same side the group is right 60-70% of the time but paid less (everyone sells to
@@ -452,7 +472,7 @@ Voices, Review, Positioning, Trend, Drivers.
 - To change a digest prompt without a Mac visit (18 and 23 Oct 2026): read it through the scheduled-task API, apply
   the edit by script with each find asserted to occur exactly once, write the whole prompt back and byte-compare the
   stored copy. Both Macro Takeaways prompts sit at the 65,536-byte cap, so an addition is paid for by a trim in the
-  same edit (the Fable prompt is 65,263 bytes after 23 Oct).
+  same edit (the Fable prompt is 65,407 bytes after 1 Nov).
 - To change `trade_book_spec`: create a JSON file titled `trade_book_spec_edits` in the spec folder
   (Drive connector `create_file`, text/plain, no conversion) holding `[{"find","replace"}]`. Each find
   must occur exactly once in the live text, and edits must not overlap. `Spec.gs` applies it within
