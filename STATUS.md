@@ -47,6 +47,15 @@ Voices, Review, Positioning, Trend, Drivers.
   same pass: R03 reverted (drivers data as of 2024-09-30), flow check kept, the paused Opus Email Digest left off (Gemini
   copy covers the 05:30-06:45 SGT newsletter window). OI day-on-day history starts 1 Nov; DTCC is US-reported trades only
   ("DTCC sample"). LSEG 25-delta risk reversals need the owner's connector sign-in; not done. Mac visits: 0.
+- **Public-apis screen and disclosed shorts JP/AU (1 Nov 2026, thread "Screen public APIs for macro desk").** Screened
+  ~330 entries of github.com/public-apis (finance, currency, government, open data, news, business) for risk reversals,
+  participation, positioning or Asia data: no free FX vol or risk-reversal source exists there (LSEG stays the only
+  route); everything else duplicates Yahoo, RSS, DESK INPUT or prediction-market feeds. Only QuiVad was new: owner said
+  "wire that in, maybe of use in future". Market pack section F (keyless `quivad.com/api/positions.jsonl.gz`): most
+  shorted JP names (JFSA fund positions of 0.5% or more, summed) and ASX names (ASIC aggregate, ETFs dropped), 1-week
+  build-ups from `shorts_history.csv` (first read 8 Nov). HOW TO USE item 7: cite only on single-name JP/AU cards or
+  themes, never for an index or FX view. No prompt change. JP register dates are QuiVad snapshot dates, not filing
+  dates. Mac visits: 0.
 - **Desk inputs from Gemini, ChatGPT and Grok (1 Nov 2026, same thread; owner has spare capacity in those apps).**
   The Fable Macro Takeaways PEER TAKEAWAYS line now reads every email whose subject starts "DESK INPUT" as a second read
   (prompt 65,511 bytes, verified byte-identical; backup `notes/fable_mt_prompt_after_deskinputs_1nov2026.txt`). Scheduled in
