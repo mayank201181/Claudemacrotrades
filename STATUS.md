@@ -28,6 +28,7 @@ _Last updated: 2026-11-01._
 | `dash-history`, `dash-gdelt` | research relays (Yahoo daily/hourly bars, GDELT DOC API) | on call |
 | `scripts/gdelt/attention.py` | media-attention table (GDELT GKG hourly sample, DOC API, Wikipedia views) → project files `gdelt/` | daily routine, before 07:15 SGT |
 | `scripts/predmkt/predmkt.py` | prediction-market odds (Polymarket Gamma + Kalshi public APIs, no keys): macro contracts, data ladders with implied medians → project files `predmkt/` and Drive `predmkt_latest`; digests read it under R12 | daily 06:38 SGT (scheduled task "Prediction-market odds daily refresh") |
+| `scripts/marketpack/marketpack.py` | MARKET PACK for the Fable Macro Takeaways (stdlib, public sources, no keys): A price action on 54 assets (sigma moves, trend vs MA50/200, ext/ATR, z10, run, rv ratio, breakout and BUILD-UP flags), B futures volume vs 20d and open interest with the price/OI read (17 roots, Yahoo), C positioning build-up SQL over the 83 msd `.POS_` series (`posbuild.sql`, run by the digest), D DTCC FX options and NDFs (notional vs 20d, base-call share, large strikes near expiry), E RSS headline leads → project files `marketpack/` and Drive `market_pack_latest`; the takeaways read it in STEP 2 item 1 | daily 06:52 SGT (scheduled task "Market pack for Fable Macro Takeaways") |
 | `016_event_library.sql` | event library in the database: `dash.event_cell` / `event_cal` (plus type and asset tables), loaders `dash.put_event_cells` / `put_event_cal` (compact text from `scripts/event_library/to_sql.py`); the digests read `dash.event_brief()` and `dash.event_lookup(release, asset)` | on load (library rebuilt by hand; calendar to Jan 2027) |
 
 Site tabs: Themes, Trades (linear + convexity cards), YouTube, Podcast, Grok, Substack, Questions,
@@ -35,6 +36,17 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
+- **Market pack in the Fable Macro Takeaways (1 Nov 2026, owner "do all six", thread "Map inputs to Fable macro takeaways", Opus).**
+  Audit found the takeaways' only market data was ~13 web-searched TAPE levels; themes never saw price action, positioning
+  build-up or participation. Built `scripts/marketpack/` (see `docs/marketpack.md`): one stdlib script, ~3 min, writes
+  `market_pack_latest.md` (~30 KB) with a HOW TO USE block the digest follows. Live: Drive `market_pack_latest` (first copy
+  1 Nov 01:54Z, read back complete; Drive shows new text files to read_file_content only after ~1-2 min), daily build
+  06:52 SGT in the thread's own Opus session, and the Fable Macro Takeaways prompt STEP 2 item 1 now reads the pack
+  (65,502 bytes, live prompt byte-identical to the edited file; backups in project files
+  `notes/fable_mt_prompt_{before,after}_marketpack_1nov2026.txt`). First digest with it: Mon 2 Nov 07:30 SGT. Clean-up in the
+  same pass: R03 reverted (drivers data as of 2024-09-30), flow check kept, the paused Opus Email Digest left off (Gemini
+  copy covers the 05:30-06:45 SGT newsletter window). OI day-on-day history starts 1 Nov; DTCC is US-reported trades only
+  ("DTCC sample"). LSEG 25-delta risk reversals need the owner's connector sign-in; not done. Mac visits: 0.
 - **Prediction-market odds in both Macro Takeaways digests (28 Oct 2026, thread "Add prediction market odds to takeaways").**
   Owner ask after the Bloomberg/Millennium story. `scripts/predmkt/predmkt.py` (stdlib, ~40 s) pulls ~45 Polymarket macro events
   (tags fed-rates, Global-Rates, economy, inflation, oil, commodities, japan, china, geopolitics, tariffs, middle-east, ukraine,
@@ -294,6 +306,11 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Decisions on record
 
+- **1 Nov 2026, market pack and input clean-up (owner: "do all six").** Price action, futures participation,
+  positioning build-up, DTCC FX options and a headline wire reach the Fable takeaways through a pre-computed file, not
+  new rules or web searches. R03 reverted (stale drivers data). Flow check kept as is. Opus Email Digest stays paused.
+  The pack went in as a prompt edit, not a rule, because a new rule applies only a week later and a direct status
+  update in `dash.rules` is blocked from threads.
 - **1 Nov 2026, Fable Macro Takeaways moved to 07:30 SGT with a wait gate, and reads the ChatGPT and Gemini
   Macro Takeaways (owner).** He wants every digest in before Fable starts, including the ChatGPT and Gemini Macro
   Takeaways (he moved Gemini's to 07:30). Inbox check 27 Oct–1 Nov (SGT): Slack 04:30; ChatGPT Email 05:31–05:37;
