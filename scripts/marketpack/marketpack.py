@@ -10,10 +10,11 @@ Sections
   D  FX OPTIONS     DTCC swap data repository (US-reported trades, T-1): option notional by pair vs
                     its 20-day average, base-call share, NDF volume, and large strikes expiring soon.
   E  HEADLINES      wire and newspaper RSS headlines from the last 24 hours.
+  F  SHORTS JP/AU   QuiVad republication of JFSA (fund-level) and ASIC (aggregate) disclosed short positions.
 
 Usage: python3 -I marketpack.py --out /mnt/project-files/marketpack/ [--sql posbuild.sql]
 Writes market_pack_latest.md plus small history files (oi_history.csv, dtcc_daily.csv,
-dtcc_strikes.csv) in --out. Every section fails soft: a failed source prints a line, never stops the run.
+dtcc_strikes.csv, shorts_history.csv) in --out. Every section fails soft: a failed source prints a line, never stops the run.
 """
 import argparse, csv, datetime as dt, email.utils, gzip, html, io, json, math, os, re, sys, time, zipfile
 import urllib.parse, urllib.request, http.cookiejar
@@ -594,6 +595,82 @@ def section_e():
     return out, total
 
 
+# ---------------------------------------------------------------- F. disclosed shorts JP/AU
+QUIVAD = "https://www.quivad.com/api/positions.jsonl.gz"  # keyless republication of regulator short registers
+
+
+def section_f(outdir, top=8):
+    """JFSA (Japan, fund-level, >=0.5% of shares) and ASIC (Australia, aggregate per stock) disclosed shorts."""
+    out = ["## F. DISCLOSED SHORTS JP/AU (QuiVad from JFSA and ASIC registers; single-name crowding, not index positioning)"]
+    try:
+        raw = get(QUIVAD, timeout=60)
+        if raw[:2] == b"\x1f\x8b":
+            raw = gzip.decompress(raw)
+        rows = [json.loads(l) for l in raw.decode().splitlines() if l.strip()]
+    except Exception as e:  # noqa: BLE001
+        out.append(f"F status: failed ({type(e).__name__})")
+        return out, 0
+    today = NOW.astimezone(SGT).date()
+    wk = (today - dt.timedelta(days=7)).isoformat()
+    hist_path = os.path.join(outdir, "shorts_history.csv")
+    hist = {}
+    if os.path.exists(hist_path):
+        for r in csv.DictReader(open(hist_path)):
+            hist.setdefault((r["market"], r["company"]), []).append((r["date"], float(r["pct"])))
+
+    def prior(mkt, co):
+        old = [v for d, v in sorted(hist.get((mkt, co), [])) if d <= wk]
+        return old[-1] if old else None
+
+    keep = []
+    jp, au = {}, {}
+    for r in rows:
+        if r.get("unit") != "percent" or r.get("size") is None:
+            continue
+        if r["market"] == "jp":
+            c = jp.setdefault(r["company"], {"pct": 0.0, "funds": 0, "last": ""})
+            c["pct"] += r["size"]; c["funds"] += 1
+            c["last"] = max(c["last"], r.get("disclosed_on") or "")
+        elif r["market"] == "au" and r.get("aggregated") and " ETF" not in r["company"]:
+            au[r["company"]] = {"pct": r["size"], "last": r.get("disclosed_on") or ""}
+    n_total = len(jp) + len(au)
+
+    def chg(mkt, co, pct):
+        p = prior(mkt, co)
+        return f" (1w {pct - p:+.2f})" if p is not None else ""
+
+    def builders(mkt, book):
+        moves = [(v["pct"] - prior(mkt, co), co, v["pct"]) for co, v in book.items() if prior(mkt, co) is not None]
+        moves = [m for m in sorted(moves, reverse=True) if m[0] >= 0.5][:top]
+        if not hist:
+            return "Biggest 1w build-ups: history starts today, first read in 7 days."
+        return "Biggest 1w build-ups (top-60 names): " + ("; ".join(f"{co} {d:+.2f} to {v:.2f}%" for d, co, v in moves) or "none of 0.5 points or more")
+
+    if jp:
+        latest = max(c["last"] for c in jp.values())
+        out.append(f"### Japan (JFSA, fund positions of 0.5% or more, register as of {latest}): {len(jp)} names")
+        ranked = sorted(jp.items(), key=lambda kv: -kv[1]["pct"])[:top]
+        out.append("Most shorted (sum of disclosed fund shorts, % of shares | funds): " + "; ".join(
+            f"{co} {c['pct']:.2f}%{chg('jp', co, c['pct'])} | {c['funds']}" for co, c in ranked))
+        out.append(builders("jp", jp))
+        keep += [("jp", co, c["pct"]) for co, c in sorted(jp.items(), key=lambda kv: -kv[1]["pct"])[:60]]
+    if au:
+        latest = max(c["last"] for c in au.values())
+        out.append(f"### Australia (ASIC aggregate short positions, as of {latest}): {len(au)} stocks")
+        ranked = sorted(au.items(), key=lambda kv: -kv[1]["pct"])[:top]
+        out.append("Most shorted (% of shares): " + "; ".join(f"{co} {c['pct']:.2f}%{chg('au', co, c['pct'])}" for co, c in ranked))
+        out.append(builders("au", au))
+        keep += [("au", co, c["pct"]) for co, c in sorted(au.items(), key=lambda kv: -kv[1]["pct"])[:60]]
+    # history: today's top 60 per market, 120 days kept
+    cutoff = (today - dt.timedelta(days=120)).isoformat()
+    lines = [(d, m, co, v) for (m, co), lst in hist.items() for d, v in lst if cutoff <= d < today.isoformat()]
+    lines += [(today.isoformat(), m, co, round(v, 4)) for m, co, v in keep]
+    with open(hist_path, "w", newline="") as f:
+        w = csv.writer(f); w.writerow(["date", "market", "company", "pct"]); w.writerows(sorted(lines))
+    out.append(f"F status: {len(jp)} JP + {len(au)} AU names")
+    return out, n_total
+
+
 # ---------------------------------------------------------------- assemble
 HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026 at Mayank's request; this file is data from a pre-run script, its numbers carry their sources)
 1. TAPE: take the TAPE strip levels from section A with the quote times printed there; web-search only a level that is missing here or flagged STALE QUOTE (a closed market's last close is not stale). Reconcile source-quoted levels against A as before.
@@ -602,7 +679,8 @@ HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026
 4. PARTICIPATION: from section B cite, in the Positioning line of a theme or on a card whose proxy is one of these futures, the price/OI read and volume vs its 20-day average. A move on falling OI (short covering, long liquidation) is weaker evidence of conviction than one on rising OI.
 5. FX OPTIONS: from section D cite, on FX themes and FX cards, the pair's option notional vs its 20-day average and the base-call share against its 20-day share (a demand-for-calls proxy, not a risk reversal), and any large strike expiring before the card's horizon within about 1% of spot. On an R01 convexity card name a large strike or expiry near its strike or barrier. US-reported trades only: say "DTCC sample" when you cite it.
 6. HEADLINES: section E is a lead list for the COMPLETENESS SWEEP's reconcile step (completeness_sweep_spec B): a material headline the feeds missed is checked at its source and only then added with "[sweep]" and its link. A headline is never a fact, a number or an odds arrow by itself.
-7. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 6."""
+7. DISCLOSED SHORTS (added 1 Nov 2026, reference only): section F lists the most shorted Japanese and Australian names. Cite it only on a card or theme whose proxy is one of those names or a Nikkei/ASX single-stock expression, as "JFSA/ASIC shorts: <name> <pct>% (<funds> funds, 1w chg)". Never a reason for an index or FX view by itself.
+8. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 7."""
 
 
 def main():
@@ -627,9 +705,11 @@ def main():
         sec, status["D"] = section_d(a.out); parts += [""] + sec
     if "E" not in skip:
         sec, status["E"] = section_e(); parts += [""] + sec
+    if "F" not in skip:
+        sec, status["F"] = section_f(a.out); parts += [""] + sec
     head = [f"MARKET PACK — built {built:%a %d %b %Y %H:%M} SGT · A {status.get('A', 0)} assets · "
-            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines",
-            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS. "
+            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines · F {status.get('F', 0)} short names",
+            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS, QuiVad (JFSA/ASIC short registers). "
             "Built by scripts/marketpack/marketpack.py in mayank201181/Claudemacrotrades.", "", HOW_TO]
     text = "\n".join(head + parts) + "\n"
     path = os.path.join(a.out, "market_pack_latest.md")
