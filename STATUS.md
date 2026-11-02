@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-11-01._
+_Last updated: 2026-11-02._
 
 ## Where things are
 
@@ -36,6 +36,16 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
+- **KRW equity flows on KRW cards (2 Nov 2026, owner note, thread "Add Korea equity flows to KRW cards", Opus).**
+  Owner: Fable's USDKRW cards reason from exporter conversion only; Korea also has big equity-side flows (retail
+  overseas-equity outflows, NPS/insurer outflows, foreign hedging of KOSPI holdings). Rule R16 proposed 2 Nov via
+  `dash.propose_rule` (scope both; text `supabase/rules/R16_krw_equity_flows.sql`), applies Sun 8 Nov 20:00 SGT unless
+  "oppose R16": every KRW card prints a KRW FLOWS line (foreign KOSPI 5d/20d net from `KR.KRX_FOREIGN_NET_1D` with a
+  pressure estimate, hedge read from DTCC NDFs / SGX KRW mini OI, latest KSD retail overseas figure and NPS hedge news
+  from dated sources) and a card that rests on conversion alone against two equity channels is thin edge at best.
+  Our data: weekly foreign net vs USDKRW, 6m corr -0.49, ~0.09% USDKRW per KRW 1tn; daily corr is near zero.
+  Market pack unchanged: foreign KOSPI flows, SGX OI and DTCC NDFs are already in; KSD retail overseas data has no
+  keyless feed (SEIBro is a web app; the data.go.kr API needs a sign-up), so the digest takes it from news. Review 15 Dec.
 - **Market pack in the Fable Macro Takeaways (1 Nov 2026, owner "do all six", thread "Map inputs to Fable macro takeaways", Opus).**
   Audit found the takeaways' only market data was ~13 web-searched TAPE levels; themes never saw price action, positioning
   build-up or participation. Built `scripts/marketpack/` (see `docs/marketpack.md`): one stdlib script, ~3 min, writes
