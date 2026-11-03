@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-11-01._
+_Last updated: 2026-11-03._
 
 ## Where things are
 
@@ -36,6 +36,17 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
+- **EconVitals in the Fable Macro Takeaways (3 Nov 2026, thread "Add EconVitals to macro takeaways").** The owner subscribed
+  to EconVitals (Jason Furman; AI-written US macro briefings, free) at his Gmail. Senders `briefings@econvitals.org`: Daily
+  Briefing after the US close (~06:00-07:00 SGT; cross-asset MARKET RECAP with 1d/1w/YTD moves, Fed-implied odds, GDP
+  tracker), Morning Note (~18:00 SGT; Furman opening, research picks, day-ahead consensus), data notes on US releases (~20:30
+  SGT), weekly US/Europe/China briefings (Saturdays) and occasional essays. Some land outside the inbox (a label). Fable MT
+  PEER TAKEAWAYS line now reads them as second reads on DESK INPUT terms: `from:briefings@econvitals.org`, newer_than:1d
+  (3d on Mondays, to catch the weeklies), any label, essays skipped, cited "(EconVitals)", MARKET RECAP used to check the TAPE
+  strip and Fed odds; numbers still need STEP 2 item 7 confirmation (AI-written, unreviewed). Bytes freed by dropping the
+  paused Claude Email Digest subject template and timing, and 3-space indents: prompt 65,511 -> 65,506 bytes, live copy
+  byte-identical (backups `notes/fable_mt_prompt_{before,after}_econvitals_3nov2026.txt`). First run with it: Wed 4 Nov
+  07:30 SGT (the 3 Nov run had already fired). Mac visits: 0.
 - **Market pack in the Fable Macro Takeaways (1 Nov 2026, owner "do all six", thread "Map inputs to Fable macro takeaways", Opus).**
   Audit found the takeaways' only market data was ~13 web-searched TAPE levels; themes never saw price action, positioning
   build-up or participation. Built `scripts/marketpack/` (see `docs/marketpack.md`): one stdlib script, ~3 min, writes
