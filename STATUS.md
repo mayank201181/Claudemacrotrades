@@ -36,6 +36,13 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
+- **Late Fable Macro Takeaways, 3 Nov 2026 (thread "Fix missing Fable takeaways email").** Not a failure: the run fired
+  07:40 SGT and the email landed 10:14 SGT (5 of 5 feeds), against 08:45 on 2 Nov. Time went on: feed reads to 08:17,
+  stance-ledger subagent run in the foreground 08:17-08:37, trade book from 08:51, a container restart at ~09:01-09:08
+  that killed the trade-book subagent (restarted 09:10, done ~09:50), accuracy gate 09:53-10:02. The 00:02Z EconVitals
+  prompt edit did not touch the running session, and the 65,506-byte prompt is under the 65,536 cap. No catch-up fired (it
+  would duplicate the email). Open: if Wed 4 Nov also lands after ~09:30 SGT, trim the run (run the stance ledger in the
+  background, cap red-team answers); check booked for 4 Nov 09:30 SGT. Mac visits: 0.
 - **EconVitals in the Fable Macro Takeaways (3 Nov 2026, thread "Add EconVitals to macro takeaways").** The owner subscribed
   to EconVitals (Jason Furman; AI-written US macro briefings, free) at his Gmail. Senders `briefings@econvitals.org`: Daily
   Briefing after the US close (~06:00-07:00 SGT; cross-asset MARKET RECAP with 1d/1w/YTD moves, Fed-implied odds, GDP
