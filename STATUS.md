@@ -36,6 +36,13 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
+- **Fable Macro Takeaways must land by 08:15 SGT (4 Nov 2026, owner).** 4 Nov run failed at 08:34 SGT on Fable usage
+  credits (account cap; ~$64 a run), no email. Root cause of lateness since 1 Nov: the 07:30 start plus the wait-until-07:45
+  gate (before: 07:15 start, ~08:15-08:25 landing). Fix live from Thu 5 Nov: cron 06:58 SGT, START GATE "never wait", one
+  re-search for Gemini Email and the ChatGPT/Gemini takeaways before STEP 3, and the stance payload and trade book run as
+  background sub-agents. Prompt 65,515 of 65,536 bytes, live copy byte-identical (backups
+  `notes/fable_mt_prompt_{before,after}_gate_4nov2026.txt`). Open: today's catch-up (Opus 5.5, his pick); raise the
+  extra-usage cap; if 5 Nov still misses 08:15, drop some 1 Nov second reads. Mac visits: 0.
 - **Late Fable Macro Takeaways, 3 Nov 2026 (thread "Fix missing Fable takeaways email").** Not a failure: the run fired
   07:40 SGT and the email landed 10:14 SGT (5 of 5 feeds), against 08:45 on 2 Nov. Time went on: feed reads to 08:17,
   stance-ledger subagent run in the foreground 08:17-08:37, trade book from 08:51, a container restart at ~09:01-09:08
