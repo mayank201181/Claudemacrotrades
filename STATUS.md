@@ -38,12 +38,13 @@ Voices, Review, Positioning, Trend, Drivers.
 
 - **Fable Macro Takeaways missed again 5 Nov; start moved to 06:33 SGT, second reads cut, watchdog added.** The 06:59 run's
   cloud container disconnected at 07:06 SGT (infra, not the prompt or credits); a Fable catch-up fired 08:22 and landed
-  09:54. Even with no waits a run takes ~85-90 min, so 06:58 cannot make 08:15. Live from Fri 6 Nov: cron 06:33 SGT; market
-  pack read last in STEP 2 and re-searched with Grok consolidated, Gemini Email and the peer takeaways before STEP 3; DESK
-  INPUT emails and EconVitals removed as second reads (owner OK'd cutting added analysis, 4 Nov). Prompt 65,269 bytes,
-  live copy byte-identical (backup `notes/fable_mt_prompt_after_trim_5nov2026.txt`). New daily 07:20 SGT watchdog
+  09:54. Even with no waits a run takes ~85-90 min, so 06:58 cannot make 08:15. Live from Fri 6 Nov: cron 06:33 SGT; every
+  input kept (owner, 5 Nov: "incorporate everything"; a brief cut of DESK INPUT and EconVitals was reverted); LATE PICKUP
+  before STEP 3 and again before B10 folds in anything that landed after the start (5 Nov: all inputs were in by 07:10
+  except ChatGPT MT 07:23, Gemini MT 07:43, ChatGPT energy brief 08:04). Prompt 65,508 bytes, live copy byte-identical
+  (backup `notes/fable_mt_prompt_restored_5nov2026.txt`). New daily 07:20 SGT watchdog
   (scheduled task "Fable MT watchdog 07:20") refires the run only if its session is dead. Open: check 6 Nov arrival;
-  if still late, next cuts are the peer takeaways, flow check and completeness sweep. Mac visits: 0.
+  if still late, speed up the run, never cut inputs. Mac visits: 0.
 - **Fable Macro Takeaways must land by 08:15 SGT (4 Nov 2026, owner).** 4 Nov run failed at 08:34 SGT on Fable usage
   credits (account cap; ~$64 a run), no email. Root cause of lateness since 1 Nov: the 07:30 start plus the wait-until-07:45
   gate (before: 07:15 start, ~08:15-08:25 landing). Fix live from Thu 5 Nov: cron 06:58 SGT, START GATE "never wait", one
