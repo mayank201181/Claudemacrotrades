@@ -11,6 +11,7 @@ Sections
                     its 20-day average, base-call share, NDF volume, and large strikes expiring soon.
   E  HEADLINES      wire and newspaper RSS headlines from the last 24 hours.
   F  SHORTS JP/AU   QuiVad republication of JFSA (fund-level) and ASIC (aggregate) disclosed short positions.
+  G  FUNDAMENTALS   the weekly fundamentals pack (scripts/fundpack/fundpack.py), copied in when built within 9 days.
 
 Usage: python3 -I marketpack.py --out /mnt/project-files/marketpack/ [--sql posbuild.sql]
 Writes market_pack_latest.md plus small history files (oi_history.csv, dtcc_daily.csv,
@@ -275,7 +276,16 @@ def section_b(outdir):
             hist.setdefault(r["symbol"], []).append(r)
     try:
         allsyms = [s for root, suf, mo, _ in ROOTS for s in candidates(root, suf, mo)]
-        quotes = yahoo_quotes(allsyms)
+        quotes = None
+        for wait in (0, 30, 60):  # Yahoo 429s this batch call now and then; it clears within a minute
+            time.sleep(wait)
+            try:
+                quotes = yahoo_quotes(allsyms)
+                break
+            except Exception as e2:  # noqa: BLE001
+                err = e2
+        if quotes is None:
+            raise err
     except Exception as e:  # noqa: BLE001
         out.append(f"B status: unavailable ({type(e).__name__}: {e})")
         return out, 0
@@ -506,7 +516,7 @@ def section_d(outdir, backfill_days=22):
             key = (r["pair"], r["strike"], r["expiry"])
             agg[key] = agg.get(key, 0.0) + float(r["usd"])
     big = sorted(((v, k) for k, v in agg.items() if v >= (100e6 if k[0][:3] in PRIO and k[0][3:] in PRIO else 50e6)),
-                 reverse=True)
+                 key=lambda x: x[0], reverse=True)  # ties: strikes can mix str and float, so sort on notional only
     out.append("Large strikes expiring in the next 14 days (traded in the last 15 DTCC days; USD notional, floors):")
     if not big:
         out.append("none above $100m (G10) / $50m (Asia)")
@@ -671,6 +681,19 @@ def section_f(outdir, top=8):
     return out, n_total
 
 
+# ---------------------------------------------------------------- G. weekly fundamentals pack
+def section_g(path):
+    """Copy in the weekly fundamentals pack (built Sundays by scripts/fundpack/fundpack.py)."""
+    if not os.path.exists(path):
+        return ["## G. FUNDAMENTALS (weekly)", f"Fund pack: not found ({path})"], "missing"
+    age = (time.time() - os.path.getmtime(path)) / 86400
+    built = dt.datetime.fromtimestamp(os.path.getmtime(path), SGT)
+    if age > 9:
+        return ["## G. FUNDAMENTALS (weekly)", f"Fund pack: stale ({built:%d %b %Y}); skip section G"], f"stale {built:%d %b}"
+    body = open(path).read().rstrip().replace("\n## ", "\n### ")
+    return ["## G. FUNDAMENTALS (weekly; slow anchor, never a trigger; follow its own HOW TO USE)", body], f"{built:%d %b}"
+
+
 # ---------------------------------------------------------------- assemble
 HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026 at Mayank's request; this file is data from a pre-run script, its numbers carry their sources)
 1. TAPE: take the TAPE strip levels from section A with the quote times printed there; web-search only a level that is missing here or flagged STALE QUOTE (a closed market's last close is not stale). Reconcile source-quoted levels against A as before.
@@ -680,7 +703,8 @@ HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026
 5. FX OPTIONS: from section D cite, on FX themes and FX cards, the pair's option notional vs its 20-day average and the base-call share against its 20-day share (a demand-for-calls proxy, not a risk reversal), and any large strike expiring before the card's horizon within about 1% of spot. On an R01 convexity card name a large strike or expiry near its strike or barrier. US-reported trades only: say "DTCC sample" when you cite it.
 6. HEADLINES: section E is a lead list for the COMPLETENESS SWEEP's reconcile step (completeness_sweep_spec B): a material headline the feeds missed is checked at its source and only then added with "[sweep]" and its link. A headline is never a fact, a number or an odds arrow by itself.
 7. DISCLOSED SHORTS (added 1 Nov 2026, reference only): section F lists the most shorted Japanese and Australian names. Cite it only on a card or theme whose proxy is one of those names or a Nikkei/ASX single-stock expression, as "JFSA/ASIC shorts: <name> <pct>% (<funds> funds, 1w chg)". Never a reason for an index or FX view by itself.
-8. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 7."""
+8. FUNDAMENTALS (added 6 Nov 2026): section G is the weekly fundamentals pack (inflation, cycle, trade, reserves, credit, real rates for G10 and Asia). Follow its own HOW TO USE: a slow anchor for each theme's top-down view and its risks line, never a trigger, never a reason to raise p.
+9. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines · G <fund pack date>", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 8."""
 
 
 def main():
@@ -688,6 +712,7 @@ def main():
     ap.add_argument("--out", default=".")
     ap.add_argument("--sql", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "posbuild.sql"))
     ap.add_argument("--skip", default="", help="comma list of sections to skip, e.g. D,E")
+    ap.add_argument("--fund", default="/mnt/project-files/fundpack/fund_pack_latest.md", help="weekly fundamentals pack to copy in as section G")
     a = ap.parse_args()
     os.makedirs(a.out, exist_ok=True)
     skip = set(a.skip.upper().split(",")) if a.skip else set()
@@ -707,9 +732,11 @@ def main():
         sec, status["E"] = section_e(); parts += [""] + sec
     if "F" not in skip:
         sec, status["F"] = section_f(a.out); parts += [""] + sec
+    if "G" not in skip:
+        sec, status["G"] = section_g(a.fund); parts += [""] + sec
     head = [f"MARKET PACK — built {built:%a %d %b %Y %H:%M} SGT · A {status.get('A', 0)} assets · "
-            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines · F {status.get('F', 0)} short names",
-            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS, QuiVad (JFSA/ASIC short registers). "
+            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines · F {status.get('F', 0)} short names · G {status.get('G') or 'n/a'}",
+            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS, QuiVad (JFSA/ASIC short registers), fundamentals pack (IMF, OECD, Eurostat, BIS, FRED; weekly). "
             "Built by scripts/marketpack/marketpack.py in mayank201181/Claudemacrotrades.", "", HOW_TO]
     text = "\n".join(head + parts) + "\n"
     path = os.path.join(a.out, "market_pack_latest.md")
