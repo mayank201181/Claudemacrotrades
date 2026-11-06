@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-11-03._
+_Last updated: 2026-11-06._
 
 ## Where things are
 
@@ -28,6 +28,7 @@ _Last updated: 2026-11-03._
 | `dash-history`, `dash-gdelt` | research relays (Yahoo daily/hourly bars, GDELT DOC API) | on call |
 | `scripts/gdelt/attention.py` | media-attention table (GDELT GKG hourly sample, DOC API, Wikipedia views) → project files `gdelt/` | daily routine, before 07:15 SGT |
 | `scripts/predmkt/predmkt.py` | prediction-market odds (Polymarket Gamma + Kalshi public APIs, no keys): macro contracts, data ladders with implied medians → project files `predmkt/` and Drive `predmkt_latest`; digests read it under R12 | daily 06:38 SGT (scheduled task "Prediction-market odds daily refresh") |
+| `scripts/fundpack/fundpack.py` | FUNDAMENTALS PACK (stdlib, IMF/OECD/Eurostat/BIS/FRED, no keys): inflation, policy and real rates, OECD cycle, trade, reserves, credit for 20 G10/Asia economies, level + 3m/6m momentum + 5y percentile → project files `fundpack/` and Drive `fund_pack_latest`; market pack copies it in as section G | weekly Sun 18:41 SGT (scheduled task "Weekly fundamentals pack", Opus) |
 | `scripts/marketpack/marketpack.py` | MARKET PACK for the Fable Macro Takeaways (stdlib, public sources, no keys): A price action on 54 assets (sigma moves, trend vs MA50/200, ext/ATR, z10, run, rv ratio, breakout and BUILD-UP flags), B futures volume vs 20d and open interest with the price/OI read (17 roots, Yahoo), C positioning build-up SQL over the 83 msd `.POS_` series (`posbuild.sql`, run by the digest), D DTCC FX options and NDFs (notional vs 20d, base-call share, large strikes near expiry), E RSS headline leads → project files `marketpack/` and Drive `market_pack_latest`; the takeaways read it in STEP 2 item 1 | daily 06:52 SGT (scheduled task "Market pack for Fable Macro Takeaways") |
 | `016_event_library.sql` | event library in the database: `dash.event_cell` / `event_cal` (plus type and asset tables), loaders `dash.put_event_cells` / `put_event_cal` (compact text from `scripts/event_library/to_sql.py`); the digests read `dash.event_brief()` and `dash.event_lookup(release, asset)` | on load (library rebuilt by hand; calendar to Jan 2027) |
 
@@ -36,6 +37,15 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
+- **Weekly fundamentals pack in the Fable Macro Takeaways (6 Nov 2026, thread "Build weekly fundamentals pack for takeaways",
+  Opus only at the owner's ask).** Owner asked whether national data portals (data.gov.sg etc.) could feed the fundamental side.
+  Built `scripts/fundpack/` (see `docs/fundpack.md`): one stdlib script pulling IMF (CPI, IMTS, IL reserves), OECD (core CPI,
+  CLI, business confidence as the PMI stand-in), Eurostat (EA HICP), BIS (policy rates, credit, credit gap) and FRED (US block)
+  for 20 G10/Asia economies; DBnomics tested and dropped (copies months stale). Weekly build Sun 18:41 SGT in the thread's Opus
+  session (no Fable cost), Drive `fund_pack_latest`; the daily market pack now copies it in as section G (HOW TO USE item 8:
+  slow anchor and risks-line check, never a trigger or p input; footer G field), live copy of marketpack.py updated 6 Nov and
+  repo synced with the 4 Nov live fixes. No prompt or rule change. First market pack with G: Sat 7 Nov 06:52 SGT. Gaps: Taiwan
+  CPI/trade, SG policy rate, no PMIs (not free). Mac visits: 0.
 - **Fable Macro Takeaways missed again 5 Nov; start moved to 06:33 SGT, second reads cut, watchdog added.** The 06:59 run's
   cloud container disconnected at 07:06 SGT (infra, not the prompt or credits); a Fable catch-up fired 08:22 and landed
   09:54. Even with no waits a run takes ~85-90 min, so 06:58 cannot make 08:15. Live from Fri 6 Nov: cron 06:33 SGT; every
