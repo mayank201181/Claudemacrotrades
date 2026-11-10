@@ -22,11 +22,14 @@
 //      for an FX symbol whose daily series Yahoo no longer serves (see parseYahooHourly).
 // POST also takes symbols ({asset_id: [symbol, …]}, merged over 'trend_symbols') with only, so a
 // symbol choice can be tested on a few assets; it is never used for a stored run.
-// POST {token, shadow: 'TM1.1', dry?, diag?} runs the TM1.1 shadow instead (pg_cron
-// dash-trend-shadow-daily, 10 minutes after the main run): the 15 FX pairs only, each close the
-// 17:00 New York price (D6 in _shared/trend.ts; parseYahooHourlyNy, redateDaily), stored in
-// dash.trend_shadow by run_date and params_version beside the TM1 run, never in its tables.
-// diag adds the per-pair splice statistics to the reply.
+// FX clock (D6 in _shared/trend.ts): since 10 Nov 2026 the main run takes each FX close at 17:00 New
+// York (fetchYahooNy: parseYahooHourlyNy, redateDaily; stored with the symbol suffix @ny17), except
+// USDCNH, USDINR and USDIDR (NY_CLOSE_KEEP_DAILY). A pair whose New York close cannot be built falls
+// back to Yahoo's daily bars for that run, with a note in fetch_errors.
+// POST {token, shadow: 'TM1.1', dry?, diag?} runs the TM1.1 shadow instead: all 15 FX pairs on the
+// New York clock, stored in dash.trend_shadow by run_date and params_version, never in the main
+// tables. It ran daily beside TM1 from 7 Oct to 10 Nov 2026 (pg_cron dash-trend-shadow-daily, now
+// unscheduled) and is kept for replays; diag adds the per-pair splice statistics to the reply.
 // Carver forecasts (_shared/forecast.ts, added 25 Oct 2026): after the monitor, the main run appends a
 // CARVER FORECASTS block (EWMAC trend at four speeds, FX carry from BIS policy rates) to the report,
 // after END_TREND_MONITOR, so the monitor's machine block and its self-check are unchanged. A failed
@@ -43,6 +46,13 @@ const TIMEOUT_MS = 30_000;       // per request
 const RETRIES = 3;               // the spec's rules: a download that fails after 3 retries is STALE
 const YAHOO_SPACING_MS = 1_000;  // spec section 2: one ticker at a time, 1 s apart
 const MIN_BARS = 260;            // fewer daily bars than a 52-week window needs (of 8 years asked) is a failed download
+// D6 in the main run (decided 10 Nov 2026 after a month of the TM1.1 shadow beside TM1): every FX pair
+// takes its close at 17:00 New York, except the three below. USDINR and USDIDR stay on Yahoo's daily
+// bars (their hourly quotes are too thin: the shadow went stale on 5 of 24 runs for IDR), and USDCNH
+// stays on its hourly-built series, which the shadow matched on every run.
+const NY_CLOSE = { tz: 'America/New_York', hhmm: '17:00' };
+const NY_CLOSE_KEEP_DAILY = new Set(['USDCNH', 'USDINR', 'USDIDR']);
+const onNyClose = (a: AssetDef) => a.asset_class === 'fx' && !NY_CLOSE_KEEP_DAILY.has(a.asset_id);
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const isoDate = (ms: number) => new Date(ms).toISOString().slice(0, 10);
@@ -295,6 +305,27 @@ function decodeJp(buf: ArrayBuffer): string {
 
 type Got = { bars: Bar[]; last_bar_utc?: string | null; symbol: string; note?: string };
 
+// D6: one FX pair on the 17:00 New York clock. Daily closes built from Yahoo's hourly bars and, before
+// the hourly window, Yahoo's daily bars re-dated to the previous weekday (none for a symbol configured
+// as hourly-only, such as CNH). `hourly` and `re` are the two pieces, for the splice diagnostics.
+async function fetchYahooNy(conf: string, p1: number, p2: number, deadline: number): Promise<Got & { hourly: Bar[]; re?: Bar[] }> {
+  const hourlyOnly = conf.endsWith('@1h'), sym = conf.replace(/@1h$/, '');
+  const hUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=730d&interval=1h`;
+  const h = await retry(async () => parseYahooHourlyNy(await (await get(hUrl)).json()), deadline);
+  if (!h.bars.length) throw new Error('yahoo hourly: no bars');
+  let bars = h.bars, re: Bar[] | undefined;
+  if (!hourlyOnly) {
+    await sleep(YAHOO_SPACING_MS);
+    const dUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${p1}&period2=${p2}&interval=1d`;
+    const d = await retry(async () => parseYahoo(await (await get(dUrl)).json(), 'close'), deadline);
+    re = redateDaily(d.bars);
+    const firstH = bars[0].date;
+    bars = [...re.filter((b) => b.date < firstH), ...bars];
+  }
+  if (bars.length < MIN_BARS) throw new Error(`only ${bars.length} daily bars`);
+  return { bars, last_bar_utc: h.last_bar_utc, symbol: `${sym}@ny17`, hourly: h.bars, re };
+}
+
 async function fetchYahoo(a: AssetDef, symbols: string[], p1: number, p2: number, deadline: number): Promise<Got> {
   const errs: string[] = [];
   for (const [i, s] of symbols.entries()) {
@@ -407,7 +438,20 @@ async function run(body: Body, runMs: number) {
       if (Date.now() > deadline) { fail(a, new Error('time budget spent before this download')); continue; }
       if (!first) await sleep(YAHOO_SPACING_MS);
       first = false;
-      try { got.set(a.asset_id, await fetchYahoo(a, symbols[a.asset_id] ?? [a.symbol], p1, p2, deadline)); } catch (e) { fail(a, e); }
+      try {
+        // An FX pair on the New York clock that cannot be built today falls back to Yahoo's daily bars
+        // (the TM1 clock) for this run, with a note; its symbol then carries no @ny17.
+        let g: Got | null = null, nyNote = '';
+        if (onNyClose(a)) {
+          try { g = await fetchYahooNy(symbols[a.asset_id]?.[0] ?? a.symbol, p1, p2, deadline); }
+          catch (e) { nyNote = `17:00 New York close failed (${(e as Error)?.message ?? String(e)}), Yahoo daily bars used`; await sleep(YAHOO_SPACING_MS); }
+        }
+        if (!g) {
+          g = await fetchYahoo(a, symbols[a.asset_id] ?? [a.symbol], p1, p2, deadline);
+          if (nyNote) g.note = g.note ? `${nyNote}; ${g.note}` : nyNote;
+        }
+        got.set(a.asset_id, g);
+      } catch (e) { fail(a, e); }
     }
   })();
   const others = Promise.all(universe.filter((x) => x.source !== 'yahoo').map(async (a) => {
@@ -435,7 +479,10 @@ async function run(body: Body, runMs: number) {
     if (old.length) g.bars = [...old.map((r) => ({ date: r.d as string, value: Number(r.value) })), ...g.bars];
   }
 
-  const assets: AssetDef[] = universe.map((a) => ({ ...a, symbol: got.get(a.asset_id)?.symbol ?? a.symbol }));
+  const assets: AssetDef[] = universe.map((a) => {
+    const sym = got.get(a.asset_id)?.symbol ?? a.symbol;
+    return { ...a, symbol: sym, ...(a.asset_class === 'fx' && sym.endsWith('@ny17') ? { exch_close: NY_CLOSE } : {}) };
+  });
   const data: Fetched[] = universe.map((a) => {
     const g = got.get(a.asset_id);
     if (g?.note) errors[a.asset_id] = g.note;
@@ -517,8 +564,6 @@ async function run(body: Body, runMs: number) {
 
 // ---------- the TM1.1 shadow (D6) ----------
 
-const NY_CLOSE = { tz: 'America/New_York', hhmm: '17:00' };
-
 async function runShadow(body: Body, runMs: number) {
   const t0 = Date.now(), deadline = t0 + FETCH_BUDGET_MS;
   const dry = !!body.dry;
@@ -539,26 +584,14 @@ async function runShadow(body: Body, runMs: number) {
   let first = true;
   for (const a of universe) {
     const conf = symbols[a.asset_id]?.[0] ?? a.symbol;
-    const hourlyOnly = conf.endsWith('@1h'), sym = conf.replace(/@1h$/, '');
+    const sym = conf.replace(/@1h$/, '');
     if (Date.now() > deadline) { errors[a.asset_id] = 'time budget spent before this download'; continue; }
     try {
       if (!first) await sleep(YAHOO_SPACING_MS);
       first = false;
-      const hUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=730d&interval=1h`;
-      const h = await retry(async () => parseYahooHourlyNy(await (await get(hUrl)).json()), deadline);
-      if (!h.bars.length) throw new Error('yahoo hourly: no bars');
-      let bars = h.bars;
-      // Before the hourly window: Yahoo's daily bars, re-dated (none for CNH, whose daily series Yahoo lacks).
-      if (!hourlyOnly) {
-        await sleep(YAHOO_SPACING_MS);
-        const dUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=${p1}&period2=${p2}&interval=1d`;
-        const d = await retry(async () => parseYahoo(await (await get(dUrl)).json(), 'close'), deadline);
-        const re = redateDaily(d.bars), firstH = bars[0].date;
-        bars = [...re.filter((b) => b.date < firstH), ...bars];
-        if (body.diag) splice[a.asset_id] = { first_hourly: firstH, ...spliceStats(re, h.bars) };
-      }
-      if (bars.length < MIN_BARS) throw new Error(`only ${bars.length} daily bars`);
-      got.set(a.asset_id, { bars, last_bar_utc: h.last_bar_utc, symbol: `${sym}@ny17` });
+      const g = await fetchYahooNy(conf, p1, p2, deadline);
+      if (body.diag && g.re) splice[a.asset_id] = { first_hourly: g.hourly[0].date, ...spliceStats(g.re, g.hourly) };
+      got.set(a.asset_id, { bars: g.bars, last_bar_utc: g.last_bar_utc, symbol: g.symbol });
     } catch (e) { errors[a.asset_id] = `${sym}: ${(e as Error)?.message ?? String(e)}`; }
   }
 
