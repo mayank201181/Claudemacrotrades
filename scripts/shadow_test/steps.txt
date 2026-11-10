@@ -1,0 +1,79 @@
+STEP 1 — FIND THE INPUTS (a sweep)
+A sweep is three Gmail search_threads calls, each with view THREAD_VIEW_SUMMARY and pageSize 50:
+ q1: newer_than:1d (subject:"YouTube Digest" OR subject:"Podcast Digest" OR subject:"Email Digest" OR subject:(Slack Digest) OR subject:"GROK FULL" OR subject:"GROK CROWDING" OR subject:"DESK INPUT")
+ q2: newer_than:1d subject:"MACRO TAKEAWAYS" (subject:ChatGPT OR subject:Gemini)
+ q3: from:briefings@econvitals.org newer_than:1d      (on a Monday: newer_than:3d)
+Keep a thread only when it is today's: its subject carries TODAY's date in any form (2026-11-12, 12 Nov 2026, Nov 12), or its subject carries no date at all and it arrived after 16:00 UTC of the day before TODAY (00:00 Singapore time today). Then sort each kept thread into a group by its subject, case ignored:
+
+ group and letter    | subject                                                    | copy name
+ YOUTUBE  Y          | contains "YouTube Digest"                                  | Fable, Opus, Gemini or ChatGPT (see below)
+ PODCAST  P          | contains "Podcast Digest", not "Morning Podcast"           | the same
+ EMAIL  E            | contains "Email Digest"                                    | the same
+ SLACK  S            | contains "Slack" and "Digest"                              | Slack
+ GROK  G             | contains "GROK FULL CONSOLIDATED"                          | Grok
+ CROWDING  C         | contains "GROK CROWDING CHECK"                             | Crowding
+ DESK INPUT  D       | starts "DESK INPUT"                                        | Desk-<kind>, e.g. Desk-RedTeam, Desk-GrokPolicy, Desk-EventPreview, Desk-FedWire
+ ECONVITALS  V       | from briefings@econvitals.org and starts "Daily Briefing"  | EconVitals
+ PEER TAKEAWAYS  M   | contains "MACRO TAKEAWAYS" and "ChatGPT" or "[Gemini]"     | ChatGPT-MT, Gemini-MT
+
+Copy name of a digest: "[Fable …]" in the subject is Fable, "[Opus …]" is Opus, "[Gemini]" or "[Argon]" is Gemini, "ChatGPT" is ChatGPT. A feed split over two emails is two inputs of the same copy.
+Not inputs, never opened: any "MACRO TAKEAWAYS [Fable" or "[Opus" email; "GROK FINDS"; "GROK BOT CONSOLE TEST"; "Morning Podcast"; an EconVitals "Morning Note" or essay; an "Email Digest … source alert" stub; anything dated another day; any ordinary mail.
+GROK: the same nine scanner digests arrive in up to three emails. Read ONE: the "ChatGPT Work — GROK FULL CONSOLIDATED" email if present, else the "Grok Bot … inline copy", never the one whose body only points at an attachment. List the others as duplicates.
+CROWDING: if q1 shows none for TODAY, search once more: subject:"GROK CROWDING CHECK" newer_than:7d, and take the newest; write its date in the status column.
+
+Keep the list in W/inputs.tsv, tab separated, one row per thread found, first row the column names:
+ n  sweep  landed_sgt  group  copy  subject  thread_id  size_estimate  status
+landed_sgt is the email's time plus eight hours. status starts as "to read" and ends as one of: read, duplicate, not read: <why>. A thread already in the file is never added again.
+
+There are four sweeps: sweep 1 at the start, sweep 2 at 07:20 Singapore time, sweep 3 at 07:50, sweep 4 at 08:10. Most inputs land between 06:30 and 07:40, so the later sweeps matter; sweep 4 only catches a late arrival and usually finds nothing to read. To wait, run python3 -I W/ev.py wait 07:20 with the shell tool's timeout set to 300000 ms: it sleeps at most four and a half minutes a call and says whether to run it again. If the shell tool stops it early, run it again. Never start a sweep before its time. If a sweep's time has already passed, run it at once. If the time is after 08:25 when a sweep's readers finish, skip the sweeps that remain.
+
+STEP 2 — READ (after each sweep)
+The threads with status "to read" go to readers. Each reader is one sub-agent with its own context, started with the Agent tool (in some setups named Task). Start all readers of a sweep except PEER in ONE message so that they run side by side, and wait until every one has returned; if the tool has a run_in_background option, set it to false, so that each call returns the reader's answer. Do not give a reader another model: it runs on yours. If you have no such tool, do each reader's work yourself, one reader at a time, by following W/brief.md.
+
+ reader      | groups it reads                  | part file
+ YOUTUBE     | YOUTUBE                          | W/parts/YOUTUBE_s<sweep>.md
+ PODCAST     | PODCAST                          | W/parts/PODCAST_s<sweep>.md
+ EMAIL       | EMAIL                            | W/parts/EMAIL_s<sweep>.md
+ SLACKGROK   | SLACK, GROK, CROWDING            | W/parts/SLACKGROK_s<sweep>.md
+ DESK        | DESK INPUT, ECONVITALS           | W/parts/DESK_s<sweep>.md
+ PEER        | PEER TAKEAWAYS                   | W/parts/PEER_s<sweep>.md
+
+A reader is started only when it has a thread to read in this sweep. PEER starts after the other readers of the sweep have returned, because it reads their part files first.
+Send each reader exactly this, with the angle brackets filled in:
+
+ Read the file <W>/brief.md first and follow it exactly. The brief writes the work folder as a W in angle brackets; the work folder is <W>.
+ Reader: <reader>. Sweep: <sweep>. Part file to write: <part file>.
+ Number new items from <letter><sweep × 1000 + 1> (for example Y1001 in sweep 1, Y2001 in sweep 2); each letter counts separately.
+ Earlier part files to read first: <the earlier part files of this reader, or "none">  (for PEER: every file in <W>/parts/).
+ Inputs, in this order:
+ 1. group <group>, letter <letter>, copy <copy name>, thread <thread id>, save name <GROUP>__<copy name>__<n>.txt, subject: <subject>
+ 2. …
+
+Order the inputs of a digest feed Fable, Opus, Gemini, ChatGPT. <GROUP> in a save name is the group name with "_" for the space (DESK_INPUT, PEER_TAKEAWAYS); <n> is the row number in inputs.tsv.
+When a reader returns: run python3 -I W/ev.py check <its part file>, and set the status of each of its threads from its answer. If a part file is missing or holds no claim for an input the reader was given, start that reader once more for that input alone; if that fails too, write "not read: reader failed". Then go to the next sweep.
+
+STEP 3 — BUILD THE FILE
+Run: python3 -I W/ev.py finish W <TODAY> "<note>"
+<note> is one line: Built by the Takeaways evidence pass (Sonnet 5.5, shadow test). Started <HH:MM>, sweeps <HH:MM> / <HH:MM> / <HH:MM> / <HH:MM>, finished <HH:MM> SGT. Digest feeds present: <n> of 5 (<YouTube: copies · Podcast: copies · Email: copies · Slack · Grok>). Missing: <feeds with no copy, or none>. Not read: <n>.
+It writes W/evidence_<TODAY>.txt: the totals, the input list, a tally of what each copy carries, a topic index, every block and claim, what was left out, and the stance rows it lifts from the saved texts.
+
+STEP 4 — TWO CHECKS BY SCRIPT
+ITEM COVERAGE. finish lists every video and episode link of each saved YouTube and Podcast copy and prints "item link not covered" for a link that no block and no LEFT OUT line of that copy carries (all of them are in W/missing_items.txt). If there are any, start the reader of that feed once more, in one message for all feeds concerned, with: the first two lines of the reader message, part file W/parts/<reader>_s9.md, numbering from <letter>9001, earlier part files all of that reader's, and "The texts are already saved in <W>/in/. Add the items with these links, each from the copy named: <save name>: <links> …. An item already in a block gets the header again with also lines or new claims naming this copy. A link that only points at an older digest or is not an item gets a LEFT OUT line with the reason reference only." One round only.
+FIGURE CHECK. finish compares every figure in every claim with the saved text of the copies that claim names, and prints "figure not found" lines (all of them are in W/numcheck.txt). For each one, search that copy's text in W/in/ for the speaker or a nearby word (grep) and decide: the claim has the figure wrong, so correct the claim line in its part file with the Edit tool; or the input writes it another way (a spelled-out number, another unit), so leave it. Work through at most 60 lines and at most 15 minutes. Then run finish once more, with this added to the note: Item links not covered: <n> before, <n> after the extra round. Figure check: <n> flagged, <m> corrected.
+
+STEP 5 — UPLOAD
+finish prints the arguments of one Google Drive create_file call. Use exactly:
+ title = evidence_<TODAY>            (in a DRY RUN: evidence_<TODAY>_dryrun)
+ parentId = 1wbkTyJqzhbCcYkKqtdXkcJS-nswKbFQO
+ contentMimeType = text/plain
+ disableConversionToGoogleType = true
+ base64Content = the "sha256:…" value finish printed, character for character. It is a reference to the file, not its content: do not read the file into the conversation and do not use textContent.
+The fileSize that comes back must equal the EXPECT value. If the call is refused or the size differs, make the same call once more. If that fails too: run head -c 15000 W/evidence_<TODAY>.txt, upload that text with textContent under the title evidence_<TODAY>_HEAD_ONLY, and say in your last message that the whole file could not be uploaded and why.
+
+LAST MESSAGE, and nothing after it (no email):
+ Evidence file: <title>, <bytes> bytes, Drive id <id>
+ Inputs: <n> read, <n> duplicates, <n> not read (<which and why>)
+ Items <n>, claims <n>, stance rows <n>
+ Item links not covered: <n> before, <n> after. Figure check: <n> flagged, <m> corrected
+ Started <HH:MM>, finished <HH:MM> SGT; readers used: <sub-agents or none>; ev.py and brief.md: <copied by script or written by hand>
+ Anything in this prompt that was unclear or did not work: <one line each, or none>

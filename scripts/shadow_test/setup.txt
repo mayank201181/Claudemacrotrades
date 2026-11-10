@@ -1,0 +1,45 @@
+SETUP
+1. Run: TZ=Asia/Singapore date "+%F %H:%M". TODAY is the date it prints; keep the time as the start time.
+2. Work folder W = <your scratchpad directory>/evidence_<TODAY>. If your instructions name no scratchpad directory, run: ls -d /tmp/claude-*/*/"$CLAUDE_CODE_SESSION_ID"/scratchpad and use what it prints; failing that, use the working directory. Make W/in and W/parts.
+3. Two files are part of this prompt, at its end: ev.py (the scripted steps) and brief.md (the instructions each reader follows). Copy them out by running this, with W filled in:
+
+python3 - "<W>" <<'PYEOF'
+import glob, json, os, sys
+W = sys.argv[1]
+def strings(o):
+    if isinstance(o, str):
+        yield o
+    elif isinstance(o, dict):
+        for v in o.values():
+            yield from strings(v)
+    elif isinstance(o, list):
+        for v in o:
+            yield from strings(v)
+marks = ("#### " + "EV.PY START", "#### " + "EV.PY END", "#### " + "BRIEF START", "#### " + "BRIEF END")
+def cut(s):
+    out = []
+    for a, b in ((marks[0], marks[1]), (marks[2], marks[3])):
+        i, j = s.find(a + "\n"), s.find("\n" + b)
+        if not 0 <= i < j:
+            return None
+        out.append(s[i + len(a) + 1:j] + "\n")
+    return out if out[0].startswith("#!/usr/bin/env python3") else None
+best = None
+for p in set(glob.glob(os.path.expanduser("~/.claude/projects/*/*.jsonl")) + glob.glob("/root/.claude/projects/*/*.jsonl")):
+    for line in open(p, encoding="utf-8", errors="replace"):
+        if marks[0] in line and marks[3] in line:
+            try:
+                for s in strings(json.loads(line)):
+                    got = cut(s)
+                    if got and (best is None or len(got[0]) + len(got[1]) > len(best[0]) + len(best[1])):
+                        best = got
+            except ValueError:
+                pass
+if best:
+    for name, text in zip(("ev.py", "brief.md"), best):
+        open(os.path.join(W, name), "w", encoding="utf-8").write(text)
+print("copied" if best else "not copied")
+PYEOF
+
+   If it prints "not copied", write the two files yourself with the Write tool, character for character, from the text between the marker lines at the end of this prompt.
+4. Run: python3 -I W/ev.py selftest. It must end with "selftest ok". If it does not, compare W/ev.py with the text in this prompt, correct it and run it again.
