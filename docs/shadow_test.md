@@ -66,6 +66,12 @@ auditor's table, writes the day's report with the count of claims behind each co
   read, 1,290 claims in a file about a quarter of the inputs' size, uploaded byte for byte. The audit took about five
   minutes and passed with no claim lost or degraded. That morning was looser than a normal one: the live digest was a
   midday catch-up, so every input had landed long before it ran.
+- Dry run 2, the same inputs on version 2 with a six-minute wait test added by its note: 19.5 minutes, about US$7,
+  the same 17 inputs read into 1,347 claims. The wait command ran its full 270 seconds in the foreground and the
+  "run it again" branch worked, readers took full content, and the patched audit steps passed it with no claim lost
+  or degraded (69 claims behind 33 judged items). The script could check 855 claims against inputs saved to disk;
+  the other 492 came from small emails read in the conversation (see Limits). Not yet tried: waits as long as a
+  real morning's.
 - A digest email can carry only its top section in its plain-text part and the whole text in its HTML part, and
   nothing in the plain part says that it is cut. The Macro Takeaways email does this by design. Anything that reads a
   digest email through the Gmail connector must ask for FULL_CONTENT; `ev.py read` compares the two parts, takes the

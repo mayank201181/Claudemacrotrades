@@ -6,8 +6,9 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-10 evening (audit and its fourteen follow-ups; then the workflow review's eleven approved
-changes, built the same day: Open items 1). Scheduled tasks and rules were read from the live systems that day._
+_Last updated: 2026-11-10 late evening (audit and its fourteen follow-ups; then the workflow review's eleven approved
+changes, built the same day, the split-run shadow test last: Open items 1). Scheduled tasks and rules were read from
+the live systems that day._
 
 ## Where things are
 
@@ -31,7 +32,7 @@ changes, built the same day: Open items 1). Scheduled tasks and rules were read 
 | `scripts/apps_script/Code.gs` | Gmail and Drive feeder in the owner's Google account, posts to `dash-ingest`. Uses a Grok Bot HTML attachment as the body and mails one inline copy for the digests. Opens the trade book with DocumentApp, so a plain-text `trade_book_current` is skipped | every 10 min |
 | `scripts/apps_script/Spec.gs` | applies a staged `trade_book_spec_edits` JSON to the spec Doc, archiving it first | every 10 min |
 | `scripts/apps_script/Alert.gs` | the morning check outside Claude: mails the owner when no Macro Takeaways email has arrived. **Not installed yet**: it needs the owner's one visit (Open items 1) | daily 08:15 to 08:45 SGT once installed |
-| `dash-ingest` (v9) | raw payloads into the `dash` tables (digests, trade books, feeds, questions). Since 10 Nov it keeps a card's `risk` key (R17) and its TWIN line (R18). The deployed function is a stub importing this repo at `main` commit 9fcaed6; rollback is the same stub pinned to fe335fd | on post |
+| `dash-ingest` (v10) | raw payloads into the `dash` tables (digests, trade books, feeds, questions). Since 10 Nov it keeps a card's `risk` key (R17) and its TWIN line (R18), and stores a "[Gemini]" digest copy under the source `gemini` (it had been stored as `claude`). The deployed function is a stub importing this repo at `main` commit 08a5516; rollback is the same stub pinned to 9fcaed6 | on post |
 | `dash-mark` (v7) | live R per open trade (one R = the card's planned risk when it carries a `risk` key, R17), hourly-close stop flag (spec v15), option twins priced on the smile and marked hourly (R18, `twin_*` keys in the card's meta), shadow outcomes in ATR(20) units. Stub pinned to 9fcaed6, rollback fe335fd | pg_cron `7 * * * *` |
 | dashboard banner (`site/app.js`) | a red banner on every tab when today's Fable digest row is still absent at 08:20 SGT | on page load |
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rule inputs | pg_cron `40 22 * * *` UTC |
@@ -43,7 +44,7 @@ changes, built the same day: Open items 1). Scheduled tasks and rules were read 
 
 ### Scheduled Claude tasks (times SGT)
 
-`list_triggers` is the truth. State on 10 Nov 2026, about 17:00 SGT, after the workflow thread's changes.
+`list_triggers` is the truth. State on 10 Nov 2026, about 19:00 SGT, after the workflow thread's changes.
 
 | Task | Id | When | Notes |
 |---|---|---|---|
@@ -53,6 +54,8 @@ changes, built the same day: Open items 1). Scheduled tasks and rules were read 
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
 | Feeder: prediction-market odds | `trig_019jXUYgtu3beS5Zt6yxb8tH` | 06:20 daily | writes Drive `predmkt_latest` (R12); moved from 06:38 so that it lands before the 06:33 start |
 | Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup |
+| Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | 06:33 on 12 to 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`): mails nothing, writes Drive `evidence_<date>`. It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`). Switch it off after 16 Nov |
+| Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | 09:05 on 12 to 16 Nov | wakes the thread "Audit the split Takeaways shadow test" (Opus 5.5), which compares the evidence file with the live digest; results in project files `shadow_test/` |
 | Weekly fundamentals pack | `trig_019siN4tMsZfsPNPCiLUqvYr` | Sun 18:41 | market pack section G. Stays in its own Opus thread (owner, 6 Nov) |
 | Macro Desk scorer | `trig_01BbvwRoPCZtxzMeZfuqmUFX` | 09:57 daily | stance calls and `dash.refresh_scores()` |
 | Macro Desk weekly review | `trig_013JmK7MsEHmNzi84F33zbBx` | Sat 09:53 | review email; since 10 Nov it runs fixed cuts and must end with up to two rule proposals or "none, because" (`docs/weekly_review.md`; first such run 14 Nov) |
@@ -60,16 +63,13 @@ changes, built the same day: Open items 1). Scheduled tasks and rules were read 
 | MSD brief email | `trig_01RrYqBatUV8ZdiGCFBUqtXk` | 06:30 daily | `brief.today()` |
 | Weekly STATUS digest | `trig_01MYWHLQohf1qjDVYepNpfEd` | Mon 08:45 | reads this file |
 
-Disabled: Question Hunt `trig_01E1MeWdsE7x7z79XC4gcZo9` (paused 10 Nov), Opus Macro Takeaways
-`trig_01PDjNqUabmAdt9VoCVMwUwx` (31 Oct), the Opus Email Digest, and the three old feeder tasks that the Haiku thread
-replaced on 10 Nov (`trig_01UvLHEc5HZn6cbcCtbsdGob`, `trig_01Uz92j76ozWE1EJ3SHxbHWz`, `trig_01KTuAEzuMfvBNr98nBEEfhk`;
-delete them after a clean week). The paused Fable YouTube `trig_01X6SstZSnanyjyrfyhirx85`, Fable Podcast
-`trig_011qkFh4EkgsNgQbxm5a1tRK` and Fable Email `trig_01Q7JHUSc11TGiWQfhjDHwBz` tasks are test vehicles until
-13 Nov: renamed "... [Sonnet 5.5 test]", model Sonnet 5.5, fired by hand with a note that redirects the output to a
-Drive test folder. Fired without that note they mail a digest, so leave them alone (Open items 1). Deleted on 10 Nov (prompts
-of the larger ones kept in project files `notes/deleted_tasks_10nov2026/`): the question-hunt verdict task, Macro
-Desk ingest, Daily Grok Consolidated, Daily Slack Digest, MT Newswires check, CFTC v5 self-check, New Claude features
-check.
+Disabled: Question Hunt `trig_01E1MeWdsE7x7z79XC4gcZo9` (paused 10 Nov), the Opus Email Digest, and the three old
+feeder tasks that the Haiku thread replaced on 10 Nov (`trig_01UvLHEc5HZn6cbcCtbsdGob`,
+`trig_01Uz92j76ozWE1EJ3SHxbHWz`, `trig_01KTuAEzuMfvBNr98nBEEfhk`; delete them after a clean week). The paused Fable
+YouTube `trig_01X6SstZSnanyjyrfyhirx85`, Fable Podcast `trig_011qkFh4EkgsNgQbxm5a1tRK` and Fable Email
+`trig_01Q7JHUSc11TGiWQfhjDHwBz` tasks are test vehicles until 13 Nov: renamed "... [Sonnet 5.5 test]", model
+Sonnet 5.5, fired by hand with a note that redirects the output to a Drive test folder. Fired without that note they
+mail a digest, so leave them alone (Open items 1). Seven tasks were deleted on 10 Nov (`docs/history.md`).
 
 Outside Claude: Grok Bot console (06:50) and crowding check; the ChatGPT and Gemini copies of the YouTube, Podcast and
 Email digests; ChatGPT and Gemini Macro Takeaways (second reads); "DESK INPUT" emails from Grok, ChatGPT and Gemini;
@@ -129,21 +129,28 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      Apps Script project and run `setupTakeawaysAlert` once; in the ChatGPT red-team task and the Grok crowding
      check change the subject match "MACRO TAKEAWAYS [Fable 5.1]" to "MACRO TAKEAWAYS [Fable"; the two API keys in
      the YouTube digest prompts and the seven "Fable 5.1" labels in the Fable YouTube prompt (a thread cannot retype
-     a prompt that holds a key); connectors per digest task cut to the four it uses. Optional: the one line in each
-     rule file that puts R17 to R19 in force before Sunday.
-   - *First runs to check:* the Takeaways of 11 Nov under `dash-ingest` v9; the Haiku feeder thread's first
-     scheduled morning on 11 Nov (`feeders/status.csv`; delete the three disabled old feeder tasks after a clean
+     a prompt that holds a key); connectors per digest task cut to the four it uses, and the evidence-pass task cut
+     to Gmail and Google Drive. Optional, one paste in the SQL editor: the line that puts R17 to R19 in force before
+     Sunday, and `019_gemini_source.sql` (relabels the 86 Gemini rows stored as `claude`).
+   - *First runs to check:* the Takeaways of 11 Nov under `dash-ingest` v10 (and a "[Gemini]" copy stored as
+     `gemini`); the Haiku feeder thread's first scheduled morning on 11 Nov (`feeders/status.csv`; delete the three disabled old feeder tasks after a clean
      week); the weekly review of 14 Nov under the new prompt; the Takeaways of 16 Nov under R17 to R19 (the `risk`
      key, TWIN lines and the expression table in the digest, `twins` above zero in the `dash-mark` reply).
    - *Sonnet 5.5 side by side* for the YouTube, Podcast and Email digests, mornings of 11 to 13 Nov: notes and
      results in project files `notes/model_tests_nov2026/`. On a pass the two Opus digest tasks move to Sonnet 5.5
      on 13 Nov and the three test tasks are restored (names, models) and left paused.
-   - *Not built yet:* the five-day split-run shadow test of the Takeaways (decision 7), and the Gemini digest copies
-     that are stored in `dash.feeds` under the source name `claude`.
+   - *Split-run shadow test* (decision 7), mornings of 12 to 16 Nov: a cheaper reader writes one evidence file from
+     every input, and an audit thread checks each morning whether the live digest rested on anything the file lost
+     (`docs/shadow_test.md`; hand-over in project files `shadow_test/README.md`). Two dry runs on the evening of
+     10 Nov passed their audits with no claim lost or degraded (62 and 69 claims behind 29 and 33 judged items;
+     about US$7 and 15 to 20 minutes each), and the second proved the wait between sweeps and the full-content
+     read in the task's own environment. The first scheduled morning is the first with waits as long as a real
+     morning's. Verdict to the owner on Mon 16 Nov, one yes/no from the workflow thread (a wake is set for
+     09:45 SGT); then switch the evidence task off.
    - *Standing decisions the weekly review carries every week until made:* thin edge at 30 closed cards, the option
      twin trial (ten finished pairs or 13 Dec), the expression table (15 cards or six weeks).
 2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to d334277), `dash-mark`
-   and `dash-ingest` (both pinned to 9fcaed6) are one-file stubs that import this repo at a `main` commit: merge,
+   (9fcaed6) and `dash-ingest` (08a5516) are one-file stubs that import this repo at a `main` commit: merge,
    deploy the stub with the new commit, POST a dry run through `pg_net` and read the reply in `net._http_response`.
    The branch `claude/project-thread-e80nxd` holds the `dash-trend` rollback commit 64d1f84; keep it until the New
    York clock has run cleanly for a couple of weeks.
@@ -244,10 +251,15 @@ a compliance view). Details in `docs/history.md`.
 - Upload a file to Drive without retyping it: `create_file` with `base64Content` = `sha256:<hex>:<absolute path>`,
   the file sitting in the session's scratchpad. `feeders/feeder.py` does the staging and prints the call.
 - A scheduled task bound to a thread keeps that thread's model, and its prompt can be changed only from that
-  thread; switching it off works from any thread. A task that starts a new thread at each run cannot be changed or
-  switched back on by a thread at all (delete and create again). `create_trigger` takes no connectors here.
-- Tests: `deno test supabase/functions/_shared/` (Deno is not preinstalled in cloud sessions);
-  `python3 scripts/fxopt/test_fxopt.py` needs QuantLib.
-- Migrations: the next number is 019. `015` exists twice (`015_drivers.sql`, `015_grokbot_source.sql`); both are
-  applied, so neither is renamed. 006 to 009 and 015 to 017 were applied through the SQL editor or `execute_sql`,
-  so the database's own migration list does not show them all.
+  thread; switching it off works from any thread. A task that starts a new project thread at each run cannot be
+  changed or switched back on by a thread at all (delete and create again). A task made in Cowork that starts a
+  fresh session each run (the digests, the evidence pass) can be renamed, rescheduled, switched on or off and given
+  another model or prompt from a thread; its connectors cannot. `create_trigger` takes no connectors here.
+- Read a digest email through the Gmail connector with FULL_CONTENT. The Macro Takeaways email carries only its top
+  section in the plain-text part and nothing there says it is cut; `scripts/shadow_test/ev.py read` picks the
+  complete part of a saved result.
+- Tests: `npx -y tsx --test supabase/functions/_shared/*.test.ts` (39 tests on 10 Nov; Deno is not preinstalled in
+  cloud sessions); `python3 scripts/fxopt/test_fxopt.py` needs QuantLib; `ev.py selftest` and `audit.py selftest`.
+- Migrations: the next number is 020. `019_gemini_source.sql` is not applied yet (Open items 1). `015` exists twice
+  (`015_drivers.sql`, `015_grokbot_source.sql`); both are applied, so neither is renamed. 006 to 009 and 015 to 017
+  were applied through the SQL editor or `execute_sql`, so the database's own migration list does not show them all.

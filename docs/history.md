@@ -6,6 +6,44 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 10 Nov 2026: split-run shadow test set up; Gemini source name (pull requests #63 and #64)
+
+Decision 7 of the workflow review, the last of the eleven to be built. The question: could a cheaper model read
+every copy of every feed and hand the deciding model one evidence file, each claim once with the copies that carry
+it, without losing anything the digest rests on? The test runs the reader beside the live Takeaways on the mornings
+of 12 to 16 Nov and audits the two against each other; the owner gets one yes/no on Mon 16 Nov. Design, files and
+limits are in `docs/shadow_test.md`.
+
+How it was built. The reader is the old Opus Macro Takeaways task (switched off on 31 Oct), renamed, moved to a
+cheaper model and given a new prompt, because a thread cannot give a new scheduled task the Gmail and Drive
+connectors; the old prompt is kept in project files. The prompt is built from parts by
+`scripts/shadow_test/build_prompt.py` and carries its own script and reader brief, which a run copies out of its own
+prompt at the start. The audit runs in its own project thread, woken at 09:05 SGT on the five mornings.
+
+Two dry runs on the evening of 10 Nov replayed that morning's inputs by landing time. The first took about 15
+minutes and US$7 at list prices, read 17 inputs into 1,290 claims in a file a quarter of the inputs' size, and its
+audit found no claim lost or degraded behind 29 judged items. It also found the method's own faults, the main one
+being that the Takeaways email carries only its top section in the plain-text part: a reader or auditor that asks
+Gmail for plain text sees a fifth of the digest and nothing says so. Version 2 of the prompt reads full content,
+sweeps the inbox a fourth time at 08:10 so that a late input the live run still picks up is not counted against the
+reader, and tightens the scripted checks. The second dry run, on version 2 with a six-minute wait test added by
+its note, took 19.5 minutes and about US$7, read the same 17 inputs into 1,347 claims, proved the 270-second wait and
+its repeat branch in the fired environment, and passed the patched audit steps: 69 claims behind 33 judged items,
+none lost or degraded. Its script could check 855 claims against inputs saved to disk; the other 492 came from small
+emails read in the conversation, which the figure check cannot see.
+
+The Gemini copies of the YouTube, Podcast and Email digests had been stored in `dash.feeds` under the source
+`claude` since their first day, because `feedSource()` knew no "[Gemini]" tag. It returns `gemini` now
+(`feeds.test.ts`), the site shows the name, and `dash-ingest` went live as v10, a stub pinned to `main` commit
+08a5516 (rollback 9fcaed6). The 86 rows stored before that keep the old name until the owner runs
+`019_gemini_source.sql`.
+
+Lessons. A scheduled task made in Cowork that starts a fresh session each run can be renamed, rescheduled, switched
+back on and given another model and prompt from a thread; only its connectors cannot be changed. `fire_trigger`
+takes a note that arrives after the prompt, so a prompt can define a dry run. Read digest emails with FULL_CONTENT.
+Mac visits for the whole workflow build: 0, one tap on a decision card; one visit is still planned for the pieces
+only the owner can do.
+
 ### 10 Nov 2026: workflow review, the eleven approved changes built (pull requests #61 and #62)
 
 Background: the weekly Claude allowance ran out early on Sun 8 Nov with the monthly extra-usage cap already spent, so
