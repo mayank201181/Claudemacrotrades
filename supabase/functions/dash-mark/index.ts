@@ -1,17 +1,22 @@
 // dash-mark: hourly. Pulls Yahoo bars for every open trade's proxy and every tested idea's
 // proxy, writes dash.bars, then computes
-//   - dash.live_marks: latest hourly mark of each open trade in R, intraday touches since fill,
+//   - dash.live_marks: latest hourly mark of each open trade in R (one R = the card's planned risk under rule R17,
+//     |entry - stop| for cards filled before it), intraday touches since fill,
 //     the latest complete daily close with close-breaches (the exit basis up to spec v13), and the
 //     hourly-close stop breach spec v15 uses (target on touch, stop on hourly close);
 //   - convexity cards (rule R01): the model value V as a share of the payout, R = V / p0fill − 1,
 //     touches on live hourly bars after the fill (which freeze the card) and settlement at the cut;
 //   - dash.idea_outcomes: forward move of every tested idea in its own direction, in ATR(20) units,
 //     at 1/5/10/20 sessions after the idea's date, from the first price a reader could deal at
-//     after the 08:00 SGT digest (see ideaRef: a gap over a market closure is not credited).
-// Invoked by pg_cron with the ingest token; read-only towards trades.
+//     after the 08:00 SGT digest (see ideaRef: a gap over a market closure is not credited);
+//   - option twins (rule R18): for a cash FX card whose block carries a TWIN line, the premium of that structure
+//     at the card's fill, its hourly mark, a touch, the settlement at the cut or an early close with the card.
+// Invoked by pg_cron with the ingest token; read-only towards trades, except the twin_* keys it adds to a
+// card's meta (the book never writes those keys, and ingest merges meta, so neither side overwrites the other).
 import postgres from 'npm:postgres@3.4.4';
-import { type Bar, HOUR, ideaRef, markLive } from '../_shared/marks.ts';
+import { type Bar, HOUR, ideaRef, markLive, oneR as planned1R } from '../_shared/marks.ts';
 import { cardFromMeta, fxBase, liveSinceFill, markConvexity } from '../_shared/convexity.ts';
+import { scoreTwin } from '../_shared/twin.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
 
@@ -95,7 +100,11 @@ Deno.serve(async (req) => {
     const known = new Map((await sql`select model, d::text d, idea, ref, ref_d::text ref_d from dash.idea_outcomes where ref_v = 4`).map((r) => [`${r.model}|${r.d}|${r.idea}`, r]));
     const ideas = await sql`select model, d::text d, idea, proxy, direction from dash.tested
       where proxy is not null and direction is not null and d >= current_date - 120`;
-    const proxies = new Set<string>([...trades.map((t) => t.proxy), ...ideas.map((i) => i.proxy)]);
+    // Twins still running: the card is open, or closed with its twin not yet touched, settled or closed with it.
+    const twins = await sql`select model, pid, status, proxy, direction, filled, closed, meta from dash.trades
+      where jsonb_exists(meta, 'twin') and filled is not null and proxy is not null and (status = 'open' or status like 'closed-%')
+        and coalesce(meta->>'twin_state', 'open') not in ('touch', 'expiry', 'view') and first_seen >= current_date - 200`;
+    const proxies = new Set<string>([...trades.map((t) => t.proxy), ...ideas.map((i) => i.proxy), ...twins.map((t) => t.proxy)]);
     const symbols = new Set<string>();
     for (const p of proxies) for (const l of legs(p).legs) symbols.add(l);
 
@@ -104,6 +113,7 @@ Deno.serve(async (req) => {
     // keep Yahoo's own 1-month series, exactly as before.
     const longHourly = new Set<string>();
     for (const t of trades) if (t.tclass === 'convexity') for (const l of legs(t.proxy).legs) longHourly.add(l);
+    for (const t of twins) longHourly.add(t.proxy); // a twin sits on one '=X' symbol
     const hourly = new Map<string, Bar[]>(), daily = new Map<string, Bar[]>(), hourlyRaw = new Map<string, Bar[]>();
     for (const s of symbols) {
       const long = longHourly.has(s);
@@ -162,7 +172,7 @@ Deno.serve(async (req) => {
       }
       if (t.entry == null || t.stop == null || t.direction == null) continue;
       const dir = Number(t.direction), entry = Number(t.entry), stop = Number(t.stop), target = t.target == null ? null : Number(t.target);
-      const oneR = Math.abs(entry - stop);
+      const oneR = planned1R(entry, stop, t.meta?.risk); // R17: the card's planned risk when it carries one
       const h = series(t.proxy, false);
       if (!h.length || !oneR) continue;
       const last = h[h.length - 1];
@@ -195,6 +205,24 @@ Deno.serve(async (req) => {
         stop_closed = excluded.stop_closed, target_closed = excluded.target_closed, stop_closed_h = excluded.stop_closed_h,
         stop_closed_h_px = excluded.stop_closed_h_px, stop_closed_h_at = excluded.stop_closed_h_at`;
       nLive++;
+    }
+
+    // Option twins. A view or reader close of the card closes its twin at the book's closing mark (a spot bar close).
+    const twinSkipped: string[] = [];
+    let nTwin = 0;
+    if (twins.length) {
+      const closing = new Map<string, number>();
+      for (const r of await sql`select m.model, m.pid, m.mark from dash.trade_marks m join dash.trades t on t.model = m.model and t.pid = m.pid
+        where jsonb_exists(t.meta, 'twin') and t.status in ('closed-view', 'closed-reader') and m.d::text = left(t.closed, 10) and m.mark is not null`) {
+        closing.set(`${r.model}|${r.pid}`, Number(r.mark));
+      }
+      for (const t of twins) {
+        try {
+          const res = scoreTwin(t as never, hourlyRaw.get(t.proxy) ?? [], closing.get(`${t.model}|${t.pid}`) ?? null, now);
+          if (res.skipped) twinSkipped.push(`${t.model} ${t.pid}: ${res.skipped}`); else nTwin++;
+          if (res.meta) await sql`update dash.trades set meta = meta || ${sql.json(res.meta)}::jsonb where model = ${t.model} and pid = ${t.pid}`;
+        } catch (e) { twinSkipped.push(`${t.model} ${t.pid}: ${String(e)}`); }
+      }
     }
 
     let nOut = 0;
@@ -231,7 +259,8 @@ Deno.serve(async (req) => {
         last_d = excluded.last_d, ret_last = excluded.ret_last, updated_at = excluded.updated_at, ref_v = excluded.ref_v`;
       nOut++;
     }
-    return new Response(JSON.stringify({ ok: true, symbols: symbols.size, live: nLive, convexity: nConvex, convexity_skipped: convexSkipped, outcomes: nOut,
+    return new Response(JSON.stringify({ ok: true, symbols: symbols.size, live: nLive, convexity: nConvex, convexity_skipped: convexSkipped,
+      twins: nTwin, twins_skipped: twinSkipped, outcomes: nOut,
       empty: [...symbols].filter((s) => !(daily.get(s)?.length)) }), { headers: { 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500 });

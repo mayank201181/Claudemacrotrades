@@ -88,7 +88,7 @@
     if (!data.session) { $('#login').hidden = false; $('#app').hidden = true; return; }
     $('#login').hidden = true; $('#app').hidden = false;
     try {
-      state.index = await rpc('dash_index');
+      state.index = await rpc('dash_index'); indexAt = Date.now();
     } catch (e) {
       $('#themesBody').innerHTML = `<div class="card empty">Signed in as ${esc(data.session.user.email)}, but this account is not on the allow-list.</div>`;
       return;
@@ -110,6 +110,27 @@
   };
   $('#signout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
 
+  // ---------- missing-digest banner ----------
+  // The day's Fable Macro Takeaways is due by 08:15 Singapore time. If its row is still absent at 08:20, every tab
+  // says so: the scheduled task can die without sending anything (8 to 10 Nov 2026).
+  function digestAlert(index, nowMs) {
+    const sgt = new Date(nowMs + 8 * 3600000);
+    const today = sgt.toISOString().slice(0, 10);
+    if (sgt.getUTCHours() * 60 + sgt.getUTCMinutes() < 8 * 60 + 20) return '';
+    const ds = (index?.digests || []).filter((x) => x.model === 'fable').map((x) => String(x.d).slice(0, 10)).sort();
+    if (ds.includes(today)) return '';
+    const last = ds[ds.length - 1];
+    return `No Fable Macro Takeaways for ${dayLabel(today)} in the dashboard (checked ${sgt.toISOString().slice(11, 16)} SGT). Latest: ${last ? dayLabel(last) : 'none'}.`;
+  }
+  // A page left open keeps the index it loaded: reload it every ten minutes while the tab is in view.
+  let indexAt = 0;
+  async function refreshIndex() {
+    if (document.hidden || !state.index || Date.now() - indexAt < 10 * 60000) return;
+    try { state.index = await rpc('dash_index'); indexAt = Date.now(); syncChrome(); } catch { /* keep the index already shown */ }
+  }
+  document.addEventListener('visibilitychange', refreshIndex);
+  setInterval(refreshIndex, 5 * 60000);
+
   // ---------- chrome ----------
   function syncChrome() {
     document.querySelectorAll('#mainTabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === state.tab));
@@ -122,6 +143,8 @@
     $('#modelSeg').hidden = !!FEEDS[state.tab] || ['voices', 'review', 'positioning', 'trend', 'drivers'].includes(state.tab);
     const bk = state.index?.book?.[state.model];
     $('#freshness').textContent = bk ? `book ${bk.updated || ''} · synced ${ago(bk.ingested_at)}` : '';
+    const al = digestAlert(state.index, Date.now());
+    $('#alertBar').hidden = !al; $('#alertBar').textContent = al;
   }
   document.querySelectorAll('#mainTabs button').forEach((b) => (b.onclick = () => { state.tab = b.dataset.tab; store('tab', state.tab); syncChrome(); render(); }));
   document.querySelectorAll('#modelSeg button').forEach((b) => (b.onclick = () => { state.model = b.dataset.model; store('model', state.model); state.date = null; state.open.clear(); syncChrome(); render(); }));
@@ -315,6 +338,40 @@
     };
   }
 
+  // ---------- option twins (rule R18): the R01 structure of a cash FX card, scored beside it by dash-mark ----------
+  // A twin exists only for a card that was filled; a void, missed or vetoed card has none.
+  const twinOf = (t) => { const g = t.meta || {}; return (g.twin || g.twin_terms) && /^(open$|closed-)/.test(t.status || '') ? g : null; };
+  const twinDone = (g) => /^(touch|expiry|view)$/.test(g.twin_state || '');
+  function twinStat(trades) {
+    const tw = trades.filter((t) => twinOf(t) && n(twinOf(t).twin_r) != null);
+    if (!tw.length) return null;
+    // A pair is finished when the card has closed and its twin has touched, settled or closed with it.
+    const done = tw.filter((t) => isClosed(t) && twinDone(t.meta) && n(t.result_r) != null);
+    return {
+      n: done.length, running: tw.length - done.length,
+      twin: avg(done, (t) => n(t.meta.twin_r)), card: avg(done, (t) => n(t.result_r)),
+    };
+  }
+  function twinHtml(t) {
+    const g = t.meta || {};
+    if (!g.twin && !g.twin_terms) return '';
+    const st = g.twin_state || '';
+    let line;
+    if (!twinOf(t)) line = t.status === 'pending' ? '<span class="muted">priced once the card fills</span>' : '<span class="muted">no twin: the card was not filled</span>';
+    else if (!st) line = '<span class="muted">not priced yet (the hourly scorer prices it after the fill)</span>';
+    else if (/^skipped/.test(st)) line = `<span class="warn">${esc(st)}</span>`;
+    else {
+      const r = n(g.twin_r), cr = curR(t);
+      const what = st === 'open' ? `value ${esc(g.twin_v)}% · ${esc(g.twin_left)} sessions left`
+        : st === 'touch' ? `touched at ${esc(g.twin_px)}`
+        : st === 'expiry' ? `settled at ${esc(g.twin_px)}, paid ${esc(g.twin_v)}%`
+        : `closed with the card at ${esc(g.twin_px)}, value ${esc(g.twin_v)}%`;
+      const tv = g.twin_tv ? ` (theoretical value ${esc(g.twin_tv)}%${g.twin_vol ? ` at ${esc(g.twin_vol)} vol` : ''})` : g.twin_vol ? ` at ${esc(g.twin_vol)} vol` : '';
+      line = `premium ${esc(g.twin_p0)}% of payout${tv}, bought at ${esc(g.twin_fill)} · ${what} · <b class="${cls(r)}">${fmtR(r)}</b> on the premium against <b class="${cls(cr)}">${fmtR(cr)}</b> on the card <span class="muted">(${esc(sgtTime(g.twin_asof))})</span>`;
+    }
+    return `<h4 style="margin-top:10px">Option twin (R18 trial, not in the book)</h4><div class="mono small">${esc(g.twin_terms || g.twin)}</div><div>${line}</div>`;
+  }
+
   function renderAnalytics(data) {
     const all = data.trades || [], tested = data.tested || [];
     // Every linear figure leaves convexity out (R01 item 8); it gets its own stat below.
@@ -322,6 +379,7 @@
     const closed = trades.filter(isClosed), open = trades.filter((t) => t.status === 'open'), pending = trades.filter((t) => t.status === 'pending');
     const missed = trades.filter((t) => /missed|void|vetoed/.test(t.status || ''));
     const cx = convexityStat(all);
+    const tw = twinStat(trades);
     const wins = closed.filter((t) => n(t.result_r) > 0).length;
     const cum = closed.reduce((a, t) => a + (n(t.result_r) || 0), 0);
     const openR = open.reduce((a, t) => a + (curR(t) || 0), 0);
@@ -338,6 +396,7 @@
       stat('Realised', fmtR(cum), `sum of closed ${cx ? 'linear ' : ''}trades, 1R each`, cls(cum)),
       stat('Open', `${open.length}${pending.length ? ` +${pending.length}p` : ''}`, `marked ${fmtR(openR)} now`, cls(openR)),
       cx ? stat('Convexity', fmtR(cx.cum), `${cx.html} · 1R = premium, never summed with linear R`, cls(cx.cum)) : '',
+      tw ? stat('FX option twins', tw.n ? `${fmtR(tw.twin)} vs ${fmtR(tw.card)}` : '—', `average R of the option against its card, ${tw.n} finished pair${tw.n === 1 ? '' : 's'} · ${tw.running} running · R18 trial, outside the book`) : '',
       stat('Gate pass rate', passRate == null ? '—' : `${passRate.toFixed(0)}%`, `${proposed} carded vs ${notCarded.length} rejected (${ideaDays} days)`),
       stat('Rejected ideas, +5d', avg(priced, (x) => n(x.outcome.ret5)) == null ? '—' : `${fmt(avg(priced, (x) => n(x.outcome.ret5)))} ATR`, `n=${priced.length} · ${priced.filter((x) => n(x.outcome.ret5) > 0).length} moved their way`),
       stat('Near-misses (EV ≥ +0.15R)', avg(near, (x) => n(x.outcome.ret5)) == null ? '—' : `${fmt(avg(near, (x) => n(x.outcome.ret5)))} ATR`, `n=${near.length} vs rest ${avg(far, (x) => n(x.outcome.ret5)) == null ? '—' : fmt(avg(far, (x) => n(x.outcome.ret5)))} ATR (n=${far.length})`),
@@ -418,7 +477,8 @@
     return `<div class="dgrid">
       <div><h4>Why — thesis</h4><div>${esc(t.thesis || '—')}</div>
         <h4 style="margin-top:10px">Invalidation</h4><div>${esc(t.invalidation || '—')}</div>
-        ${t.structure ? `<h4 style="margin-top:10px">Real structure (unscored)</h4><div>${esc(t.structure)}</div>` : ''}</div>
+        ${t.structure ? `<h4 style="margin-top:10px">Real structure (unscored)</h4><div>${esc(t.structure)}</div>` : ''}
+        ${twinHtml(t)}</div>
       <div><h4>Card</h4><div class="kv">
         <div>Direction</div><div>${dirTxt(t.direction)}</div><div>Proxy</div><div class="mono">${esc(t.proxy || '—')}</div>
         <div>Ref / entry</div><div class="mono">${lvl(t.ref)} / ${lvl(t.entry)}</div><div>Filled</div><div>${esc(t.filled || '—')}</div>

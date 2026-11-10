@@ -39,6 +39,8 @@ button.icon { padding: 4px 8px; }
 
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; }
 .topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+/* Sits on its own row inside the sticky top bar, so it stays in view on every tab while the page scrolls. */
+.alertbar { flex: 0 0 100%; background: #b91c1c; color: #fff; padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 13px; }
 .brand { font-weight: 700; letter-spacing: .2px; }
 .spacer { flex: 1; }
 .tabs button, .seg button { border: none; background: transparent; padding: 6px 10px; color: var(--muted); border-radius: 6px; }
