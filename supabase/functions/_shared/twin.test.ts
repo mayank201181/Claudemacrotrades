@@ -58,6 +58,19 @@ test('the terms line', () => {
   assert.equal(ok<ConvexCard>(twinCard('KRW=X', 'dig-dn · strike 1,320 · cut 2026-11-25 · iv 10.4%', -1)).k, 1320);
   near(ok<ConvexCard>(twinCard('JPY=X', LINE.replace(' · carry -2.90%', ''), -1)).carry, 0);
 
+  // skew: the dearer of the at-the-money vol and the 25-delta vol on the structure's own side
+  const skew = (line: string, proxy = 'JPY=X', dir = -1) => ok<ConvexCard>(twinCard(proxy, line, dir)).vol * Math.sqrt(252) * 100;
+  near(skew(LINE.replace(' · carry', ' · rr -1.95 · bf 0.23 · carry')), 6.7 + 0.23 + 0.975, 1e-9); // a put-side touch with puts over
+  near(skew(LINE.replace(' · carry', ' · rr +1.95 · bf 0.23 · carry')), 6.7, 1e-9);               // calls over: the put wing is cheaper, ATM stands
+  near(skew(LINE.replace(' · carry', ' · rr - · bf - · carry')), 6.7, 1e-9);
+  near(skew(LINE.replace(' · carry', ' · rr -1.95 · carry')), 6.7 + 0.975, 1e-9);                 // no butterfly printed
+  near(skew(LINE.replace(' · carry', ' · bf 0.23 · carry')), 6.7, 1e-9);                          // a butterfly alone moves nothing
+  near(skew('cs · strike 1,350/1,380 · cut 2026-11-25 · iv 10.4% · rr +0.75 · bf 0.30 · carry -1.30%', 'KRW=X', 1), 10.4 + 0.3 + 0.375, 1e-9);
+  near(skew('dig-up · strike 1.1650 · cut 2026-12-01 · iv 5.7% · rr −0.33 · bf 0.16', 'EURUSD=X', 1), 5.7, 1e-9); // 5.7 + 0.16 − 0.165 is under ATM
+  err(twinCard('JPY=X', LINE.replace(' · carry', ' · rr skewed · carry'), -1), /^rr/);
+  err(twinCard('JPY=X', LINE.replace(' · carry', ' · rr -19.5 · carry'), -1), /^rr/);
+  err(twinCard('JPY=X', LINE.replace(' · carry', ' · rr -1.95 · bf 23 · carry'), -1), /^bf/);
+
   err(twinCard('JPY=X', LINE, 1), /ot-dn on a long card/);
   err(twinCard('EURUSD=X', 'ps · strike 1.15/1.13 · cut 2026-12-01 · iv 5.7%', 1), /ps on a long card/);
   err(twinCard('KRW=X', 'ot-dn · strike 1,320 · cut 2026-11-25 · iv 10.4%', -1), /offshore touch on USDKRW/);
@@ -183,7 +196,8 @@ test('what is stored on the trade and read back', () => {
   const now = Date.UTC(2026, 10, 6, 12);
   const m = ok<TwinMark>(markTwin(card, liveSinceFill(hourly(H0, now, () => 158), FILL, true), FILL, now, 1));
   const meta = twinMeta(m, LINE);
-  assert.deepEqual(Object.keys(meta).sort(), ['twin_asof', 'twin_fill', 'twin_left', 'twin_p0', 'twin_px', 'twin_r', 'twin_state', 'twin_terms', 'twin_v']);
+  assert.deepEqual(Object.keys(meta).sort(), ['twin_asof', 'twin_fill', 'twin_left', 'twin_p0', 'twin_px', 'twin_r', 'twin_state', 'twin_terms', 'twin_v', 'twin_vol']);
+  assert.equal(meta.twin_vol, '6.70');
   assert.equal(meta.twin_terms, LINE.replace('TWIN: ', ''));
   assert.equal(meta.twin_state, 'open'); assert.equal(meta.twin_fill, '158.025'); assert.equal(meta.twin_px, '158');
   assert.equal(meta.twin_p0, (m.p0fill * 100).toFixed(1)); assert.equal(meta.twin_r, m.r.toFixed(2));

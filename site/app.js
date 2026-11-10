@@ -366,7 +366,7 @@
         : st === 'touch' ? `touched at ${esc(g.twin_px)}`
         : st === 'expiry' ? `settled at ${esc(g.twin_px)}, paid ${esc(g.twin_v)}%`
         : `closed with the card at ${esc(g.twin_px)}, value ${esc(g.twin_v)}%`;
-      line = `premium ${esc(g.twin_p0)}% of payout, bought at ${esc(g.twin_fill)} · ${what} · <b class="${cls(r)}">${fmtR(r)}</b> on the premium against <b class="${cls(cr)}">${fmtR(cr)}</b> on the card <span class="muted">(${esc(sgtTime(g.twin_asof))})</span>`;
+      line = `premium ${esc(g.twin_p0)}% of payout${g.twin_vol ? ` at ${esc(g.twin_vol)} vol` : ''}, bought at ${esc(g.twin_fill)} · ${what} · <b class="${cls(r)}">${fmtR(r)}</b> on the premium against <b class="${cls(cr)}">${fmtR(cr)}</b> on the card <span class="muted">(${esc(sgtTime(g.twin_asof))})</span>`;
     }
     return `<h4 style="margin-top:10px">Option twin (R18 trial, not in the book)</h4><div class="mono small">${esc(g.twin_terms || g.twin)}</div><div>${line}</div>`;
   }
