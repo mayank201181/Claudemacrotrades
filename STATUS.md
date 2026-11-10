@@ -133,9 +133,10 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      to Gmail and Google Drive. Optional, one paste in the SQL editor: the line that puts R17 to R19 in force before
      Sunday, and `019_gemini_source.sql` (relabels the 86 Gemini rows stored as `claude`).
    - *First runs to check:* the Takeaways of 11 Nov under `dash-ingest` v10 (and a "[Gemini]" copy stored as
-     `gemini`); the Haiku feeder thread's first scheduled morning on 11 Nov (`feeders/status.csv`; delete the three disabled old feeder tasks after a clean
-     week); the weekly review of 14 Nov under the new prompt; the Takeaways of 16 Nov under R17 to R19 (the `risk`
-     key, TWIN lines and the expression table in the digest, `twins` above zero in the `dash-mark` reply).
+     `gemini`); the Haiku feeder thread's first scheduled morning on 11 Nov (`feeders/status.csv`; delete the three
+     disabled old feeder tasks after a clean week); the weekly review of 14 Nov under the new prompt; the Takeaways
+     of 16 Nov under R17 to R19 (the `risk` key, TWIN lines and the expression table in the digest, `twins` above
+     zero in the `dash-mark` reply).
    - *Sonnet 5.5 side by side* for the YouTube, Podcast and Email digests, mornings of 11 to 13 Nov: notes and
      results in project files `notes/model_tests_nov2026/`. On a pass the two Opus digest tasks move to Sonnet 5.5
      on 13 Nov and the three test tasks are restored (names, models) and left paused.
