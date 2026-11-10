@@ -6,7 +6,8 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-10 (audit; scheduled tasks and rules read from the live systems that day)._
+_Last updated: 2026-11-10 (audit and its fourteen approved follow-ups; scheduled tasks and rules read from the live
+systems that day)._
 
 ## Where things are
 
@@ -15,7 +16,7 @@ _Last updated: 2026-11-10 (audit; scheduled tasks and rules read from the live s
   Supabase project `macro-state-db` (`diiwqbxyhtgvozhncoef`, Pro plan), schema `dash`; the site reads only the
   `dash_*` RPCs.
 - **Public repo:** no trade, theme or digest data here, ever. Tokens live in `dash.config` or the task settings.
-  The repo must stay public while `dash-trend` imports its code from raw.githubusercontent.com (see Open items 3).
+  The repo must stay public while `dash-trend` imports its code from raw.githubusercontent.com.
 - **Phase:** the build phase closed on 12 Oct 2026. Run the book and the digests; change things only when a trade
   shows something. No VMs, no long runs, nothing on the owner's Mac.
 - **One book:** the Fable Macro Takeaways is the only live digest and trade book (owner's choice, 31 Oct). The Opus
@@ -32,9 +33,8 @@ _Last updated: 2026-11-10 (audit; scheduled tasks and rules read from the live s
 | `dash-ingest` (v8) | raw payloads into the `dash` tables (digests, trade books, feeds, questions) | on post |
 | `dash-mark` (v6) | live R per open trade, hourly-close stop flag (spec v15), shadow outcomes in ATR(20) units | pg_cron `7 * * * *` |
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rule inputs | pg_cron `40 22 * * *` UTC |
-| `dash-trend` (v7, TM1) | 38-asset trend monitor, events, FX one-touch board, Carver forecast block (R10). The deployed function is a stub importing this repo at commit 64d1f84 | pg_cron 00:30 UTC Tue-Sat |
-| `dash-trend` shadow (TM1.1) | 15 FX pairs on 17:00 New York closes, beside TM1 | pg_cron 00:40 UTC Tue-Sat |
-| `dash-history`, `dash-gdelt` | research relays (Yahoo bars, GDELT DOC API) | on call |
+| `dash-trend` (v8, TM1) | 38-asset trend monitor, events, FX one-touch board, Carver forecast block (R10). FX closes at 17:00 New York since 10 Nov (all pairs but USDCNH, USDINR, USDIDR). The deployed function is a stub importing this repo at `main` commit d334277; rollback is the same stub pinned to 64d1f84 | pg_cron 00:30 UTC Tue-Sat |
+| `dash-history`, `dash-gdelt` | research relays (Yahoo bars, GDELT DOC API). `dash-probe` is a retired stub that answers 410 | on call |
 | `dash.put_drivers`, Drivers tab | one drivers snapshot as of 2024-09-30; no part passed its holdout, engine parked | none |
 | event library (`016_event_library.sql`) | `dash.event_brief()` and `dash.event_lookup()` for the digests (R05); calendar ends 8 Jan 2027 | loaded by hand |
 | `msd-*` functions and jobs, `chatgpt_macro` job | the macro-state database's own pipelines, not part of this repo | pg_cron |
@@ -59,12 +59,12 @@ State read on 10 Nov 2026, about 12:45 SGT.
 | MSD brief email | `trig_01RrYqBatUV8ZdiGCFBUqtXk` | 06:30 daily | `brief.today()` |
 | Weekly STATUS digest | `trig_01MYWHLQohf1qjDVYepNpfEd` | Mon 08:45 | reads this file |
 
-Disabled: Question Hunt `trig_01E1MeWdsE7x7z79XC4gcZo9` (paused 10 Nov; its 28 Nov verdict one-shot
-`trig_01U3FNzP1mjkY5ZLf2GSjQcj` is still scheduled, see Open items 2), Opus Macro Takeaways
-`trig_01PDjNqUabmAdt9VoCVMwUwx` (31 Oct), Fable YouTube `trig_01X6SstZSnanyjyrfyhirx85`
-and Fable Podcast `trig_011qkFh4EkgsNgQbxm5a1tRK` (23 Oct; fired by hand on 10 Nov), both Email Digests, Slack Digest,
-Grok Consolidated, Macro Desk ingest (replaced by `Code.gs`), and four finished stubs (MT Newswires check, CFTC v5
-self-check, TEMP merge test, New Claude features check).
+Disabled: Question Hunt `trig_01E1MeWdsE7x7z79XC4gcZo9` (paused 10 Nov), Opus Macro Takeaways
+`trig_01PDjNqUabmAdt9VoCVMwUwx` (31 Oct), Fable YouTube `trig_01X6SstZSnanyjyrfyhirx85` and Fable Podcast
+`trig_011qkFh4EkgsNgQbxm5a1tRK` (23 Oct; fired by hand on 10 Nov), and both Email Digests. Deleted on 10 Nov (prompts
+of the larger ones kept in project files `notes/deleted_tasks_10nov2026/`): the question-hunt verdict task, Macro
+Desk ingest, Daily Grok Consolidated, Daily Slack Digest, MT Newswires check, CFTC v5 self-check, New Claude features
+check.
 
 Outside Claude: Grok Bot console (06:50) and crowding check; the ChatGPT and Gemini copies of the YouTube, Podcast and
 Email digests; ChatGPT and Gemini Macro Takeaways (second reads); "DESK INPUT" emails from Grok, ChatGPT and Gemini;
@@ -81,7 +81,7 @@ limit. Check the output file's date, not the task status.
 ## Rules in force (`dash.rules`, read 10 Nov 2026)
 
 A proposal applies at the next Sunday 20:00 SGT window unless the owner replies "oppose Rnn" to the Saturday review
-email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/` (R13 has no file).
+email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/`.
 
 | Rule | What | In force | Review due |
 |---|---|---|---|
@@ -96,11 +96,11 @@ email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/
 | R10 | Carver trend/carry forecast line; FX option pricer for option cards | 1 Nov | 6 Dec |
 | R11 | FOMC days: the presser is the event; take profit or halve at 14:20 ET | 26 Oct | 30 Jun 2027 |
 | R12 | prediction-market odds as what's-priced evidence | 1 Nov | 30 Nov |
-| R13 | question hunt evidence (scope opus only; the hunt is paused) | 1 Nov | 28 Nov |
 | R14 | one direction per underlying | 1 Nov | 11 Dec |
 | R16 | KRW cards weigh the equity-flow channels | 8 Nov | 15 Dec |
 
 R03 (drivers engine) reverted 1 Nov. R15 (market pack as a rule) withdrawn 1 Nov; the pack went in as a prompt edit.
+R13 (question hunt evidence, scope opus) is being reverted on 10 Nov with the database items in Open items 2.
 
 ## Trade book spec (`trade_book_spec` on Drive, both books read it)
 
@@ -117,37 +117,38 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    pack, FX option twins, expression table, split-run shadow test, cheaper models by stage, one feeder task, weekly
    review must propose, housekeeping (stale times in feeder prompts, the Fable 5.2 relabel, connectors per task, two
    API keys out of prompt text). That thread records each outcome here; do not touch those pieces from elsewhere.
-2. **Question Hunt leftovers.** The hunt was paused on 10 Nov (its only reader, the Opus Takeaways, stopped on
-   31 Oct). Still in place: R13 in force (scope opus) and the 28 Nov verdict task, which would score evidence that
-   stopped on 31 Oct. Owner to decide: revert R13 and delete the verdict task, or point the hunt at the Fable run.
-3. **`dash-trend` is pinned to a commit that is not on `main`.** 64d1f84 is reachable only from the branch
-   `claude/project-thread-e80nxd`. Do not delete that branch until the stub is re-pinned to a `main` commit (the
-   three imported files are identical on `main`, so a re-pin changes nothing). A later change to `trend.ts` or
-   `forecast.ts` also needs the stub re-pinned.
-4. **Frozen Opus book.** Three Opus cards have been "open" since the digest was disabled on 31 Oct; `dash-mark`
-   still marks them hourly and the Trades tab shows them as live. Owner to decide whether to close them out.
-5. **TM1 or TM1.1 for FX.** The side-by-side was due to end about 21 Oct and was never decided; the shadow still
-   runs daily. Before switching TM1's FX to the 17:00 New York close, check USDINR and USDIDR (thin quotes).
-6. **Two dashboard tweaks written but never deployed** (from pull requests #14 and #34): label stop flags by basis
-   (hourly or daily) on the Trades tab, and name the `crowding` and `grokbot` sources on the Grok tab. `dash-mark`
-   already supplies the data.
-7. **Rule reviews coming due:** R04, R05, R06 on 23 Nov; R07 and R13 on 28 Nov; R12 on 30 Nov. Month-end scorecard:
+2. **Database part of the 10 Nov audit, waiting for the owner's approval tap.** One statement, in project file
+   `notes/audit_10nov2026_db.sql`: revert R13, close the three Opus cards left open when that book stopped on
+   31 Oct (exit at the close of the first hourly bar after the decision) and retire its ten open questions, a
+   neutral stored subject for the Email Digest family, a weekly prune of the cron run log, and unscheduling the
+   TM1.1 trend shadow job. Until it runs, the shadow job still fires at 00:40 UTC (harmless) and
+   `018_audit_housekeeping.sql` is not applied.
+3. **After a change to `dash-trend/index.ts`, `trend.ts` or `forecast.ts`, re-pin the stub** to the new `main`
+   commit (one small deploy), then POST a dry run and read the reply in `net._http_response`. The branch
+   `claude/project-thread-e80nxd` holds the rollback commit 64d1f84; keep it until the New York clock has run
+   cleanly for a couple of weeks.
+4. **First stored runs on the New York FX clock:** check on 11 and 12 Nov that `dash.trend_run` is OK, that the
+   twelve pairs carry `@ny17` sources in `dash.trend_px`, and that no pair fell back to daily bars
+   (`fetch_errors`).
+5. **Rule reviews coming due:** R04, R05, R06 on 23 Nov; R07 on 28 Nov; R12 on 30 Nov. Month-end scorecard:
    count R08 and R14 conflict closes and whether they were premature; note that touch targets with hourly-close stops
    flatter realised R a little; judge the flow check again.
-8. **Thin-edge review at 30 closes** (spec v12). The fill-rule decision in item 1 changes its answer; settle that
+6. **Thin-edge review at 30 closes** (spec v12). The fill-rule decision in item 1 changes its answer; settle that
    first.
-9. **Crowd asymmetry calibration (R09):** after 20 closed with-crowd cards, compare realised R with the adjusted EV.
-10. **Event calendar in the database ends 8 Jan 2027.** Rebuild the calendar, rerun `scripts/event_library/to_sql.py`
+7. **Crowd asymmetry calibration (R09):** after 20 closed with-crowd cards, compare realised R with the adjusted EV.
+8. **Event calendar in the database ends 8 Jan 2027.** Rebuild the calendar, rerun `scripts/event_library/to_sql.py`
     and load with project file `event_library/016_event_library_and_rule.sql` before then.
-11. **Spec and rules disagree on one sentence:** fold the spec's TACTICAL WASHOUT sentence into the next spec version
+9. **Spec and rules disagree on one sentence:** fold the spec's TACTICAL WASHOUT sentence into the next spec version
     (a `trade_book_spec_edits` file) so that the Doc matches R08 and R14.
-12. **FOMC presser rule (R11):** recheck the post-May-2026 pressers as the new chair's sample grows.
-13. **Known data fragility in `dash-trend`:** MOF JGB file intermittently 404s (falls back to stored closes); CSI300
+10. **FOMC presser rule (R11):** recheck the post-May-2026 pressers as the new chair's sample grows.
+11. **Known data fragility in `dash-trend`:** MOF JGB file intermittently 404s (falls back to stored closes); CSI300
     on the 510300.SS ETF goes stale over China holidays; USDCNH vol percentile is short-sample until about Feb 2027;
     no second price source, so the cross-check always reads `XCHECK_NA`.
-14. **Housekeeping waiting on the owner (10 Nov audit):** fifteen superseded pull requests and about forty merged
-    branches; eight dead scheduled tasks; the unused `dash-probe` edge function; `claude/settings.json` in this repo
-    (an allowlist for a run that was dropped on 12 Oct); `cron.job_run_details` is never pruned (64,000 rows).
+12. **Housekeeping left over from the audit:** about forty merged or superseded branches (threads cannot delete
+    branches; GitHub's "Automatically delete head branches" setting would stop new ones piling up); the scheduled
+    task "TEMP merge test" can only be deleted by the owner (https://claude.ai/code/routines/trig_01NymU4Af4gkJGUAQUZz3DHK);
+    the paused Fable Email Digest task is left to the workflow thread; the `dash-probe` stub can be deleted in the
+    Supabase dashboard whenever convenient.
 
 Parked, not open: drivers engine and spec v2, CFTC S3 v5 (sealed incomplete at step 15), the data-source registry,
 MT Newswires, the second claude.ai account for the Fable digests, LSEG risk reversals (needs the owner's sign-in and
@@ -155,7 +156,11 @@ a compliance view). Details in `docs/history.md`.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
-- 10 Nov: Takeaways task runs on the Fable 5.2 model; prompt unchanged.
+- 10 Nov: project audit, fourteen items approved: FX trend closes at 17:00 New York (INR, IDR and CNH excepted) and
+  the TM1.1 shadow retired; R13 reverted and the question hunt stopped; the frozen Opus cards closed out at the first
+  hourly bar after the book ended; new threads default to Opus 5.5 at high effort; old position names in the
+  public repo's history are left as they are.
+- 10 Nov: Takeaways task runs on the Fable 5.2 model and label; all eleven workflow-review decisions approved.
 - 6 Nov: weekly fundamentals pack is a slow anchor in the market pack, never a trigger.
 - 5 Nov: every input stays in the Takeaways ("incorporate everything"); if a run is late, speed it up, never cut inputs.
 - 4 Nov: the Takeaways email must land by 08:15 SGT.
@@ -207,6 +212,6 @@ a compliance view). Details in `docs/history.md`.
 - Upload a file to Drive without retyping it: `create_file` with `base64Content` = `sha256:<hex>:<absolute path>`.
 - Tests: `deno test supabase/functions/_shared/` (Deno is not preinstalled in cloud sessions);
   `python3 scripts/fxopt/test_fxopt.py` needs QuantLib.
-- Migrations: the next number is 018. `015` exists twice (`015_drivers.sql`, `015_grokbot_source.sql`); both are
+- Migrations: the next number is 019. `015` exists twice (`015_drivers.sql`, `015_grokbot_source.sql`); both are
   applied, so neither is renamed. 006 to 009 and 015 to 017 were applied through the SQL editor or `execute_sql`,
   so the database's own migration list does not show them all.
