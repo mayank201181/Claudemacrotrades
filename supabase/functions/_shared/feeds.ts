@@ -25,6 +25,7 @@ export function feedSource(subject: string): string {
   if (/Grok Bot/i.test(subject)) return 'grokbot'; // console built by Grok Bot instead of ChatGPT (docs/grok_console_routine.md)
   if (/\[Fable[^\]]*\]/i.test(subject)) return 'fable';
   if (/\[Opus[^\]]*\]/i.test(subject)) return 'opus';
+  if (/\[(Gemini|Argon)[^\]]*\]/i.test(subject)) return 'gemini'; // stored as 'claude' until 10 Nov 2026 (migration 019 relabels those rows)
   if (/ChatGPT/i.test(subject)) return 'chatgpt';
   return 'claude'; // untagged Claude copies from before the 24 Sep A/B split
 }
