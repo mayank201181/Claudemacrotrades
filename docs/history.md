@@ -6,6 +6,24 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+- **10 Nov 2026, audit follow-ups (owner: "Yes to all" on the fourteen review items; pull request #58).**
+  Trend monitor: the month of TM1.1 shadow runs (25 runs from 7 Oct) was read pair by pair against TM1. For the G10
+  pairs and KRW, SGD and TWD the two disagreed on 1 to 10 of 24 days and on most of those the New York clock simply
+  showed TM1's next-day state a day early; USDCNH matched on every run; USDIDR went stale on 5 of 24 shadow runs and
+  its level sat up to 3% from TM1's, USDINR once. So the main run now takes FX closes at 17:00 New York for twelve
+  pairs, keeps USDCNH on its hourly-built series and USDINR and USDIDR on Yahoo daily bars, and falls back to daily
+  bars with a note when a New York close cannot be built. Stub redeployed as v8 pinned to `main` commit d334277
+  (which also ends the pin to a commit that was only on a side branch); a dry run through `pg_net` returned OK,
+  38 of 38 assets, no stale, no fetch errors, both report blocks present, 48 s. Dashboard: stop flags labelled
+  hourly or daily and the Grok source names, live with the merge. Scheduled tasks deleted: the question-hunt verdict
+  task, Macro Desk ingest (its prompt held the ingest token), Daily Grok Consolidated, Daily Slack Digest, MT
+  Newswires check, CFTC v5 self-check, New Claude features check; prompts of four kept in project files
+  `notes/deleted_tasks_10nov2026/`. Thirteen superseded pull requests closed. `dash-probe` replaced by a stub that
+  answers 410. Project folder `eventday_handoff/` (96 MB, rehearsal dropped 12 Oct) deleted. Not possible from a
+  thread: deleting branches (the git proxy refuses it) and deleting the "TEMP merge test" task. The database part
+  (R13, Opus cards and questions, Email Digest subjects, cron log prune, shadow job) is one statement that timed
+  out waiting for the owner's approval; see STATUS Open items 2. Correction to the audit: the stored raw Email
+  Digest emails it reported were not found on re-check, so there was nothing to delete. Mac visits: 0.
 - **10 Nov 2026, project audit (thread "Audit project for broken and stale parts").** `main` had drifted from what
   runs: fifteen pull requests from 8 Oct to 10 Nov were never merged, among them code that was already live
   (dash-mark v6 with the hourly-close stop flag, the Grok feed sources in `feeds.ts`, the Grok Bot attachment
