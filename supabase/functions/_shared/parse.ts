@@ -445,6 +445,9 @@ export function parseTradeBook(docText: string): TradeBook {
       if (l.startsWith('THESIS:')) { cur.thesis = l.slice(7).trim(); continue; }
       if (l.startsWith('INVALIDATION:')) { cur.invalidation = l.slice(13).trim(); continue; }
       if (l.startsWith('STRUCTURE:')) { cur.structure = l.slice(10).trim(); continue; }
+      // R18: the terms of the card's option twin, kept whole under meta.twin; dash-mark prices and scores it.
+      // Ingest merges meta, so the line survives the block's compression on the day the card closes.
+      if (/^TWIN:/i.test(l)) { const tw = l.slice(5).trim(); if (tw && !/^(none\b|n\/a\b|-)/i.test(tw)) cur.meta.twin = tw; continue; }
       const mk = l.match(/^-\s*(\d{4}-\d{2}-\d{2})\s*·\s*mark\s+([^·]+?)\s*·\s*(.*)$/);
       if (mk) {
         const rest = mk[3].split(/\s+·\s+/);
