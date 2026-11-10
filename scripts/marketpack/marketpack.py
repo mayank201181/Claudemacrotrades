@@ -351,6 +351,7 @@ WATCH = ["EURUSD", "USDJPY", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF", "
 APPROX_USD = {"USD": 1.0, "EUR": 1.15, "GBP": 1.33, "AUD": 0.70, "NZD": 0.57, "CHF": 1.22, "CAD": 0.72, "JPY": 0.0065}
 MAX_TRADE_USD = 5e9  # larger single prints are reporting errors
 NDF_CCY = ["KRW", "TWD", "INR", "IDR", "PHP", "MYR", "CNY"]
+STRIKE_MAX_AWAY = 0.12  # a large expiring strike further than this from spot is left out of the list
 
 
 def mkt_pair(a, b):
@@ -848,8 +849,14 @@ def section_d(outdir, backfill_days=22):
     for v, (pair, k, exp) in big:
         if per_pair.get(pair, 0) >= 4:
             continue
-        per_pair[pair] = per_pair.get(pair, 0) + 1
         sp = SPOT.get(pair) or SPOT.get(pair.replace("CNY", "CNH"))
+        try:
+            far = bool(sp) and abs(float(k) / sp - 1) > STRIKE_MAX_AWAY
+        except (TypeError, ValueError):
+            far = False
+        if far:
+            continue  # no magnet inside 14 days, and it drops junk prints such as a 0.01 strike
+        per_pair[pair] = per_pair.get(pair, 0) + 1
         away = f" · spot {fmt_level(sp)}, {(float(k) / sp - 1) * 100:+.1f}% away" if sp else ""
         out.append(f"{pair} {k} exp {exp}: ${v / 1e6:,.0f}m{away}")
         if sum(per_pair.values()) >= 24:
