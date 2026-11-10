@@ -38,3 +38,12 @@ export function ideaRef(h: Bar[], cut: number, now: number): { ts: number; px: n
   }
   return firstAfter ? { ts: firstAfter.ts, px: firstAfter.o } : null;
 }
+
+// Rule R17: one R is the risk the card planned (META "risk" = |REF - stop| when the card was written), never the
+// distance left between a gapped fill and the stop. Cards filled before the rule carry no risk key and keep
+// |entry - stop|, which is how the book scored them.
+export function oneR(entry: number, stop: number, metaRisk: unknown): number {
+  const m = String(metaRisk ?? '').replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  const risk = m ? parseFloat(m[0]) : NaN;
+  return Number.isFinite(risk) && risk > 0 ? risk : Math.abs(entry - stop);
+}

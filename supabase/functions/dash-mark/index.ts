@@ -1,6 +1,7 @@
 // dash-mark: hourly. Pulls Yahoo bars for every open trade's proxy and every tested idea's
 // proxy, writes dash.bars, then computes
-//   - dash.live_marks: latest hourly mark of each open trade in R, intraday touches since fill,
+//   - dash.live_marks: latest hourly mark of each open trade in R (one R = the card's planned risk under rule R17,
+//     |entry - stop| for cards filled before it), intraday touches since fill,
 //     the latest complete daily close with close-breaches (the exit basis up to spec v13), and the
 //     hourly-close stop breach spec v15 uses (target on touch, stop on hourly close);
 //   - convexity cards (rule R01): the model value V as a share of the payout, R = V / p0fill − 1,
@@ -10,7 +11,7 @@
 //     after the 08:00 SGT digest (see ideaRef: a gap over a market closure is not credited).
 // Invoked by pg_cron with the ingest token; read-only towards trades.
 import postgres from 'npm:postgres@3.4.4';
-import { type Bar, HOUR, ideaRef, markLive } from '../_shared/marks.ts';
+import { type Bar, HOUR, ideaRef, markLive, oneR as planned1R } from '../_shared/marks.ts';
 import { cardFromMeta, fxBase, liveSinceFill, markConvexity } from '../_shared/convexity.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
@@ -162,7 +163,7 @@ Deno.serve(async (req) => {
       }
       if (t.entry == null || t.stop == null || t.direction == null) continue;
       const dir = Number(t.direction), entry = Number(t.entry), stop = Number(t.stop), target = t.target == null ? null : Number(t.target);
-      const oneR = Math.abs(entry - stop);
+      const oneR = planned1R(entry, stop, t.meta?.risk); // R17: the card's planned risk when it carries one
       const h = series(t.proxy, false);
       if (!h.length || !oneR) continue;
       const last = h[h.length - 1];

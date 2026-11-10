@@ -68,3 +68,23 @@ test('a convexity card parses without corrupting the other fields', () => {
   const card = cardFromMeta(c.proxy!, { ...c.meta }, '') as ConvexCard;
   assert.equal(card.struct, 'dig-dn'); assert.equal(card.basePay, true); assert.equal(card.cut, Date.UTC(2026, 10, 13, 15));
 });
+
+test('the planned-risk key (R17) is stored and a restated void card keeps its fields', () => {
+  const book = `TRADE BOOK — Macro Takeaways [Fable 5.2] (single writer)
+Last updated: 2026-11-16 08:00 SGT · open: 1 · pending: 0 · closed: 0 · factors: 1 · next P: 12
+RULES: …
+SCORECARD: closed 0
+SECTION TRADES
+## P11 — long sample index
+META: open · opened 2026-11-16 07:40 SGT · filled 2026-11-16 09:00 SGT · closed - · equities · long · class tactical · boundary - · proxy ^KS11 · expires - · ref 100.00 · entry 99.20 · stop 97.50 · target 104.00 · horizon 2 · review - · rr 1.60 · p 45% · p0 38% · ev +0.17R · pgate no · factor sample · linked - · conviction - · crowd none · priced n/a · result - · exit - · risk 2.50
+## P10 — long sample ETF
+META: void · opened 2026-11-03 09:40 SGT · filled 2026-11-03 22:30 SGT · closed 2026-11-04 · equities · long · class tactical · boundary - · proxy EWT · expires - · ref 100.00 · entry 97.60 · stop 97.50 · target 104.00 · horizon 2 · review - · rr 1.60 · p 40% · p0 37% · ev +0.04R · pgate yes · factor sample · linked - · conviction - · crowd against · priced n/a · result - · exit -
+SECTION LOG
+`;
+  const tb = parseTradeBook(book);
+  const [a, b] = tb.trades;
+  assert.equal(a.pid, 'P11'); assert.equal(a.meta.risk, '2.50');
+  assert.equal(a.asset_class, 'equities'); assert.equal(a.direction, 1); assert.equal(a.stop, 97.5); assert.equal(a.entry, 99.2);
+  assert.equal(b.pid, 'P10'); assert.equal(b.status, 'void'); assert.equal(b.result_r, null); assert.equal(b.exit_reason, null);
+  assert.equal(b.meta.risk, undefined);
+});

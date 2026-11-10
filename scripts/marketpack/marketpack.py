@@ -8,16 +8,17 @@ Sections
                     open interest and its day-on-day change, and the price/OI read.
   C  POSITIONING    the SQL the digest runs itself (build-up over the msd positioning series).
   D  FX OPTIONS     DTCC swap data repository (US-reported trades, T-1): option notional by pair vs
-                    its 20-day average, base-call share, NDF volume, and large strikes expiring soon.
-  E  HEADLINES      wire and newspaper RSS headlines from the last 24 hours.
+                    its 20-day average, base-call share, NDF volume, large strikes expiring soon, and
+                    implied vol by tenor with a risk-reversal proxy, backed out of the reported premiums.
+  E  HEADLINES      wire and newspaper RSS headlines from the last 24 hours, plus the Fed's own feeds.
   F  SHORTS JP/AU   QuiVad republication of JFSA (fund-level) and ASIC (aggregate) disclosed short positions.
   G  FUNDAMENTALS   the weekly fundamentals pack (scripts/fundpack/fundpack.py), copied in when built within 9 days.
 
 Usage: python3 -I marketpack.py --out /mnt/project-files/marketpack/ [--sql posbuild.sql]
 Writes market_pack_latest.md plus small history files (oi_history.csv, dtcc_daily.csv,
-dtcc_strikes.csv, shorts_history.csv) in --out. Every section fails soft: a failed source prints a line, never stops the run.
+dtcc_strikes.csv, dtcc_iv_obs.csv, shorts_history.csv) in --out. Every section fails soft: a failed source prints a line, never stops the run.
 """
-import argparse, csv, datetime as dt, email.utils, gzip, html, io, json, math, os, re, sys, time, zipfile
+import argparse, bisect, csv, datetime as dt, email.utils, gzip, html, io, json, math, os, re, sys, time, zipfile
 import urllib.parse, urllib.request, http.cookiejar
 from xml.etree import ElementTree as ET
 
@@ -25,6 +26,7 @@ SGT = dt.timezone(dt.timedelta(hours=8))
 UA = {"User-Agent": "Mozilla/5.0"}  # Yahoo answers 429 to fuller browser strings and to curl/python defaults
 NOW = dt.datetime.now(dt.timezone.utc)
 SPOT = {}  # label -> last, filled by section A, used by section D for strike distance
+RVOL = {}  # label -> 20-day realised vol, annualised %, filled by section A, used by section D beside implied vol
 
 # ---------------------------------------------------------------- http
 _cj = http.cookiejar.CookieJar()
@@ -140,6 +142,7 @@ def price_stats(kind, rows, last_px):
     run = up if up >= dn else -dn
     rv10, rv60 = _sd(ch_nz[-10:]), _sd(ch_nz[-60:])
     rvr = rv10 / rv60 if rv60 and rv60 == rv60 and rv60 > 0 else float("nan")
+    rv20 = _sd(ch_nz[-20:]) * math.sqrt(252) * 100 if kind == "px" else float("nan")  # annualised %
     prior = closes[:-1]
     hi = lambda k: max(r[2] for r in rows[-1 - k:-1]) if n > k else float("nan")
     lo = lambda k: min(r[3] for r in rows[-1 - k:-1]) if n > k else float("nan")
@@ -164,7 +167,7 @@ def price_stats(kind, rows, last_px):
     elif ma50 == ma50:
         trend = ("above" if closes[-1] > ma50 else "below") + " 50"
     return dict(last=closes[-1], d1=move(1), w1=move(5), m1=move(21), z1=zs(1), z5=zs(5), z21=zs(21),
-                ext=ext, z10=z10, run=run, rvr=rvr, trend=trend, flags=flags, sig=sig_pct)
+                ext=ext, z10=z10, run=run, rvr=rvr, rv20=rv20, trend=trend, flags=flags, sig=sig_pct)
 
 
 def fmt(x, d=2, sign=True):
@@ -214,6 +217,7 @@ def section_a():
                 st["trend"], f"ext {fmt(st['ext'], 1)}", f"z10 {fmt(st['z10'], 1)}", f"run {st['run']:+d}",
                 f"rv {fmt(st['rvr'], 2, False)}", ", ".join(st["flags"]) or "-"]))
             SPOT[label] = st["last"]
+            RVOL[label] = st["rv20"]
             ok += 1
         except Exception as e:  # noqa: BLE001
             bad.append(f"{label} ({type(e).__name__})")
@@ -370,10 +374,317 @@ def dtcc_file(day):
     return z.open(z.namelist()[0])
 
 
+# Implied vol from the premiums on DTCC vanilla prints (free; the only keyless FX vol source found).
+IV_YAHOO = {"EURUSD": "EURUSD=X", "USDJPY": "JPY=X", "GBPUSD": "GBPUSD=X", "AUDUSD": "AUDUSD=X", "NZDUSD": "NZDUSD=X",
+            "USDCAD": "CAD=X", "USDCHF": "CHF=X", "EURJPY": "EURJPY=X", "AUDJPY": "AUDJPY=X", "EURGBP": "EURGBP=X",
+            "USDCNH": "CNH=X|CNY=X", "USDCNY": "CNH=X|CNY=X", "USDKRW": "KRW=X", "USDTWD": "TWD=X", "USDINR": "INR=X",
+            "USDSGD": "SGD=X", "USDIDR": "IDR=X", "USDPHP": "PHP=X", "USDTHB": "THB=X", "USDMYR": "MYR=X",
+            "USDHKD": "HKD=X"}
+IV_TENORS = [("1W", 4, 10), ("2W", 11, 20), ("1M", 21, 45), ("2M", 46, 75), ("3M", 76, 110), ("6M", 150, 215), ("1Y", 330, 400)]
+IV_KEEP = 12       # DTCC days of observations kept
+IV_BACKFILL = 10   # DTCC days fetched for the table on its first run
+IV_FIELDS = ["date", "pair", "days", "kind", "delta", "value"]
+IV_RANGE = ["5d"]  # Yahoo 5-minute bars: "1mo" when a day older than four days is being priced
+IV_FLOOR = {"atm": 0.0015, "wing": 0.0020}  # error floors in vol: the mix of expiries inside a tenor shifts a median this much
+_BARS = {}
+USD_RATE = []      # the US 3-month bill yield, read once
+
+
+def _ncdf(x):
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def _black(F, K, sd, call):
+    """Undiscounted Black price; sd = vol x sqrt(T)."""
+    if sd <= 0:
+        return max(0.0, (F - K) if call else (K - F))
+    d1 = (math.log(F / K) + 0.5 * sd * sd) / sd
+    d2 = d1 - sd
+    return F * _ncdf(d1) - K * _ncdf(d2) if call else K * _ncdf(-d2) - F * _ncdf(-d1)
+
+
+def _solve_sd(target, price):
+    """The total stdev at which price(sd) = target (price rises with sd); None when no vol reprices it."""
+    lo, hi = 1e-5, 1.5
+    if not price(lo) < target < price(hi):
+        return None
+    for _ in range(50):
+        mid = 0.5 * (lo + hi)
+        if price(mid) > target:
+            hi = mid
+        else:
+            lo = mid
+    return 0.5 * (lo + hi)
+
+
+def iv_print(r, base, quote):
+    """One vanilla row -> (call on base, strike, base notional, premium, premium in base ccy, exec ts, expiry ts).
+    Leg 2 notional = Leg 1 x strike on every row, so the legs give the base amount and the strike as quote per
+    base; call/put amounts are sometimes rounded, so only their currencies are used (for the side)."""
+    legs = {}
+    for amt, ccy in ((r.get("Notional amount-Leg 1"), r.get("Notional currency-Leg 1")),
+                     (r.get("Notional amount-Leg 2"), r.get("Notional currency-Leg 2"))):
+        if "+" in (amt or ""):  # capped block size: the premium belongs to a larger trade
+            return None
+        v = num(amt)
+        if v and ccy:
+            legs[ccy.strip()] = v
+    prem_raw, pccy = r.get("Option Premium Amount") or "", (r.get("Option Premium Currency") or "").strip()
+    prem = num(prem_raw)
+    if "+" in prem_raw or not prem or prem <= 0 or pccy not in (base, quote) or not legs.get(base) or not legs.get(quote):
+        return None
+    cc, pc = (r.get("Call currency") or "").strip(), (r.get("Put currency") or "").strip()
+    call = True if (cc == base or pc == quote) else False if (pc == base or cc == quote) else None
+    if call is None:
+        return None
+    try:
+        t_ex = dt.datetime.fromisoformat((r.get("Execution Timestamp") or "")[:19]).replace(tzinfo=dt.timezone.utc)
+        t_exp = dt.datetime.fromisoformat((r.get("Expiration Date") or "")[:10] + "T15:00:00").replace(tzinfo=dt.timezone.utc)
+    except ValueError:
+        return None
+    return (call, legs[quote] / legs[base], legs[base], prem, pccy == base, t_ex.timestamp(), t_exp.timestamp())
+
+
+def iv_spot(pair, ts):
+    """Yahoo 5-minute close nearest to an execution time, within 30 minutes; else None."""
+    if pair not in _BARS:
+        bars = []
+        for sym in IV_YAHOO[pair].split("|"):
+            try:
+                meta, rows = yahoo_chart(sym, rng=IV_RANGE[0], interval="5m")
+                bars = [(r[0] + 300, r[4]) for r in rows if r[4]]
+            except Exception:  # noqa: BLE001
+                bars = []
+            if len(bars) > 50:
+                break
+        _BARS[pair] = ([b[0] for b in bars], [b[1] for b in bars])
+        time.sleep(0.15)
+    times, px = _BARS[pair]
+    if not times:
+        return None
+    i = bisect.bisect_left(times, ts)
+    j = min((k for k in (i - 1, i) if 0 <= k < len(times)), key=lambda k: abs(times[k] - ts))
+    return px[j] if abs(times[j] - ts) <= 1800 else None
+
+
+def usd_rate():
+    """The US 3-month bill yield from Yahoo (^IRX), as a decimal; 4% when it cannot be read. Used to discount premiums."""
+    if not USD_RATE:
+        try:
+            v = float(yahoo_chart("^IRX", rng="5d")[0].get("regularMarketPrice")) / 100
+            USD_RATE.append(v if 0 < v < 0.15 else 0.04)
+        except Exception:  # noqa: BLE001
+            USD_RATE.append(0.04)
+    return USD_RATE[0]
+
+
+def _median(xs):
+    xs = sorted(xs)
+    return xs[len(xs) // 2] if len(xs) % 2 else 0.5 * (xs[len(xs) // 2 - 1] + xs[len(xs) // 2])
+
+
+def iv_observe(day_prints, carry_hist):
+    """New days' prints -> observation rows (date, pair, days, kind, delta, value).
+    S = an at-the-money straddle: a call and a put with the same strike, expiry and size, dealt within two
+        minutes. Put-call parity gives the forward (F = K + (call - put) / DF) and the sum of the two premiums
+        gives the vol, so an error in the spot timing cancels.
+    F = that straddle's forward drift a year, ln(F / spot) / T: the rate of the quote currency less the base's.
+    C, P = a single call or put, priced off spot x exp(drift x T) with the pair's median drift.
+    Premiums are paid up front, so each is divided by the quote currency's discount factor before Black is
+    inverted: the US bill yield for a USD quote, and that yield plus the USD pair's drift for any other."""
+    obs, strads, singles = [], [], []
+    for iso, prints in day_prints.items():
+        for pair, rows in prints.items():
+            seen, uniq = set(), []
+            for x in sorted(rows, key=lambda x: x[5]):
+                key = (x[0], round(x[1], 8), round(x[2]), round(x[3], 2), x[4], x[6])  # the same trade reported twice
+                if key not in seen:
+                    seen.add(key); uniq.append(x)
+            puts, used = [x for x in uniq if not x[0]], set()
+            for c in (x for x in uniq if x[0]):
+                best = None
+                for q in puts:
+                    if q in used or q[6] != c[6] or abs(q[5] - c[5]) > 120:
+                        continue
+                    if abs(math.log(q[1] / c[1])) > 2e-4 or abs(math.log(q[2] / c[2])) > 0.01:
+                        continue
+                    if best is None or abs(q[5] - c[5]) < abs(best[5] - c[5]):
+                        best = q
+                if best is None:
+                    continue
+                used.add(best); used.add(c)
+                T = (c[6] - c[5]) / (365 * 86400.0)
+                s = iv_spot(pair, c[5])
+                if not s or not 3 <= T * 365 <= 400:
+                    continue
+                cu, pu = (c[3] * s if c[4] else c[3]) / c[2], (best[3] * s if best[4] else best[3]) / best[2]
+                strads.append((iso, pair, T, s, c[1], cu, pu))
+                drift = math.log(max(c[1] + cu - pu, 1e-12) / s) / T  # discounting moves this by a few basis points only
+                if T * 365 >= 6 and abs(drift) < 0.25:
+                    obs.append([iso, pair, round(T * 365, 1), "F", 0.0, round(drift, 5)])
+            singles += [(iso, pair, x) for x in uniq if x not in used]
+    drifts = {}
+    for row in list(carry_hist) + obs:
+        if row[3] == "F":
+            drifts.setdefault(row[1], []).append(float(row[5]))
+    drift = {pair: _median(d) for pair, d in drifts.items() if len(d) >= 3}
+
+    def quote_rate(pair):
+        q = pair[3:]
+        if q == "USD":
+            return usd_rate()
+        q = "CNY" if q == "CNH" else q
+        return usd_rate() + drift.get("USD" + q, 0.0) - drift.get(q + "USD", 0.0)
+
+    for iso, pair, T, s, K, cu, pu in strads:
+        df = math.exp(-quote_rate(pair) * T)
+        F = K + (cu - pu) / df
+        if F <= 0 or abs(math.log(F / K)) > 0.03:
+            continue
+        sd = _solve_sd((cu + pu) / df, lambda v: _black(F, K, v, True) + _black(F, K, v, False))
+        vol = sd / math.sqrt(T) if sd else None
+        if vol and 0.01 < vol < 0.8:
+            obs.append([iso, pair, round(T * 365, 1), "S", 0.0, round(vol, 5)])
+    for iso, pair, x in singles:
+        T = (x[6] - x[5]) / (365 * 86400.0)
+        s = iv_spot(pair, x[5])
+        if not s or not 3 <= T * 365 <= 400:
+            continue
+        F = s * math.exp(drift.get(pair, 0.0) * T)
+        pu, K, call = (x[3] * s if x[4] else x[3]) / x[2] / math.exp(-quote_rate(pair) * T), x[1], x[0]
+        if abs(math.log(K / F)) > 0.12:
+            continue
+        sd = _solve_sd(pu, lambda v: _black(F, K, v, call))
+        vol = sd / math.sqrt(T) if sd else None
+        if not vol or not 0.01 < vol < 0.8:
+            continue
+        d1 = (math.log(F / K) + 0.5 * sd * sd) / sd
+        obs.append([iso, pair, round(T * 365, 1), "C" if call else "P",
+                    round(_ncdf(d1) if call else _ncdf(d1) - 1, 3), round(vol, 5)])
+    return obs
+
+
+def _med_se(xs, floor=0.0):
+    """Median, its standard error (from the interquartile range, never under the floor; None under 5 values), count."""
+    xs = sorted(xs)
+    n = len(xs)
+    if not n:
+        return None, None, 0
+    med = xs[n // 2] if n % 2 else 0.5 * (xs[n // 2 - 1] + xs[n // 2])
+    if n < 5:
+        return med, None, n
+    q = lambda f: xs[min(n - 1, max(0, int(round(f * (n - 1)))))]
+    return med, math.hypot(1.2533 * (q(0.75) - q(0.25)) / 1.349 / math.sqrt(n), floor), n
+
+
+def iv_table(obs):
+    """Observation history -> the table lines of section D."""
+    dates = sorted({r[0] for r in obs})
+    if not dates:
+        return ["Implied vol from DTCC premiums: no usable prints"]
+    last, prev = dates[-1], (dates[-2] if len(dates) > 1 else None)
+    w5, p5 = set(dates[-5:]), set(dates[-10:-5])
+    out = [f"Implied vol from DTCC option premiums (vanilla and NDO prints to {last}; vol in %, (n) = prints; ATM = "
+           "straddles, with the forward from put-call parity, plus single prints of 0.40-0.60 delta; ± = one standard "
+           "error; ~ = 5-day pool; RR25 = 0.15-0.35 delta calls minus puts, 21-110 days, 5-day pool, + = base-currency "
+           "calls over; BF25 = the wings' average minus ATM; fwd = parity-implied forward drift a year; * = a change "
+           "beyond two standard errors, anything else is noise; a US-reported sample at T-1, not a broker run):"]
+    n_pairs = 0
+    for pair in WATCH:
+        rows = [r for r in obs if r[1] == pair]
+        atm_all = [float(r[5]) for r in rows if r[3] == "S" or (r[3] in "CP" and 0.40 <= abs(float(r[4])) <= 0.60)]
+        if len(atm_all) < 5:
+            continue
+        mid = _med_se(atm_all)[0]
+        ok = lambda v: 0.5 * mid <= v <= 2.0 * mid  # drops package legs whose premium is not their own
+
+        def atm(lo, hi, ds):
+            return _med_se([float(r[5]) for r in rows if r[0] in ds and lo <= float(r[2]) <= hi and ok(float(r[5]))
+                            and (r[3] == "S" or (r[3] in "CP" and 0.40 <= abs(float(r[4])) <= 0.60))], IV_FLOOR["atm"])
+
+        def wing(kind, ds):
+            return _med_se([float(r[5]) for r in rows if r[0] in ds and r[3] == kind and 21 <= float(r[2]) <= 110
+                            and 0.15 <= abs(float(r[4])) <= 0.35 and ok(float(r[5]))], IV_FLOOR["wing"])
+
+        def change(a, b):
+            """a - b in vol points with a star when it is beyond two standard errors; '' when either is thin."""
+            if a[0] is None or b[0] is None or a[1] is None or b[1] is None:
+                return None
+            d = (a[0] - b[0]) * 100
+            return f"{d:+.2f}" + ("*" if abs(d) > 200 * math.sqrt(a[1] ** 2 + b[1] ** 2) else "")
+
+        g10 = pair[:3] in PRIO and pair[3:] in PRIO
+        day = {last} if g10 else w5
+        cells = []
+        for name, lo, hi in IV_TENORS:
+            m, se, n = atm(lo, hi, day)
+            pool = ""
+            if g10 and n < 4:
+                m, se, n = atm(lo, hi, w5); pool = "~"
+            if n < 4:
+                continue
+            cells.append(f"{name} {m * 100:.1f}{pool}" + (f" ±{se * 100:.1f}" if se is not None and name in ("1M", "3M") else "") + f" ({n})")
+        if not cells:
+            continue
+        drift = _med_se([float(r[5]) for r in rows if r[3] == "F"])
+        name = "USDCNH/CNY" if pair == "USDCNY" else pair  # the repository reports offshore and onshore yuan under CNY
+        line = name + ("" if g10 else " [5d]") + " | " + (f"fwd {drift[0] * 100:+.1f}%/y ({drift[2]} straddles)" if drift[2] >= 3 else "fwd = spot assumed") + " | ATM " + " · ".join(cells)
+        ch = []
+        if g10 and prev:
+            c1 = change(atm(21, 45, {last}), atm(21, 45, {prev}))
+            if c1:
+                ch.append(f"1d {c1}")
+        if p5:
+            c5 = change(atm(21, 45, w5), atm(21, 45, p5))
+            if c5:
+                ch.append(f"5d on prior 5d {c5}")
+        if ch:
+            line += " | 1M chg " + ", ".join(ch)
+        cw, pw = wing("C", w5), wing("P", w5)
+        if cw[2] >= 5 and pw[2] >= 5:
+            rr = (cw[0] - pw[0]) * 100
+            line += f" | RR25 {rr:+.2f} ±{100 * math.sqrt(cw[1] ** 2 + pw[1] ** 2):.2f} ({cw[2]}c/{pw[2]}p)"
+            if p5:
+                c0, p0 = wing("C", p5), wing("P", p5)
+                if c0[2] >= 5 and p0[2] >= 5:
+                    d = rr - (c0[0] - p0[0]) * 100
+                    star = "*" if abs(d) > 200 * math.sqrt(cw[1] ** 2 + pw[1] ** 2 + c0[1] ** 2 + p0[1] ** 2) else ""
+                    line += f", chg {d:+.2f}{star}"
+            a = atm(21, 110, w5)
+            bf = (0.5 * (cw[0] + pw[0]) - a[0]) * 100 if a[2] >= 5 else None
+            if bf is not None and bf > 0:
+                line += f" | BF25 {bf:.2f}"
+        m1 = atm(21, 45, w5)
+        rv = RVOL.get(pair) or RVOL.get(pair.replace("CNY", "CNH"))
+        if m1[2] >= 4 and rv and rv == rv and 0.4 * m1[0] * 100 <= rv <= 2.5 * m1[0] * 100:  # a wilder gap is a bad Yahoo bar
+            line += f" | 1M less 20d realised {m1[0] * 100 - rv:+.1f}"
+        out.append(line)
+        n_pairs += 1
+    if not n_pairs:
+        out.append("no pair with enough prints")
+    return out
+
+
+def iv_update(outdir, day_prints):
+    """Add the new days' observations to dtcc_iv_obs.csv, keep IV_KEEP DTCC days, return the table lines.
+    Each processed day also gets one marker row (kind D), so a day without a usable print is not fetched again."""
+    path = os.path.join(outdir, "dtcc_iv_obs.csv")
+    hist = [[r[k] for k in IV_FIELDS] for r in csv.DictReader(open(path))] if os.path.exists(path) else []
+    new = {d: p for d, p in day_prints.items() if d not in {r[0] for r in hist}}
+    if new:
+        IV_RANGE[0] = "1mo" if (NOW.date() - dt.date.fromisoformat(min(new))).days > 4 else "5d"
+        hist += iv_observe(new, hist) + [[d, "-", 0, "D", 0, 0] for d in new]
+    keep = set(sorted({r[0] for r in hist})[-IV_KEEP:])
+    hist = sorted((r for r in hist if r[0] in keep), key=lambda r: (r[0], r[1], r[3]))
+    with open(path, "w", newline="") as f:
+        w = csv.writer(f); w.writerow(IV_FIELDS); w.writerows(hist)
+    return iv_table(hist)
+
+
 def dtcc_summarise(day):
-    """One day's new trades -> per-pair option stats, NDF stats and strike buckets."""
+    """One day's new trades -> per-pair option stats, NDF stats, strike buckets and vanilla prints with premiums."""
     f = io.TextIOWrapper(dtcc_file(day), encoding="utf-8", errors="replace")
-    opt, ndf, strikes = {}, {}, {}
+    opt, ndf, strikes, prints = {}, {}, {}, {}
     for r in csv.DictReader(f):
         if r.get("Action type") != "NEWT" or r.get("Event type") != "TRAD":
             continue
@@ -414,6 +725,10 @@ def dtcc_summarise(day):
         side = "call" if (cc == base or pc == quote) else "put" if (pc == base or cc == quote) else None
         if side and usd:
             s[side] += usd
+        if typ in ("Van", "NDO") and pair in IV_YAHOO:
+            pr = iv_print(r, base, quote)
+            if pr:
+                prints.setdefault(pair, []).append(pr)
         k = num(r.get("Strike Price"))
         kp = (r.get("Strike price currency/currency pair") or "").replace(" ", "")
         exp = (r.get("Expiration Date") or "")[:10]
@@ -423,7 +738,7 @@ def dtcc_summarise(day):
             dp = 2 if quote in ("JPY", "INR", "TWD", "PHP", "THB") else 0 if quote in ("KRW", "IDR") else 4
             key = (pair, round(k, dp), exp)
             strikes[key] = strikes.get(key, 0.0) + usd
-    return opt, ndf, strikes
+    return opt, ndf, strikes, prints
 
 
 def section_d(outdir, backfill_days=22):
@@ -441,20 +756,29 @@ def section_d(outdir, backfill_days=22):
             days.append(d)
         d -= dt.timedelta(days=1)
     latest, fetched, errors = None, 0, []
-    limit = backfill_days if not daily else 6
+    ipath = os.path.join(outdir, "dtcc_iv_obs.csv")
+    iv_have = {r["date"] for r in csv.DictReader(open(ipath))} if os.path.exists(ipath) else set()
+    iv_days = {d.isoformat() for d in days[:IV_BACKFILL]}  # the implied vol table needs each recent day's prints once
+    day_prints = {}
+    limit = backfill_days if not daily else (6 if iv_have else IV_BACKFILL + 1)
     for day in days:  # newest first
         iso = day.isoformat()
-        if iso in have:
+        need_iv = iso in iv_days and iso not in iv_have
+        if iso in have and not need_iv:
             latest = latest or iso
             continue
         if fetched >= limit:
             break
         try:
-            opt, ndf, stk = dtcc_summarise(day)
+            opt, ndf, stk, prints = dtcc_summarise(day)
         except Exception as e:  # noqa: BLE001
             errors.append(f"{iso} {type(e).__name__}")
             continue
         fetched += 1
+        if need_iv:
+            day_prints[iso] = prints
+        if iso in have:
+            continue
         latest = latest or iso if day == days[0] else latest
         for pair, s in opt.items():
             daily.append({"date": iso, "kind": "opt", "key": pair, "n": s["n"], "usd": round(s["usd"]),
@@ -530,6 +854,10 @@ def section_d(outdir, backfill_days=22):
         out.append(f"{pair} {k} exp {exp}: ${v / 1e6:,.0f}m{away}")
         if sum(per_pair.values()) >= 24:
             break
+    try:
+        out += iv_update(outdir, day_prints)
+    except Exception as e:  # noqa: BLE001
+        out.append(f"Implied vol from DTCC option premiums: unavailable ({type(e).__name__})")
     return out, last
 
 
@@ -546,8 +874,16 @@ MARKET_WORDS = re.compile(
     r"boj|pboc|rbi|bok|ecb|boe|rba|mas|tariff\w*|intervention|kospi|nikkei|s&p|nasdaq|dow|hang seng|taiex|"
     r"economy|economic|fiscal|deficit|budget|sanction\w*|hike\w*|cut\w*|easing|tightening)\b", re.I)
 
+FED = "https://www.federalreserve.gov/feeds/"
+FED_WORDS = re.compile(r"\b(fed|fed's|fed’s|fomc|warsh|federal reserve|rate hikes?|rate cuts?|interest rates?)\b", re.I)
+FED_PRESS = ("wsj.com", "cnbc.com", "bloomberg.com", "reuters.com", "ft.com", "nytimes.com", "washingtonpost.com")
 FEEDS = [
-    ("Fed and Fed watchers", gn('(Fed OR FOMC OR Powell OR Warsh OR Timiraos OR "Fed\'s") (rates OR inflation OR policy)'), 6),
+    # (group, url or urls, cap[, hours looked back, title filter: True keeps every title, a pattern replaces MARKET_WORDS])
+    ("Federal Reserve (Board speeches, testimony, monetary policy releases; last 72h)",  # sparse, so 72 hours, unfiltered
+     (FED + "speeches.xml", FED + "testimony.xml", FED + "press_monetary.xml"), 6, 72, True),
+    ("Fed-watcher press (WSJ, CNBC, Bloomberg, Reuters, FT, NYT, Washington Post)",  # one query a site: Google ignores site: in an OR chain
+     tuple(gn(f'(Fed OR FOMC OR Warsh OR "Federal Reserve") site:{site}') for site in FED_PRESS), 12, 24, FED_WORDS),
+    ("Fed, other sources", gn('(Fed OR FOMC OR Warsh OR Timiraos OR "Fed\'s") (rates OR inflation OR policy)'), 6, 24, FED_WORDS),
     ("Reuters markets", gn("site:reuters.com/markets/currencies OR site:reuters.com/markets/rates-bonds OR site:reuters.com/markets/asia OR site:reuters.com/markets/us OR site:reuters.com/business/energy"), 8),
     ("Reuters business and world", gn("site:reuters.com (economy OR central bank OR tariffs OR sanctions)"), 5),
     ("Bloomberg markets", gn("site:bloomberg.com markets"), 6),
@@ -562,16 +898,21 @@ FEEDS = [
 
 
 def section_e():
-    out = ["## E. HEADLINES (RSS, last 24h; headlines are leads, not facts)"]
+    out = ["## E. HEADLINES (RSS, last 24h; headlines are leads, not facts; a line without a link came through Google "
+           "News, whose links cannot be fetched: search its title to reach the source)"]
     seen, total, failed = set(), 0, []
-    since = NOW - dt.timedelta(hours=24)
-    for group, url, cap in FEEDS:
-        try:
-            root = ET.fromstring(get(url, timeout=25))
-        except Exception as e:  # noqa: BLE001
-            failed.append(f"{group} ({type(e).__name__})"); continue
+    for group, urls, cap, *opt in FEEDS:
+        since = NOW - dt.timedelta(hours=opt[0] if opt else 24)
+        words = opt[1] if len(opt) > 1 else MARKET_WORDS
+        keep_all = words is True
+        roots = []
+        for url in ((urls,) if isinstance(urls, str) else urls):
+            try:
+                roots.append(ET.fromstring(get(url, timeout=25)))
+            except Exception as e:  # noqa: BLE001
+                failed.append(f"{group.split(' (')[0]} ({type(e).__name__})")
         items = []
-        for it in root.iter("item"):
+        for it in (i for root in roots for i in root.iter("item")):
             title = html.unescape((it.findtext("title") or "").strip())
             link = (it.findtext("link") or "").strip()
             pub = it.findtext("pubDate") or ""
@@ -581,9 +922,9 @@ def section_e():
                     when = when.replace(tzinfo=dt.timezone.utc)
             except Exception:  # noqa: BLE001
                 continue
-            if when < since or len(title) < 25:
+            if when < since or (len(title) < 25 and not keep_all):
                 continue
-            if "Stock Price & Latest News" in title or not MARKET_WORDS.search(title):
+            if "Stock Price & Latest News" in title or "Trending News" in title or not (keep_all or words.search(title)):
                 continue
             src = ""
             s = it.find("source")
@@ -599,7 +940,9 @@ def section_e():
         if items:
             out.append(f"### {group}")
         for when, title, src, link in items[:cap]:
-            out.append(f"- {when.astimezone(SGT):%d %b %H:%M} SGT · {src or group} · {title} · {link}")
+            # a Google News link is a redirect no fetch tool can open, and 250 bytes a line: print the others only
+            tail = "" if link.startswith("https://news.google.com/") or not link else f" · {link}"
+            out.append(f"- {when.astimezone(SGT):%d %b %H:%M} SGT · {src or group.split(' (')[0]} · {title}{tail}")
             total += 1
     out.append(f"E status: {total} headlines" + (f" · failed: {', '.join(failed)}" if failed else ""))
     return out, total
@@ -700,8 +1043,8 @@ HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026
 2. PRICE ACTION: every theme and every trade card names its main proxy's line from A in one clause: trend (vs MA50/MA200), the 1w move in sigma, ext, and any flag, e.g. "price: above 50/200, 1w +1.8 sigma, ext +1.9, 20d HIGH". A BUILD-UP flag is the trade_book_spec washout screen's test on the same bars; price alone is never crowding.
 3. POSITIONING BUILD-UP: undo Drive's backslash escapes in the section C query (\\_ to _, \\* to *, and so on: the query itself has no backslash), then run it with execute_sql (project diiwqbxyhtgvozhncoef) in the same pass as R02. In each theme's Positioning line cite the series for its market whose 4-week change |d4| is 25 points or more, as "<series>: 3y pct <pct> (4w <d4>)". A build-up is not an extreme: R02 alone decides HARD POSITIONING and R09's crowd field.
 4. PARTICIPATION: from section B cite, in the Positioning line of a theme or on a card whose proxy is one of these futures, the price/OI read and volume vs its 20-day average. A move on falling OI (short covering, long liquidation) is weaker evidence of conviction than one on rising OI.
-5. FX OPTIONS: from section D cite, on FX themes and FX cards, the pair's option notional vs its 20-day average and the base-call share against its 20-day share (a demand-for-calls proxy, not a risk reversal), and any large strike expiring before the card's horizon within about 1% of spot. On an R01 convexity card name a large strike or expiry near its strike or barrier. US-reported trades only: say "DTCC sample" when you cite it.
-6. HEADLINES: section E is a lead list for the COMPLETENESS SWEEP's reconcile step (completeness_sweep_spec B): a material headline the feeds missed is checked at its source and only then added with "[sweep]" and its link. A headline is never a fact, a number or an odds arrow by itself.
+5. FX OPTIONS: from section D cite, on FX themes and FX cards, the pair's option notional vs its 20-day average and the base-call share against its 20-day share (a demand-for-calls proxy, not a risk reversal), and any large strike expiring before the card's horizon within about 1% of spot. On an R01 convexity card name a large strike or expiry near its strike or barrier. US-reported trades only: say "DTCC sample" when you cite it. IMPLIED VOL (added 10 Nov 2026): the last table of D gives, per pair, ATM implied vol by tenor, a 25-delta risk-reversal proxy (RR25, + = base-currency calls over) and the parity-implied forward drift, all backed out of the premiums on DTCC prints. For the R10 pricer it is an implied vol with its source and time: for a pair it prints, pass vol = the ATM of the tenor nearest the expiry (atm, rr25 and bf25 when all three are printed, with bf_type smile) in place of rv20, and print "vol <x>% DTCC-implied <date>"; a same-day broker or exchange vol found on the web is printed beside it as a cross-check. Cite a vol or skew CHANGE only when it carries a star; an unstarred change is noise. Never fill a tenor or a pair the table does not print. It is a US-reported sample one day old, good to about half a vol, not a broker run.
+6. HEADLINES: section E is a lead list for the COMPLETENESS SWEEP's reconcile step (completeness_sweep_spec B): a material headline the feeds missed is checked at its source and only then added with "[sweep]" and its link (for a line printed without a link, search the title and cite the source's own link). A headline is never a fact, a number or an odds arrow by itself.
 7. DISCLOSED SHORTS (added 1 Nov 2026, reference only): section F lists the most shorted Japanese and Australian names. Cite it only on a card or theme whose proxy is one of those names or a Nikkei/ASX single-stock expression, as "JFSA/ASIC shorts: <name> <pct>% (<funds> funds, 1w chg)". Never a reason for an index or FX view by itself.
 8. FUNDAMENTALS (added 6 Nov 2026): section G is the weekly fundamentals pack (inflation, cycle, trade, reserves, credit, real rates for G10 and Asia). Follow its own HOW TO USE: a slow anchor for each theme's top-down view and its risks line, never a trigger, never a reason to raise p.
 9. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines · G <fund pack date>", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 8."""
