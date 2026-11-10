@@ -6,6 +6,71 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 10 Nov 2026: workflow review, the eleven approved changes built (pull requests #61 and #62)
+
+Background: the weekly Claude allowance ran out early on Sun 8 Nov with the monthly extra-usage cap already spent, so
+no Macro Takeaways was sent on 8 or 9 Nov or on the morning of 10 Nov, and the watchdog and the three data feeders
+died with it (their task status still read "succeeded", because a delivered wake counts as success). On the owner's
+card the Takeaways task moved to the Fable 5.2 model and a catch-up ran at 11:38 SGT. The same thread ("Improve macro
+takeaways workflow for trades") reviewed the whole workflow and gave him a private document with eleven yes/no
+decisions; he approved all eleven at 12:25 SGT, raised the cap, and left the choice of model per stage to the thread.
+What was built that day, in the order of the decisions:
+
+1. Usage cap: raised by the owner.
+2. Fill rule (R17, proposed): one R is the risk the card planned, REF to stop, written once as a `risk` key; an
+   adverse fill that has used more than half of that distance is void; the one card whose gapped fill had been
+   scored on a few ticks of risk is restated when the rule goes in force. `parse.ts` keeps the key, `oneR()` in
+   `marks.ts` uses it, and cards filled before the rule keep the risk they were booked on. `dash-ingest` v9 and
+   `dash-mark` v7 went live as stubs pinned to `main` commit 9fcaed6 and were each called once through `pg_net`
+   (both replied ok).
+3. Morning check outside Claude: `Alert.gs` (Gmail search for the day's "MACRO TAKEAWAYS [Fable" email, one alert
+   mail if it is missing; tested with `alert_test.js`) waits for the owner to install it; the dashboard shows a red
+   banner on every tab when the day's Fable digest row is still absent at 08:20 SGT.
+4. Implied vol from DTCC option prints: the market pack's section D ends with a table per pair of ATM by tenor,
+   25-delta risk reversal and butterfly and the forward drift, backed out of reported premiums (a US-reported sample
+   at T-1, pooled over five days where a day is thin; `test_marketpack_iv.py`). Section E gained the Fed's speech
+   feed and a Fed-watcher press feed. A large expiring strike more than 12% from spot is now left out of the strike
+   list (a 0.01 strike had been printed as a magnet).
+5. Option twin (R18, proposed): a TWIN line on each cash FX card names the option that expresses the same view;
+   `twin.ts` prices it on the smile at the card's fill and `dash-mark` marks it every hour, records a touch, the
+   settlement at the cut or a close with the card, and writes `twin_*` keys into the card's meta. The linear card
+   stays the book of record. Trial to 13 Dec or ten finished pairs.
+6. Expression table (R19, proposed): up to four expressions of a live view, the best one carded, the others
+   shadowed with an "alt Pnn" tag so the weekly review can compare card and alternates. No code.
+7. Split-run shadow test: not built in these two pull requests.
+8. Cheaper model for the Claude digests: the three paused Fable digest tasks were renamed "[Sonnet 5.5 test]", set
+   to Sonnet 5.5, and are fired by hand with a note that sends the output to a Drive test folder, on the mornings of
+   11 to 13 Nov beside the production copies. Notes and the pass rule are in project files
+   `notes/model_tests_nov2026/`.
+9. Feeders: one runner, `scripts/feeders/feeder.py`, builds a feed (one retry, nine-minute cap), stages the file in
+   the session's scratchpad and prints a Drive `create_file` call whose content is a file reference, so the model
+   never reads or retypes the file; `confirm` compares the size Drive stored; every run adds a line to
+   `feeders/status.csv`. A new thread on Haiku 5.5 at low effort runs it from three scheduled tasks (attention table
+   05:45, odds 06:20, market pack 06:52 SGT). Each feed was built and uploaded once from the building thread and
+   once by the Haiku thread; every Drive size equalled the built file; a run costs about 5 US cents against a wake
+   of 250 to 320 thousand tokens in the old Fable and Opus threads. The three old tasks are switched off, not
+   deleted. The fundamentals pack stays in its Opus thread.
+10. Weekly review: the prompt is built by `scripts/weekly_review/build_prompt.py` from fixed prose and one cuts
+    query, and must end with up to two rule proposals or "none, because". Two dry runs on 10 Nov (no email, no
+    writes); the second drafted two proposals. See `docs/weekly_review.md`.
+11. Housekeeping: the Takeaways subject, the watchdog and the site read "Fable 5.2"; the feeder prompts carry the
+    06:33 start in place of the stale 07:15 to 07:45 times; uploads go by file reference. GDELT attention: the
+    cloud address is refused by the Wikipedia per-article route and by the DOC API on most requests, so Wikipedia
+    views now come 50 articles a request from the action API (85,327 day values compared with the stored
+    per-article series, no difference) with a per-article fallback for an article whose newest day is still empty;
+    and the table had been printing each topic's last Wikipedia or DOC reading whatever its age, so a reading now
+    prints only when it is at most one day (Wikipedia) or two days (DOC) older than the media day. That changed 60
+    Wikipedia cells and removed 23 stale DOC readings on the day; the media columns were identical for all 109
+    topics before and after. Left for the owner: connectors per task, the two API keys in the YouTube prompts, two
+    subject matches in tasks outside Claude. Not done: the Gemini source label.
+
+Lessons for the next session. A scheduled task bound to a thread keeps that thread's model and only that thread can
+change its prompt, but any thread can switch it off. A task that starts a new thread at each run cannot be changed
+by a thread at all, and `create_trigger` takes no connectors in this organisation. A function stub pinned to a
+commit must be re-pinned after every merge that touches it. The data problems the review's dry runs found are
+listed in STATUS Open items 12. Mac visits: 0, one tap on a decision card; one visit is planned for the pieces only
+the owner can do.
+
 ### 10 Nov 2026: database part of the audit applied
 
 The owner ran the one statement (project file `notes/audit_10nov2026_db.sql`) in the Supabase SQL editor at

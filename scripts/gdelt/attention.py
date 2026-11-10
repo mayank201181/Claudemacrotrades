@@ -44,6 +44,9 @@ SGT = dt.timezone(dt.timedelta(hours=8))
 GKG_BASE = "https://data.gdeltproject.org/gdeltv2/"
 DOC_BASE = "https://api.gdeltproject.org/api/v2/doc/doc"
 WIKI_BASE = "https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/en.wikipedia/all-access/user/"
+WIKI_BATCH = "https://en.wikipedia.org/w/api.php"   # action API, prop=pageviews: the same daily counts, 50 articles a request
+WIKI_BATCH_SIZE = 50
+WIKI_BATCH_DAYS = 60    # the action API returns at most the last 60 days
 BASE_DAYS = 90          # baseline window for weekdays (valid days of the same class)
 BASE_DAYS_WE = 26       # baseline window for weekend days (Saturdays and Sundays are compared with weekends only)
 MIN_BASE = 30           # minimum weekday history before a z-score is printed
@@ -54,13 +57,15 @@ GKG_MIN_FILES = 12      # a day needs at least this many hourly files to count a
 GKG_MIN_ARTICLES = 3000
 DOC_MIN_NORM = 40000    # a DOC API day with fewer monitored articles is treated as an index gap
 MIN_SPIKE_COUNT = 5     # a SPIKE needs at least this many matching articles that day (not applied to Wikipedia views)
+WIKI_MAX_LAG = 1        # a Wikipedia value is printed beside the media day only if it is at most this many days older
+DOC_MAX_LAG = 2         # same for a DOC API value; an older one is left blank instead of passing as current
 
 
 def log(msg):
     print(dt.datetime.now(dt.timezone.utc).strftime("%H:%M:%SZ"), msg, flush=True)
 
 
-def http_get(url, timeout=90, tries=6, backoff=(10, 20, 40, 60, 60), headers=UA):
+def http_get(url, timeout=90, tries=6, backoff=(10, 20, 40, 60, 60), headers=UA, quiet=False):
     """GET with retries on 429, 5xx, network errors and GDELT's 'please limit requests' body. Returns (status, bytes)."""
     last = (0, b"")
     for i in range(tries):
@@ -82,8 +87,26 @@ def http_get(url, timeout=90, tries=6, backoff=(10, 20, 40, 60, 60), headers=UA)
             return status, body
         if status == 200:
             status = 429
-        log(f"  retry {i + 1} status {status} for {url[:120]}")
+            last = (status, body)
+        if not quiet:
+            log(f"  retry {i + 1} status {status} for {url[:120]}")
     return last
+
+
+def read_json(path, default):
+    """A raw file cut short by a killed run reads as 'not fetched yet' instead of stopping every later run."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return default
+
+
+def save_json(path, rec):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(rec, f)
+    os.replace(tmp, path)
 
 
 def load_topics(out):
@@ -202,13 +225,10 @@ def cmd_doc(a):
     t0 = time.time()
 
     def fetched_at(t):
-        p = os.path.join(rdir, f"{t['key']}.json")
-        if not os.path.exists(p):
-            return ""
-        with open(p, encoding="utf-8") as f:
-            return json.load(f).get("fetched_at", "")
+        return read_json(os.path.join(rdir, f"{t['key']}.json"), {}).get("fetched_at", "")
 
     topics.sort(key=fetched_at)  # least recently fetched first, so a time budget spreads over days
+    ok = 0
     for i, t in enumerate(topics):
         if a.budget_min and time.time() - t0 > a.budget_min * 60:
             log(f"doc: time budget of {a.budget_min} min used, {len(topics) - i} topics left for the next run")
@@ -216,8 +236,7 @@ def cmd_doc(a):
         path = os.path.join(rdir, f"{t['key']}.json")
         rec = {"key": t["key"], "query": t["doc"], "days": {}}
         if os.path.exists(path):
-            with open(path, encoding="utf-8") as f:
-                rec = json.load(f)
+            rec = read_json(path, rec)
             if rec.get("query") != t["doc"]:
                 rec = {"key": t["key"], "query": t["doc"], "days": {}}  # query changed: refetch everything
                 start = (a.start or "2024-01-01").replace("-", "") if not a.refresh_days else start
@@ -229,7 +248,9 @@ def cmd_doc(a):
         wait = max(0.0, a.spacing - (time.time() - last_start))
         time.sleep(wait)
         last_start = time.time()
-        status, body = http_get(url, tries=7, backoff=(15, 30, 60, 120, 180, 240))  # the limiter also counts other users of the address
+        # The limiter counts every user of the shared cloud address, so a refusal says nothing about this topic.
+        # Two tries, then on to the next topic: a refused topic stays least recently fetched and leads the next run.
+        status, body = http_get(url, timeout=45, tries=2, backoff=(20,))
         if status != 200:
             log(f"doc {t['key']}: FAILED status {status} {body[:80]!r}")
             continue
@@ -242,13 +263,73 @@ def cmd_doc(a):
         for p in series:
             rec["days"][p["date"][:8]] = [int(p.get("value", 0)), int(p.get("norm", 0))]
         rec["fetched_at"] = now.isoformat(timespec="seconds")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(rec, f)
+        save_json(path, rec)
+        ok += 1
         log(f"doc {t['key']}: {len(series)} days ({i + 1}/{len(topics)})")
-    log("doc done")
+    log(f"doc done: {ok} topics fetched")
 
 
 # ----------------------------------------------------------------------------------------------------------- Wikipedia
+def wiki_title(t):
+    """The article name as the action API takes it: unquoted, underscores as spaces."""
+    return urllib.parse.unquote(t["wiki"]).replace("_", " ")
+
+
+def wiki_batch(queue, load, need_day, deadline, spacing):
+    """Batch pass over the queued topics, 50 articles a request. Returns the topics that still lack need_day.
+
+    The per-article route needs one request an article and the shared cloud address is refused on most of them, so 84
+    topics took days. prop=pageviews on the action API returns the same daily user counts (checked 10 Nov 2026 on all
+    84 articles against the stored per-article series) for 50 articles a request. Two limits: it covers the last 60
+    days only, and it can show the newest day as null for some articles. A topic whose newest day is null stays in
+    the queue for the per-article route."""
+    left = []
+    for c0 in range(0, len(queue), WIKI_BATCH_SIZE):
+        chunk = queue[c0:c0 + WIKI_BATCH_SIZE]
+        titles = "|".join(wiki_title(t) for t in chunk)
+        base = (f"{WIKI_BATCH}?action=query&prop=pageviews&pvipdays={WIKI_BATCH_DAYS}&format=json&formatversion=2"
+                f"&titles={urllib.parse.quote(titles, safe='')}")
+        views, norm, cont, complete, requests = {}, {}, {}, False, 0
+        while not complete and requests < 30 and not (deadline and time.time() > deadline):
+            url = base + "".join(f"&{k}={urllib.parse.quote(str(v), safe='')}" for k, v in cont.items())
+            time.sleep(spacing if requests == 0 else min(20, 3 + 2 * requests))
+            requests += 1
+            status, body = http_get(url, timeout=30, tries=1, quiet=True)
+            if status != 200:
+                continue                      # refused: the same request again after a longer pause
+            try:
+                data = json.loads(body.decode("utf-8", "replace"))
+                q = data["query"]
+            except (ValueError, KeyError):
+                continue
+            for n in q.get("normalized", []):
+                norm[n["from"]] = n["to"]
+            for pg in q.get("pages", []):
+                for day, v in (pg.get("pageviews") or {}).items():
+                    if v is not None:
+                        views.setdefault(pg["title"], {})[day.replace("-", "")] = int(v)
+            cont = data.get("continue") or {}
+            complete = not cont
+        got = 0
+        now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        for t in chunk:
+            title = wiki_title(t)
+            days = views.get(norm.get(title, title), {})
+            path, rec = load(t)
+            if days:
+                rec["days"].update(days)
+            if complete and need_day in days:
+                rec["fetched_at"] = now
+                got += 1
+            else:
+                left.append(t)
+            if days:
+                save_json(path, rec)
+        log(f"wiki batch: {got} of {len(chunk)} articles complete in {requests} requests"
+            + ("" if complete else " (stopped before the answer was complete)"))
+    return left
+
+
 def cmd_wiki(a):
     topics = [t for t in load_topics(a.out) if t.get("wiki")]
     rdir = os.path.join(a.out, "wiki_raw")
@@ -257,47 +338,65 @@ def cmd_wiki(a):
     start = (a.start or "2024-01-01").replace("-", "")
     end = today.strftime("%Y%m%d")
     t0 = time.time()
+    deadline = t0 + a.budget_min * 60 if a.budget_min else None
 
-    def fetched_at(t):
-        p = os.path.join(rdir, f"{t['key']}.json")
-        if not os.path.exists(p):
-            return ""
-        with open(p, encoding="utf-8") as f:
-            return json.load(f).get("fetched_at", "")
-
-    topics.sort(key=fetched_at)
-    for i, t in enumerate(topics):
-        if a.budget_min and time.time() - t0 > a.budget_min * 60:
-            log(f"wiki: time budget of {a.budget_min} min used, {len(topics) - i} topics left for the next run")
-            break
+    def load(t):
         path = os.path.join(rdir, f"{t['key']}.json")
         rec = {"key": t["key"], "article": t["wiki"], "days": {}}
-        if os.path.exists(path):
-            with open(path, encoding="utf-8") as f:
-                old = json.load(f)
-            if old.get("article") == t["wiki"]:
-                rec = old
-        if a.missing_only and rec.get("fetched_at", "")[:10] == today.isoformat():
-            continue
-        art = t["wiki"] if "%" in t["wiki"] else urllib.parse.quote(t["wiki"], safe="")
-        url = f"{WIKI_BASE}{art}/daily/{start}00/{end}00"
-        time.sleep(a.spacing)
-        status, body = http_get(url, timeout=60, tries=7, backoff=(5, 10, 20, 40, 80, 120))
-        if status != 200:
-            log(f"wiki {t['key']}: FAILED status {status} {body[:80]!r}")
-            continue
-        try:
-            items = json.loads(body.decode("utf-8", "replace")).get("items", [])
-        except Exception as e:
-            log(f"wiki {t['key']}: bad JSON {e}")
-            continue
-        for it in items:
-            rec["days"][it["timestamp"][:8]] = int(it.get("views", 0))
-        rec["fetched_at"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(rec, f)
-        log(f"wiki {t['key']}: {len(items)} days ({i + 1}/{len(topics)})")
-    log("wiki done")
+        old = read_json(path, None)
+        if old and old.get("article") == t["wiki"]:
+            rec = old
+        return path, rec
+
+    queue = sorted(topics, key=lambda t: load(t)[1].get("fetched_at", ""))  # least recently fetched first
+    if a.missing_only:
+        queue = [t for t in queue if load(t)[1].get("fetched_at", "")[:10] != today.isoformat()]
+    total, ok, rounds = len(queue), 0, 0
+    span = (today - dt.date(int(start[:4]), int(start[4:6]), int(start[6:8]))).days
+    if queue and span <= WIKI_BATCH_DAYS and not getattr(a, "no_batch", False):
+        need_day = (today - dt.timedelta(days=1)).strftime("%Y%m%d")   # the newest complete UTC day
+        queue = wiki_batch(queue, load, need_day, deadline, a.spacing)
+        ok = total - len(queue)
+    # A 429 here comes from a limiter on the shared cloud address, not from the article asked for. So a refused topic
+    # goes back in the queue for the next round instead of being waited on (the old code could spend 275 seconds on
+    # one article and reached about 20 of 84 in a 10 minute budget). The spacing between requests is unchanged.
+    max_rounds = 40 if deadline else 6
+    while queue and rounds < max_rounds and not (deadline and time.time() > deadline):
+        rounds += 1
+        again, got = [], 0
+        for i, t in enumerate(queue):
+            if deadline and time.time() > deadline:
+                again.extend(queue[i:])
+                break
+            path, rec = load(t)
+            art = t["wiki"] if "%" in t["wiki"] else urllib.parse.quote(t["wiki"], safe="")
+            url = f"{WIKI_BASE}{art}/daily/{start}00/{end}00"
+            time.sleep(a.spacing)
+            status, body = http_get(url, timeout=30, tries=1, quiet=True)
+            if status == 404:
+                log(f"wiki {t['key']}: no data for this article (404)")
+                continue
+            if status != 200:
+                again.append(t)
+                continue
+            try:
+                items = json.loads(body.decode("utf-8", "replace")).get("items", [])
+            except Exception as e:
+                log(f"wiki {t['key']}: bad JSON {e}")
+                continue
+            for it in items:
+                rec["days"][it["timestamp"][:8]] = int(it.get("views", 0))
+            rec["fetched_at"] = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+            save_json(path, rec)
+            ok += 1
+            got += 1
+        log(f"wiki round {rounds}: {got} fetched, {len(again)} refused or not reached")
+        queue = again
+        if queue and not (deadline and time.time() > deadline):
+            time.sleep(min(30, 5 * rounds))
+    if queue:
+        log(f"wiki: {len(queue)} of {total} topics left for the next run")
+    log(f"wiki done: {ok} of {total} fetched in {time.time() - t0:.0f}s")
 
 
 # ----------------------------------------------------------------------------------------------------------- scoring
@@ -462,13 +561,23 @@ def cmd_compute(a):
               "by the 90-day median; trend = last 7 days against the 28 before; n = matching articles in the day's sample. "
               "Media = GDELT GKG; Wiki = Wikipedia views. Weekend days are compared with weekends, weekdays with weekdays. "
               "SPIKE: z >= 2, x90 >= 1.5 and n >= 5. ELEVATED: z >= 1. QUIET: z <= -1. THIN: the topic's normal day has "
-              "under 20 matching articles in the day's sample, so its z is noisy (see the DOC and Wiki columns instead).", ""]
+              "under 20 matching articles in the day's sample, so its z is noisy (see the DOC and Wiki columns instead). "
+              f"A Wiki value is printed only if its day is at most {WIKI_MAX_LAG} day older than the media day, a DOC value "
+              f"at most {DOC_MAX_LAG} days; blank means no current reading, not zero.", ""]
+
+    def current(i, s, max_lag):
+        """The topic's latest z from a second source, or None when that reading is too old to sit beside the media day."""
+        g = i.get(s)
+        if not g or gkg_date == "n/a":
+            return None
+        lag = (dt.date.fromisoformat(gkg_date) - dt.date.fromisoformat(g["date"])).days
+        return g.get("z90") if lag <= max_lag else None
 
     def row(i, s="gkg"):
         g = i.get(s, {})
         n = "" if g.get("count") is None else f"{g['count']:,}"
         return (f"| {i['label']} | {i['group']} | {fmt(g.get('z90'))} | {fmt(g.get('ratio90'), 1, 'x')} | {trend_word(g.get('trend'))} | {n} "
-                f"| {fmt(i.get('wiki', {}).get('z90'))} | {fmt(i.get('doc', {}).get('z90'))} | {g.get('flag', '')} |")
+                f"| {fmt(current(i, 'wiki', WIKI_MAX_LAG))} | {fmt(current(i, 'doc', DOC_MAX_LAG))} | {g.get('flag', '')} |")
 
     hdr = ["| Topic | Group | Media z90 | x90 | Trend | n | Wiki z90 | DOC z90 | Flag |", "|---|---|---|---|---|---|---|---|---|"]
     have = [i for i in latest if "gkg" in i and i["gkg"]["date"] == gkg_date]
@@ -478,7 +587,8 @@ def cmd_compute(a):
     lines += [f"## Media spikes (GKG day {gkg_date})", ""] + hdr + [row(i) for i in spikes] + ([] if spikes else ["| none | | | | | | | | |"]) + [""]
     lines += ["## Elevated", ""] + hdr + [row(i) for i in elev] + ([] if elev else ["| none | | | | | | | | |"]) + [""]
     lines += ["## Quiet (coverage well below its norm)", ""] + hdr + [row(i) for i in quiet] + ([] if quiet else ["| none | | | | | | | | |"]) + [""]
-    wsp = sorted([i for i in latest if "wiki" in i and i["wiki"]["flag"] in ("SPIKE", "ELEVATED")], key=lambda i: -i["wiki"]["z90"])[:12]
+    wsp = sorted([i for i in latest if "wiki" in i and i["wiki"]["flag"] in ("SPIKE", "ELEVATED")
+                  and current(i, "wiki", WIKI_MAX_LAG) is not None], key=lambda i: -i["wiki"]["z90"])[:12]
     lines += ["## Public attention (Wikipedia views) spikes and elevated, latest day", "", "| Topic | Group | Wiki z90 | x90 | Trend | Views | Date |", "|---|---|---|---|---|---|---|"]
     lines += [f"| {i['label']} | {i['group']} | {fmt(i['wiki']['z90'])} | {fmt(i['wiki']['ratio90'], 1, 'x')} | {trend_word(i['wiki']['trend'])} | {i['wiki']['count']:,} | {i['wiki']['date']} |" for i in wsp] or ["| none | | | | | | |"]
     lines += ["", "## All topics (sorted by media z90)", ""] + hdr
@@ -515,7 +625,8 @@ def main():
     p.add_argument("--only"); p.add_argument("--spacing", type=float, default=8.0); p.add_argument("--budget-min", type=float)
     p.add_argument("--missing-only", action="store_true", help="skip topics already fetched today"); p.set_defaults(fn=cmd_doc)
     p = sub.add_parser("wiki"); p.add_argument("--out", required=True); p.add_argument("--start"); p.add_argument("--spacing", type=float, default=2.0)
-    p.add_argument("--budget-min", type=float); p.add_argument("--missing-only", action="store_true"); p.set_defaults(fn=cmd_wiki)
+    p.add_argument("--budget-min", type=float); p.add_argument("--missing-only", action="store_true")
+    p.add_argument("--no-batch", action="store_true", help="per-article route only"); p.set_defaults(fn=cmd_wiki)
     p = sub.add_parser("compute"); p.add_argument("--out", required=True); p.set_defaults(fn=cmd_compute)
     p = sub.add_parser("refresh"); p.add_argument("--out", required=True); p.add_argument("--wiki-min", type=float, default=10)
     p.add_argument("--doc-min", type=float, default=20); p.set_defaults(fn=cmd_refresh)
