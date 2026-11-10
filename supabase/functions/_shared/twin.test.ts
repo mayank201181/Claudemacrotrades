@@ -3,8 +3,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { type Bar, HOUR } from './marks.ts';
-import { type ConvexCard, earlyCloseR, liveSinceFill, premium, valueAtTime } from './convexity.ts';
-import { exitBar, fxPair, markTwin, parseTwin, scoreTwin, twinCard, twinFrozen, twinMeta, type TwinMark, twinTier, type TwinTrade } from './twin.ts';
+import { digital, earlyCloseR, liveSinceFill, oneTouch, premium, type Struct, valueAtTime } from './convexity.ts';
+import {
+  exitBar, fxPair, markTwin, parseTwin, scoreTwin, smileShare, type TwinCard, twinCard, twinFrozen, twinMeta, type TwinMark, twinTier, type TwinTrade, twinValue, vvCall,
+} from './twin.ts';
 
 const DAY = 24 * HOUR;
 const H0 = Date.UTC(2026, 9, 1); // hourly history starts Thu 1 Oct 2026
@@ -38,38 +40,48 @@ test('the terms line', () => {
   err(parseTwin('ot-dn · strike 155.50 · cut 2026-11-25'), /iv missing/);
   err(parseTwin('TWIN:'), /empty/);
 
-  const c = ok<ConvexCard>(twinCard('JPY=X', LINE, -1));
+  const c = ok<TwinCard>(twinCard('JPY=X', LINE, -1));
   assert.equal(c.struct, 'ot-dn'); assert.equal(c.k, 155.5); assert.equal(c.kf, null); assert.equal(c.fx, true);
   assert.equal(c.basePay, true); assert.equal(c.model, 'lognormal');
   near(c.carry, -0.029); near(c.vol, 0.067 / Math.sqrt(252));
   assert.equal(c.cut, Date.UTC(2026, 10, 25, 15), '10:00 New York under EST is 15:00 UTC');
   // the same cut under daylight time, and one written with its SGT time
-  assert.equal(ok<ConvexCard>(twinCard('JPY=X', LINE.replace('2026-11-25', '2026-10-20'), -1)).cut, Date.UTC(2026, 9, 20, 14));
-  assert.equal(ok<ConvexCard>(twinCard('JPY=X', LINE.replace('2026-11-25', '2026-11-25 23:00 SGT'), -1)).cut, Date.UTC(2026, 10, 25, 15));
+  assert.equal(ok<TwinCard>(twinCard('JPY=X', LINE.replace('2026-11-25', '2026-10-20'), -1)).cut, Date.UTC(2026, 9, 20, 14));
+  assert.equal(ok<TwinCard>(twinCard('JPY=X', LINE.replace('2026-11-25', '2026-11-25 23:00 SGT'), -1)).cut, Date.UTC(2026, 10, 25, 15));
   // terms pay unless the base currency is named; a spread ignores it
-  assert.equal(ok<ConvexCard>(twinCard('JPY=X', LINE.replace('pay USD', 'pay -'), -1)).basePay, false);
-  assert.equal(ok<ConvexCard>(twinCard('JPY=X', LINE.replace('pay USD', 'pay JPY (terms)'), -1)).basePay, false);
-  assert.equal(ok<ConvexCard>(twinCard('JPY=X', LINE.replace(' · pay USD', ''), -1)).basePay, false);
+  assert.equal(ok<TwinCard>(twinCard('JPY=X', LINE.replace('pay USD', 'pay -'), -1)).basePay, false);
+  assert.equal(ok<TwinCard>(twinCard('JPY=X', LINE.replace('pay USD', 'pay JPY (terms)'), -1)).basePay, false);
+  assert.equal(ok<TwinCard>(twinCard('JPY=X', LINE.replace(' · pay USD', ''), -1)).basePay, false);
   // spreads: Kn is the strike nearer the spot; thousands separators and a typographic minus are read
-  const ps = ok<ConvexCard>(twinCard('KRW=X', 'ps · strike 1,335/1,310 · cut 2026-11-25 · pay - · iv 10.4% DTCC 2026-11-09 [5d] · carry −1.30%', -1));
+  const ps = ok<TwinCard>(twinCard('KRW=X', 'ps · strike 1,335/1,310 · cut 2026-11-25 · pay - · iv 10.4% DTCC 2026-11-09 [5d] · carry −1.30%', -1));
   assert.equal(ps.k, 1335); assert.equal(ps.kf, 1310); near(ps.carry, -0.013);
-  const cs = ok<ConvexCard>(twinCard('EURUSD=X', 'cs · strike 1.1650/1.1850 · cut 2026-12-01 · pay - · iv 5.7% · carry +1.40%', 1));
+  const cs = ok<TwinCard>(twinCard('EURUSD=X', 'cs · strike 1.1650/1.1850 · cut 2026-12-01 · pay - · iv 5.7% · carry +1.40%', 1));
   assert.equal(cs.k, 1.165); assert.equal(cs.kf, 1.185); near(cs.carry, 0.014);
-  assert.equal(ok<ConvexCard>(twinCard('KRW=X', 'dig-dn · strike 1,320 · cut 2026-11-25 · iv 10.4%', -1)).k, 1320);
-  near(ok<ConvexCard>(twinCard('JPY=X', LINE.replace(' · carry -2.90%', ''), -1)).carry, 0);
+  assert.equal(ok<TwinCard>(twinCard('KRW=X', 'dig-dn · strike 1,320 · cut 2026-11-25 · iv 10.4%', -1)).k, 1320);
+  near(ok<TwinCard>(twinCard('JPY=X', LINE.replace(' · carry -2.90%', ''), -1)).carry, 0);
 
-  // skew: the dearer of the at-the-money vol and the 25-delta vol on the structure's own side
-  const skew = (line: string, proxy = 'JPY=X', dir = -1) => ok<ConvexCard>(twinCard(proxy, line, dir)).vol * Math.sqrt(252) * 100;
-  near(skew(LINE.replace(' · carry', ' · rr -1.95 · bf 0.23 · carry')), 6.7 + 0.23 + 0.975, 1e-9); // a put-side touch with puts over
-  near(skew(LINE.replace(' · carry', ' · rr +1.95 · bf 0.23 · carry')), 6.7, 1e-9);               // calls over: the put wing is cheaper, ATM stands
-  near(skew(LINE.replace(' · carry', ' · rr - · bf - · carry')), 6.7, 1e-9);
-  near(skew(LINE.replace(' · carry', ' · rr -1.95 · carry')), 6.7 + 0.975, 1e-9);                 // no butterfly printed
-  near(skew(LINE.replace(' · carry', ' · bf 0.23 · carry')), 6.7, 1e-9);                          // a butterfly alone moves nothing
-  near(skew('cs · strike 1,350/1,380 · cut 2026-11-25 · iv 10.4% · rr +0.75 · bf 0.30 · carry -1.30%', 'KRW=X', 1), 10.4 + 0.3 + 0.375, 1e-9);
-  near(skew('dig-up · strike 1.1650 · cut 2026-12-01 · iv 5.7% · rr −0.33 · bf 0.16', 'EURUSD=X', 1), 5.7, 1e-9); // 5.7 + 0.16 − 0.165 is under ATM
+  // the smile: vol stays the at-the-money vol; a risk reversal adds the two 25-delta vols, annual per cent ÷ √252
+  const ann = (x: number) => x * Math.sqrt(252) * 100;
+  const wings = (line: string, proxy = 'JPY=X', dir = -1) => {
+    const c = ok<TwinCard>(twinCard(proxy, line, dir));
+    near(ann(c.vol), parseFloat(line.match(/iv ([\d.]+)%/)![1]), 1e-9);
+    return c.wings && [ann(c.wings.c), ann(c.wings.p)];
+  };
+  assert.equal(c.wings, null, 'no rr on the line: flat at the at-the-money vol');
+  const w = wings(LINE.replace(' · carry', ' · rr -1.95 · bf 0.23 · carry'))!; // puts over
+  near(w[0], 6.7 + 0.23 - 0.975, 1e-9); near(w[1], 6.7 + 0.23 + 0.975, 1e-9);
+  assert.equal(wings(LINE.replace(' · carry', ' · rr - · bf - · carry')), null);
+  assert.equal(wings(LINE.replace(' · carry', ' · bf 0.23 · carry')), null, 'a butterfly alone is no smile');
+  const nb = wings(LINE.replace(' · carry', ' · rr -1.95 · carry'))!;             // no butterfly printed
+  near(nb[0], 6.7 - 0.975, 1e-9); near(nb[1], 6.7 + 0.975, 1e-9);
+  const kw = wings('cs · strike 1,350/1,380 · cut 2026-11-25 · iv 10.4% · rr +0.75 · bf 0.30 · carry -1.30%', 'KRW=X', 1)!;
+  near(kw[0], 10.4 + 0.3 + 0.375, 1e-9); near(kw[1], 10.4 + 0.3 - 0.375, 1e-9);
+  const eu = wings('dig-up · strike 1.1650 · cut 2026-12-01 · iv 5.7% · rr −0.33 · bf 0.16', 'EURUSD=X', 1)!; // a typographic minus
+  near(eu[0], 5.7 + 0.16 - 0.165, 1e-9); near(eu[1], 5.7 + 0.16 + 0.165, 1e-9);
   err(twinCard('JPY=X', LINE.replace(' · carry', ' · rr skewed · carry'), -1), /^rr/);
   err(twinCard('JPY=X', LINE.replace(' · carry', ' · rr -19.5 · carry'), -1), /^rr/);
   err(twinCard('JPY=X', LINE.replace(' · carry', ' · rr -1.95 · bf 23 · carry'), -1), /^bf/);
+  err(twinCard('JPY=X', LINE.replace(' · carry', ' · rr +11.5 · carry'), -1), /^rr \+11.5 against iv/); // a put wing of 0.95 on a 6.7 vol
 
   err(twinCard('JPY=X', LINE, 1), /ot-dn on a long card/);
   err(twinCard('EURUSD=X', 'ps · strike 1.15/1.13 · cut 2026-12-01 · iv 5.7%', 1), /ps on a long card/);
@@ -89,7 +101,7 @@ test('the terms line', () => {
 });
 
 test('premium at the fill, the open mark and a frozen premium', () => {
-  const card = ok<ConvexCard>(twinCard('JPY=X', LINE, -1));
+  const card = ok<TwinCard>(twinCard('JPY=X', LINE, -1));
   const now = Date.UTC(2026, 10, 6, 12);
   const bars = liveSinceFill(hourly(H0, now, () => 158), FILL, true);
   const m = ok<TwinMark>(markTwin(card, bars, FILL, now, 1));
@@ -108,8 +120,10 @@ test('premium at the fill, the open mark and a frozen premium', () => {
   // a stored premium is never recomputed, even when the bars at the fill are gone or revised
   const late = bars.filter((b) => b.ts > FILL + 2 * DAY);
   err(markTwin(card, bars.filter((b) => b.ts > FILL + 4 * DAY), FILL, now, 1), /no hourly bar at the fill/);
-  const f = ok<TwinMark>(markTwin(card, late, FILL, now, 1, { frozen: { p0fill: 0.3, fill_px: 158.03 } }));
-  assert.equal(f.p0fill, 0.3); assert.equal(f.fill_px, 158.03); near(f.r, v / 0.3 - 1);
+  const f = ok<TwinMark>(markTwin(card, late, FILL, now, 1, { frozen: { p0fill: 0.3, fill_px: 158.03, tv: 0.28 } }));
+  assert.equal(f.p0fill, 0.3); assert.equal(f.fill_px, 158.03); assert.equal(f.tv, 0.28); near(f.r, v / 0.3 - 1);
+  // with no smile on the line, the premium is the at-the-money-vol value plus the dealing cost
+  near(m.tv, valueAtTime(card, 158.025, FILL).v); assert.equal(m.p0fill, premium(m.tv, true, 1)); near(m.vol, 6.7, 1e-9);
 
   // the stop of the linear card means nothing to the twin: a rally through it leaves the option open
   const up = liveSinceFill(hourly(H0, now, (t) => (t < FILL + DAY ? 158 : 161)), FILL, true);
@@ -117,19 +131,101 @@ test('premium at the fill, the open mark and a frozen premium', () => {
   assert.equal(u.state, 'open'); assert.ok(u.r < -0.5 && u.r > -1);
 });
 
+test('on the smile: calls, digitals, spreads and touches against fxopt.py', () => {
+  // python3 -I scripts/fxopt/fxopt.py with USDJPY spot 158, fwd 157.75 (so rd 0), 20 days, atm 6.7, rr25 -1.95,
+  // bf25 0.23, bf_type smile, delta_type fwd. fxopt discounts a base-currency payout at the base rate (fwd ÷ spot);
+  // nothing is discounted here.
+  const S = 158, F = 157.75, rt = Math.sqrt(20 / 365), sdA = 0.067 * rt, sdC = 0.05955 * rt, sdP = 0.07905 * rt, dff = F / S;
+  const sh = (struct: Struct, k: number, kf: number | null = null, basePay = false) => {
+    const v = smileShare({ struct, k, kf, basePay }, S, F, sdA, sdC, sdP);
+    assert.notEqual(v, null, `${struct} ${k}`); return v!;
+  };
+  near(vvCall(F, 158, sdA, sdC, sdP), 0.8493157570101744, 1e-7);
+  near(vvCall(F, 161, sdA, sdC, sdP), 0.02862533571062187, 1e-7);
+  near(sh('dig-dn', 155), 0.13782012834577662, 5e-6);
+  near(sh('dig-up', 160), 0.18056962688761669, 5e-6);
+  near(sh('dig-dn', 155, null, true), 0.1332449035057468 / dff, 5e-6);
+  near(sh('dig-up', 160, null, true), 0.1837942990296738 / dff, 5e-6);
+  near(sh('cs', 158, 161), (0.8493157570101744 - 0.02862533571062187) / 3, 1e-7);
+  near(sh('ps', 158, 155), (1.0993157570101744 - 0.30942513968738083) / 3, 1e-7);
+  // a touch: its at-the-money-vol value, plus that value times the smile's effect on the digital at the barrier,
+  // weighted by the chance of no touch
+  const touch = (tv: number, smileDig: number, flatDig: number) => tv * (1 + (1 - tv) * (smileDig / flatDig - 1));
+  near(sh('ot-dn', 155), touch(0.25223260623156385, 0.13782012834577662, 0.1327495335121215), 5e-6);
+  near(sh('ot-dn', 155, null, true), touch(0.24728312081398346 / dff, 0.1332449035057468 / dff, 0.129208059322175 / dff), 5e-6);
+  // with both wings at the at-the-money vol the smile is flat, and every structure reprices at its flat value
+  const flat = (struct: Struct, k: number, kf: number | null = null) => smileShare({ struct, k, kf, basePay: false }, S, F, sdA, sdA, sdA)!;
+  near(flat('dig-dn', 155), digital('lognormal', false, F, 155, sdA), 5e-6);
+  near(flat('ot-dn', 155), oneTouch('lognormal', S, F, 155, sdA), 5e-6);
+  // nothing usable: a barrier so far out that the flat digital there is nil
+  assert.equal(smileShare({ struct: 'ot-dn', k: 120, kf: null, basePay: false }, S, F, sdA, sdC, sdP), null);
+
+  // Against a vanna-volga touch (vega, vanna and volga hedged with the three pillars, the cost weighted by the
+  // chance of no touch; computed with fxopt.py's own functions): within a point of payout from 15% to 45%
+  // barriers, on the side the risk reversal favours and against it. The flat at-the-money value (last column)
+  // misses by up to six and a half. spot, fwd, days, barrier, atm, rr25, bf25, vanna-volga, flat.
+  const vv: number[][] = [
+    [158, 157.75, 20, 155, 6.7, -1.95, 0.23, 0.2606, 0.2522], [158, 157.75, 20, 161, 6.7, -1.95, 0.23, 0.1573, 0.2015],
+    [158, 157.6, 30, 153, 6.7, -1.95, 0.23, 0.1835, 0.1184], [158, 157.2, 60, 152, 6.8, -1.95, 0.23, 0.2334, 0.2090],
+    [1450, 1449.3, 30, 1490, 10.4, 0.75, 0.32, 0.3267, 0.3512], [1.16, 1.1615, 30, 1.18, 6.5, 0.3, 0.15, 0.3594, 0.3790],
+    [0.65, 0.6502, 30, 0.638, 9.0, -0.8, 0.2, 0.4454, 0.4705],
+  ];
+  let worst = 0, worstFlat = 0;
+  for (const [s, f, days, h, atm, rr, bf, want, tv] of vv) {
+    const q = Math.sqrt(days / 365) / 100;
+    const got = smileShare({ struct: h > s ? 'ot-up' : 'ot-dn', k: h, kf: null, basePay: false }, s, f, atm * q, (atm + bf + rr / 2) * q, (atm + bf - rr / 2) * q)!;
+    assert.ok(Math.abs(got - want) < 0.01, `touch ${h} from ${s}: ${got.toFixed(4)} against vanna-volga ${want}`);
+    worst = Math.max(worst, Math.abs(got - want)); worstFlat = Math.max(worstFlat, Math.abs(tv - want));
+  }
+  assert.ok(worst < 0.01 && worstFlat > 0.06, `worst miss ${worst.toFixed(4)} on the smile, ${worstFlat.toFixed(4)} flat`);
+});
+
+test('a twin with a risk reversal is priced and marked on its smile', () => {
+  const now = Date.UTC(2026, 10, 6, 12);
+  const bars = liveSinceFill(hourly(H0, now, () => 158), FILL, true);
+  const flat = ok<TwinCard>(twinCard('JPY=X', LINE, -1));
+  const smile = ok<TwinCard>(twinCard('JPY=X', LINE.replace(' · carry', ' · rr -1.95 · bf 0.23 · carry'), -1));
+  const a = ok<TwinMark>(markTwin(flat, bars, FILL, now, 1)), b = ok<TwinMark>(markTwin(smile, bars, FILL, now, 1));
+  near(b.tv, a.tv); near(b.vol, 6.7, 1e-9);
+  // Near the money (a theoretical value near 40%) a touch on this steep a skew trades under its theoretical
+  // value, by points and not by tens of points; a far barrier on the side the skew favours trades over it.
+  assert.ok(b.p0fill < a.p0fill - 0.01 && b.p0fill > a.p0fill - 0.06, `${a.p0fill} flat, ${b.p0fill} on the smile`);
+  const far = (line: string) => ok<TwinMark>(markTwin(ok<TwinCard>(twinCard('JPY=X', line.replace('155.50', '153.50'), -1)), bars, FILL, now, 1));
+  const fa = far(LINE), fb = far(LINE.replace(' · carry', ' · rr -1.95 · bf 0.23 · carry'));
+  assert.ok(fa.tv < 0.2 && fb.p0fill > fa.p0fill + 0.02 && fb.p0fill < fa.p0fill + 0.1, `far barrier: ${fa.p0fill} flat, ${fb.p0fill} on the smile`);
+  const at = twinValue(smile, 158.025, FILL);
+  assert.equal(b.p0fill, premium(at.v, true, 1)); near(at.tv, valueAtTime(smile, 158.025, FILL).v);
+  // the running mark is on the same smile, at the last bar's end
+  const last = bars[bars.length - 1];
+  near(b.v, twinValue(smile, 158, last.ts + HOUR).v); near(b.r, b.v / b.p0fill - 1);
+  assert.ok(b.v < a.v && b.r > -0.2 && b.r < 0, 'four quiet sessions on: a little time decay, still under the flat value');
+  // an upside touch on the same smile is cheaper than its theoretical value
+  const upLine = LINE.replace('ot-dn', 'ot-up').replace('155.50', '160.50').replace(' · carry', ' · rr -1.95 · bf 0.23 · carry');
+  const u = ok<TwinMark>(markTwin(ok<TwinCard>(twinCard('JPY=X', upLine, 1)), bars, FILL, now, 1));
+  assert.ok(u.p0fill < u.tv + 0.01, `${u.p0fill} against a theoretical value of ${u.tv}`);
+  // through its barrier a touch is worth 1 on any smile; inside the last half session the flat value stands
+  assert.equal(twinValue(smile, 155.4, FILL).v, 1);
+  const late = twinValue(smile, 156, smile.cut - 6 * HOUR);
+  near(late.v, late.tv); assert.ok(late.n < 0.5);
+  // a view close is valued on the smile too
+  const end = Date.UTC(2026, 10, 6, 3);
+  const e = ok<TwinMark>(markTwin(smile, bars, FILL, now, 1, { early: { ts: end, px: 157.2 } }));
+  near(e.v, twinValue(smile, 157.2, end).v); near(e.r, earlyCloseR(true, e.v, b.p0fill, 1));
+});
+
 test('what cannot be priced is skipped with its reason', () => {
   const now = Date.UTC(2026, 10, 6, 12);
   const bars = liveSinceFill(hourly(H0, now, () => 158), FILL, true);
-  err(markTwin(ok<ConvexCard>(twinCard('JPY=X', LINE.replace('155.50', '150.00'), -1)), bars, FILL, now, 1), /under the 10% floor/);
-  err(markTwin(ok<ConvexCard>(twinCard('JPY=X', LINE.replace('155.50', '158.50'), -1)), bars, FILL, now, 1), /already through its level/);
-  err(markTwin(ok<ConvexCard>(twinCard('JPY=X', LINE.replace('2026-11-25', '2026-11-02'), -1)), bars, FILL, now, 1), /cut within a session/);
-  err(markTwin(ok<ConvexCard>(twinCard('JPY=X', LINE, -1)), [], FILL, now, 1), /no hourly bar at the fill/);
+  err(markTwin(ok<TwinCard>(twinCard('JPY=X', LINE.replace('155.50', '150.00'), -1)), bars, FILL, now, 1), /under the 10% floor/);
+  err(markTwin(ok<TwinCard>(twinCard('JPY=X', LINE.replace('155.50', '158.50'), -1)), bars, FILL, now, 1), /already through its level/);
+  err(markTwin(ok<TwinCard>(twinCard('JPY=X', LINE.replace('2026-11-25', '2026-11-02'), -1)), bars, FILL, now, 1), /cut within a session/);
+  err(markTwin(ok<TwinCard>(twinCard('JPY=X', LINE, -1)), [], FILL, now, 1), /no hourly bar at the fill/);
   const flat = hourly(H0, now, () => 158).map((b) => ({ ...b, o: 158, h: 158, l: 158 }));
-  err(markTwin(ok<ConvexCard>(twinCard('JPY=X', LINE, -1)), liveSinceFill(flat, FILL, true), FILL, now, 1), /no live hourly bars/);
+  err(markTwin(ok<TwinCard>(twinCard('JPY=X', LINE, -1)), liveSinceFill(flat, FILL, true), FILL, now, 1), /no live hourly bars/);
 });
 
 test('touch, settlement at the cut, and an early close with the card', () => {
-  const card = ok<ConvexCard>(twinCard('JPY=X', LINE, -1));
+  const card = ok<TwinCard>(twinCard('JPY=X', LINE, -1));
   const p0 = premium(valueAtTime(card, 158.025, FILL).v, true, 1);
   const now = Date.UTC(2026, 10, 12, 12);
   const base = () => hourly(H0, now, () => 158);
@@ -163,7 +259,7 @@ test('touch, settlement at the cut, and an early close with the card', () => {
   }
 
   // a digital settles on the live hourly bar ending at the cut; a put spread pays its in-the-money share
-  const dig = ok<ConvexCard>(twinCard('JPY=X', LINE.replace('ot-dn', 'dig-dn').replace('155.50', '157.00'), -1));
+  const dig = ok<TwinCard>(twinCard('JPY=X', LINE.replace('ot-dn', 'dig-dn').replace('155.50', '157.00'), -1));
   const after = card.cut + 3 * HOUR;
   const path = (t: number) => (t < card.cut - HOUR ? 158 : t === card.cut - HOUR ? 156.2 : 159);
   const d = ok<TwinMark>(markTwin(dig, liveSinceFill(hourly(H0, after, path), FILL, true), FILL, after, 1));
@@ -171,7 +267,7 @@ test('touch, settlement at the cut, and an early close with the card', () => {
   near(d.r, 1 / d.p0fill - 1);
   const lose = ok<TwinMark>(markTwin(dig, liveSinceFill(hourly(H0, after, () => 158), FILL, true), FILL, after, 1));
   assert.equal(lose.state, 'expiry'); assert.equal(lose.v, 0); assert.equal(lose.r, -1);
-  const ps = ok<ConvexCard>(twinCard('JPY=X', 'ps · strike 158.00/155.00 · cut 2026-11-25 · iv 6.7% · carry -2.90%', -1));
+  const ps = ok<TwinCard>(twinCard('JPY=X', 'ps · strike 158.00/155.00 · cut 2026-11-25 · iv 6.7% · carry -2.90%', -1));
   const s = ok<TwinMark>(markTwin(ps, liveSinceFill(hourly(H0, after, path), FILL, true), FILL, after, 1));
   assert.equal(s.state, 'expiry'); near(s.v, 0.6); near(s.r, 0.6 / s.p0fill - 1);
   assert.equal(s.p0fill, premium(valueAtTime(ps, 158.025, FILL).v, false, 1));
@@ -192,17 +288,19 @@ test('the bar a view close was dealt on', () => {
 });
 
 test('what is stored on the trade and read back', () => {
-  const card = ok<ConvexCard>(twinCard('JPY=X', LINE, -1));
+  const card = ok<TwinCard>(twinCard('JPY=X', LINE, -1));
   const now = Date.UTC(2026, 10, 6, 12);
   const m = ok<TwinMark>(markTwin(card, liveSinceFill(hourly(H0, now, () => 158), FILL, true), FILL, now, 1));
   const meta = twinMeta(m, LINE);
-  assert.deepEqual(Object.keys(meta).sort(), ['twin_asof', 'twin_fill', 'twin_left', 'twin_p0', 'twin_px', 'twin_r', 'twin_state', 'twin_terms', 'twin_v', 'twin_vol']);
-  assert.equal(meta.twin_vol, '6.70');
+  assert.deepEqual(Object.keys(meta).sort(), ['twin_asof', 'twin_fill', 'twin_left', 'twin_p0', 'twin_px', 'twin_r', 'twin_state', 'twin_terms', 'twin_tv', 'twin_v', 'twin_vol']);
+  assert.equal(meta.twin_vol, '6.70'); assert.equal(meta.twin_tv, (m.tv * 100).toFixed(1));
   assert.equal(meta.twin_terms, LINE.replace('TWIN: ', ''));
   assert.equal(meta.twin_state, 'open'); assert.equal(meta.twin_fill, '158.025'); assert.equal(meta.twin_px, '158');
   assert.equal(meta.twin_p0, (m.p0fill * 100).toFixed(1)); assert.equal(meta.twin_r, m.r.toFixed(2));
   assert.match(meta.twin_asof, /^2026-11-06T11:00:00/);
-  assert.deepEqual(twinFrozen(meta), { p0fill: m.p0fill, fill_px: 158.025 });
+  assert.deepEqual(twinFrozen(meta), { p0fill: m.p0fill, fill_px: 158.025, tv: Math.round(m.tv * 1000) / 1000 });
+  // a mark stored before the theoretical value was kept reads its premium in that place
+  assert.deepEqual(twinFrozen({ twin_p0: '30.4', twin_fill: '158.025' }), { p0fill: 0.304, fill_px: 158.025, tv: 0.304 });
   assert.equal(twinFrozen({}), null);
   assert.equal(twinFrozen({ twin_state: 'skipped: iv x' }), null);
   assert.deepEqual(twinMeta('iv x', LINE), { twin_state: 'skipped: iv x' });

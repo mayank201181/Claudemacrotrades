@@ -9,16 +9,23 @@
 // struct is dig-up, dig-dn, ot-up, ot-dn, cs or ps (a twin is a directional view, so no no-touch). A cut given
 // as a date is the 10:00 New York cut of that day; "YYYY-MM-DD HH:MM SGT" is taken as written. iv is an annual
 // at-the-money implied vol; rr and bf are the 25-delta risk reversal (+ = base-currency calls over) and the
-// smile butterfly, in vol points, as the market pack prints them. The twin is priced flat at the dearer of the
-// at-the-money vol and the 25-delta vol on its own side (call = atm + bf + rr/2, put = atm + bf − rr/2), so a
-// structure bought on the side the skew favours is never priced at a vol the market would not sell it at;
-// R01 turns that vol into a per-session vol (÷ √252) and keeps it for the twin's life.
+// smile butterfly, in vol points, as the market pack prints them (25-delta call vol = atm + bf + rr/2, put vol
+// = atm + bf − rr/2). With rr given, the twin is priced and marked on that three-pillar smile, fixed for its
+// life (first-order vanna-volga, the method fxopt.py uses): a digital and a spread directly; a touch as its
+// at-the-money-vol value plus an overhedge, which is that value times what the smile does to the digital
+// struck at its barrier, weighted by the chance of no touch. Against a vanna-volga touch with the same weight
+// that is within about a point of payout for barriers priced 8% to 60%; a flat at-the-money vol misses by up
+// to eight, and the 25-delta vol on the structure's own side by up to seven. It is a model's mid, not a
+// dealer's quote. Without rr the twin is priced flat at the at-the-money vol.
 // carry is the terms-currency rate less the base-currency rate, a year (the forward drift the market pack prints).
 import { type Bar, HOUR } from './marks.ts';
-import { type ConvexCard, earlyCloseR, isBinary, liveSinceFill, markConvexity, nyClose, parseSgt, premium, type Struct, valueAtTime } from './convexity.ts';
+import {
+  call, type ConvexCard, digital, earlyCloseR, forward, isBinary, liveSinceFill, markConvexity, normPdf, nyClose, oneTouch, parseSgt, premium, scoreR,
+  type Struct, valueAtTime,
+} from './convexity.ts';
 
 export const TWIN_STRUCTS: readonly Struct[] = ['dig-up', 'dig-dn', 'ot-up', 'ot-dn', 'cs', 'ps'];
-// R01's floor: a premium under 10% of the payout is not carded, and a flat-vol price is least reliable there.
+// R01's floor: a premium under 10% of the payout is not carded, and a model price is least reliable there.
 export const TWIN_MIN_PREMIUM = 0.1;
 const UP = new Set<string>(['dig-up', 'ot-up', 'cs']);
 const G10 = new Set(['USD', 'EUR', 'JPY', 'GBP', 'CHF', 'CAD', 'AUD', 'NZD', 'SEK', 'NOK']);
@@ -67,9 +74,72 @@ function nyCut(s: string): number | null {
   return nyClose(m![0]) - 6 * HOUR;
 }
 
+// ---------- the smile ----------
+
+// A twin is a convexity card priced at its at-the-money vol (`vol`), plus the 25-delta call and put vols when
+// the terms line carried a risk reversal: σ per session, like `vol`, fixed for the twin's life.
+export interface TwinCard extends ConvexCard { wings: { c: number; p: number } | null }
+
+const Q25 = 0.6744897501960817; // Φ⁻¹(0.75): a 25-delta strike sits this many sd from the forward
+
+// The undiscounted call on the forward F at strike K on a vanna-volga smile (Castagna and Mercurio, first order)
+// through three pillars: the 25-delta put, the delta-neutral at-the-money straddle and the 25-delta call, forward
+// deltas. sdA, sdC and sdP are the pillars' σ√n. It is what fxopt.py's Smile prices a vanilla at.
+export function vvCall(F: number, K: number, sdA: number, sdC: number, sdP: number): number {
+  const k1 = F * Math.exp(-Q25 * sdP + (sdP * sdP) / 2), k2 = F * Math.exp((sdA * sdA) / 2), k3 = F * Math.exp(Q25 * sdC + (sdC * sdC) / 2);
+  const L = Math.log, vega = (k: number) => normPdf((L(F / k) + (sdA * sdA) / 2) / sdA);
+  const x1 = ((vega(K) / vega(k1)) * (L(k2 / K) * L(k3 / K))) / (L(k2 / k1) * L(k3 / k1));
+  const x3 = ((vega(K) / vega(k3)) * (L(K / k1) * L(K / k2))) / (L(k3 / k1) * L(k3 / k2));
+  const bs = (k: number, sd: number) => call('lognormal', F, k, sd);
+  return bs(K, sdA) + x1 * (bs(k1, sdP) - bs(k1, sdA)) + x3 * (bs(k3, sdC) - bs(k3, sdA));
+}
+
+// V on the smile as a share of the maximum payout, with the spot short of a touch's barrier; null where the
+// smile gives nothing usable (far outside the pillars a first-order smile can leave 0 to 1).
+export function smileShare(c: Pick<ConvexCard, 'struct' | 'k' | 'kf' | 'basePay'>, S: number, F: number, sdA: number, sdC: number, sdP: number): number | null {
+  const cv = (k: number) => vvCall(F, k, sdA, sdC, sdP);
+  // Pays 1 beyond K on the upside: −dC/dK with the smile's slope in it; in the base currency, the
+  // asset-or-nothing call over the forward.
+  const digUp = (k: number) => {
+    const h = 1e-4 * k, t = -(cv(k + h) - cv(k - h)) / (2 * h);
+    return c.basePay ? (cv(k) + k * t) / F : t;
+  };
+  const dig = (up: boolean, k: number) => (up ? digUp(k) : 1 - digUp(k));
+  let v: number;
+  switch (c.struct) {
+    case 'dig-up': v = dig(true, c.k); break;
+    case 'dig-dn': v = dig(false, c.k); break;
+    case 'ot-up': case 'ot-dn': {
+      // The overhedge: the smile's proportional effect on the digital struck at the barrier, applied to the
+      // touch and weighted by the chance of no touch (the hedge comes off when the barrier trades).
+      const up = c.struct === 'ot-up', flat = digital('lognormal', up, F, c.k, sdA, c.basePay);
+      if (!(flat > 1e-4)) return null;
+      const tv = oneTouch('lognormal', S, F, c.k, sdA, c.basePay);
+      v = tv * (1 + (1 - tv) * (dig(up, c.k) / flat - 1));
+      break;
+    }
+    case 'cs': v = (cv(c.k) - cv(c.kf!)) / (c.kf! - c.k); break;
+    case 'ps': v = (cv(c.k) - (F - c.k) - (cv(c.kf!) - (F - c.kf!))) / (c.k - c.kf!); break;
+    default: return null;
+  }
+  return Number.isFinite(v) && v > -0.02 && v < 1.02 ? Math.min(1, Math.max(0, v)) : null;
+}
+
+// V of a twin at `spot` and time t0: on its smile when it has one, else at the at-the-money vol. tv is the
+// at-the-money-vol value, the desk's theoretical value, kept beside the premium.
+export function twinValue(c: TwinCard, spot: number, t0: number): { v: number; tv: number; n: number } {
+  const flat = valueAtTime(c, spot, t0);
+  const w = c.wings;
+  // No smile, under half a session left, or a touch already through its barrier: the flat value stands.
+  if (!w || !(flat.n >= 0.5) || (c.struct.startsWith('ot') && flat.v >= 1)) return { v: flat.v, tv: flat.v, n: flat.n };
+  const rt = Math.sqrt(flat.n);
+  const sv = smileShare(c, spot, forward(spot, c.carry, flat.d), c.vol * rt, w.c * rt, w.p * rt);
+  return { v: sv ?? flat.v, tv: flat.v, n: flat.n };
+}
+
 // The twin as a convexity card, before its premium is known (markTwin sets p0fill from the fill).
 // `direction` is the linear card's: +1 long the proxy's own number, −1 short.
-export function twinCard(proxy: string, line: string, direction: number): ConvexCard | string {
+export function twinCard(proxy: string, line: string, direction: number): TwinCard | string {
   const pair = fxPair(proxy);
   if (!pair) return 'a twin needs a single FX proxy';
   const kv = parseTwin(line);
@@ -91,15 +161,17 @@ export function twinCard(proxy: string, line: string, direction: number): Convex
   const rr = blank(kv.rr) ? null : num(kv.rr), bf = blank(kv.bf) ? 0 : num(kv.bf);
   if (!blank(kv.rr) && (rr == null || !(Math.abs(rr) <= 15))) return `rr ${kv.rr}`;
   if (bf == null || !(bf >= -1 && bf <= 5)) return `bf ${kv.bf}`;
-  // The dearer of the at-the-money vol and the 25-delta vol on the structure's own side.
-  const vol = rr == null ? iv : Math.max(iv, iv + bf + ((UP.has(struct) ? 1 : -1) * rr) / 2);
+  // The 25-delta vols; a wing under a quarter of the at-the-money vol is a misprint, not a smile.
+  const wc = rr == null ? iv : iv + bf + rr / 2, wp = rr == null ? iv : iv + bf - rr / 2;
+  if (!(Math.min(wc, wp) >= iv / 4)) return `rr ${kv.rr} against iv ${kv.iv}`;
+  const perSession = (annualPct: number) => annualPct / 100 / Math.sqrt(252);
   const cy = kv.carry == null || kv.carry === '-' ? 0 : num(kv.carry);
   if (cy == null || !(Math.abs(cy) <= 25)) return `carry ${kv.carry}`;
   const pay = ((kv.pay ?? '-').toUpperCase().match(/[A-Z]{3}|-/) ?? ['?'])[0];
   if (pay !== '-' && !pair.includes(pay)) return `pay ${kv.pay}`;
   return {
     struct, k, kf: spread ? kf : null, model: 'lognormal', fx: true, basePay: pay === pair[0], carry: cy / 100, cut,
-    vol: vol / 100 / Math.sqrt(252), p0: null, p0fill: 0,
+    vol: perSession(iv), p0: null, p0fill: 0, wings: rr == null ? null : { c: perSession(wc), p: perSession(wp) },
   };
 }
 
@@ -121,8 +193,9 @@ export interface TwinMark {
   state: 'open' | 'touch' | 'expiry' | 'view';
   r: number;            // R on the premium: V ÷ p0fill − 1 while open, the settled or early-close figure once closed
   v: number;            // value as a share of the maximum payout
-  p0fill: number;       // premium paid at the fill, share of the payout (R01 price plus dealing cost)
-  vol: number;          // the annual vol it is priced at, per cent
+  p0fill: number;       // premium paid at the fill, share of the payout (the smile price plus R01's dealing cost)
+  tv: number;           // its value at the fill at the at-the-money vol, share of the payout
+  vol: number;          // the annual at-the-money vol, per cent
   fill_px: number;      // spot at the fill: the open of the first hourly bar at or after the card's fill time
   as_of: number;        // ms UTC of the mark, touch, settlement or early close
   px: number | null;    // the price behind it
@@ -134,42 +207,45 @@ export interface TwinOpts {
   // (R01 EARLY CLOSE). A stop, target or time exit is not passed, so the twin runs on to a touch or its cut.
   early?: { ts: number; px: number | null } | null;
   // The premium and fill price stored at the first mark; given, they are not recomputed (Yahoo revises old bars).
-  frozen?: { p0fill: number; fill_px: number } | null;
+  frozen?: { p0fill: number; fill_px: number; tv: number } | null;
 }
 
 // Marks one twin. `hourly` carries `live` (liveSinceFill) and reaches back to the fill. Touches are judged on
 // live hourly bars only: Yahoo's daily FX closes are too often stale to settle anything on.
 // Returns an error string when the twin cannot be priced.
-export function markTwin(card0: ConvexCard, hourly: Bar[], fillTs: number, now: number, tier: 1 | 2, opts: TwinOpts = {}): TwinMark | string {
-  let p0fill: number, fillPx: number;
-  if (opts.frozen && opts.frozen.p0fill > 0) ({ p0fill, fill_px: fillPx } = opts.frozen);
+export function markTwin(card0: TwinCard, hourly: Bar[], fillTs: number, now: number, tier: 1 | 2, opts: TwinOpts = {}): TwinMark | string {
+  let p0fill: number, fillPx: number, tv: number;
+  if (opts.frozen && opts.frozen.p0fill > 0) ({ p0fill, fill_px: fillPx, tv } = opts.frozen);
   else {
     const fb = hourly.find((b) => b.ts >= fillTs);
     if (!fb || fb.ts - fillTs > 3 * DAY) return 'no hourly bar at the fill';
-    const at = valueAtTime(card0, fb.o, fb.ts);
+    const at = twinValue(card0, fb.o, fb.ts);
     if (!(at.n >= 1)) return 'cut within a session of the fill';
     p0fill = premium(at.v, isBinary(card0.struct), tier);
     fillPx = fb.o;
+    tv = at.tv;
     if (!(p0fill >= TWIN_MIN_PREMIUM)) return `premium ${(p0fill * 100).toFixed(1)}% of payout at the fill, under the 10% floor`;
     if (!(p0fill <= 0.9)) return `premium ${(p0fill * 100).toFixed(1)}% of payout at the fill: already through its level`;
   }
-  const card: ConvexCard = { ...card0, p0fill };
+  const card: TwinCard = { ...card0, p0fill };
   const e = opts.early;
   const end = e && e.ts > fillTs && e.ts < card.cut && e.ts <= now ? e.ts : null;
   // An early close at `end` sees only the bars that had ended by then; the last of them prices it.
   const m = markConvexity(card, hourly, [], fillTs, end != null ? end - 1 : now);
   if (!m) return 'no live hourly bars';
-  const base = { p0fill, fill_px: fillPx, vol: card.vol * Math.sqrt(252) * 100 };
+  const base = { p0fill, tv, fill_px: fillPx, vol: card.vol * Math.sqrt(252) * 100 };
   if (m.paid != null) {
     const touch = m.touched_at != null;
     return { ...base, state: touch ? 'touch' : 'expiry', r: m.r, v: m.paid, as_of: touch ? m.touched_at! : card.cut, px: touch ? m.touched_px : m.settled_px, left_n: 0 };
   }
   if (end != null) {
     const px = e!.px ?? m.price;
-    const v = valueAtTime(card, px, end).v;
+    const v = twinValue(card, px, end).v;
     return { ...base, state: 'view', r: earlyCloseR(isBinary(card.struct), v, p0fill, tier), v, as_of: end, px, left_n: 0 };
   }
-  return { ...base, state: 'open', r: m.r, v: m.v, as_of: m.as_of, px: m.price, left_n: m.left_n };
+  // The running mark, on the smile: the last live bar's close, valued at that bar's end.
+  const v = twinValue(card, m.price, Math.min(m.as_of + HOUR, card.cut)).v;
+  return { ...base, state: 'open', r: scoreR(v, p0fill), v, as_of: m.as_of, px: m.price, left_n: m.left_n };
 }
 
 // What dash-mark stores in the trade's meta (strings, like every other meta value). `line` is the terms line
@@ -178,15 +254,16 @@ export function twinMeta(m: TwinMark | string, line: string): Record<string, str
   if (typeof m === 'string') return { twin_state: `skipped: ${m}` };
   return {
     twin_terms: line.replace(/^\s*TWIN:\s*/i, '').trim(), twin_state: m.state, twin_r: m.r.toFixed(2), twin_v: (m.v * 100).toFixed(1),
-    twin_p0: (m.p0fill * 100).toFixed(1), twin_vol: m.vol.toFixed(2), twin_fill: String(+m.fill_px.toPrecision(8)),
+    twin_p0: (m.p0fill * 100).toFixed(1), twin_tv: (m.tv * 100).toFixed(1), twin_vol: m.vol.toFixed(2), twin_fill: String(+m.fill_px.toPrecision(8)),
     twin_px: m.px == null ? '-' : String(+m.px.toPrecision(8)), twin_asof: new Date(m.as_of).toISOString(), twin_left: m.left_n.toFixed(1),
   };
 }
 
-// The premium and fill price of an earlier mark, read back from the meta; null before the first mark.
-export function twinFrozen(meta: Record<string, string>): { p0fill: number; fill_px: number } | null {
-  const p0 = num(meta.twin_p0), px = num(meta.twin_fill);
-  return p0 != null && p0 > 0 && px != null && px > 0 ? { p0fill: Math.round(p0 * 10) / 1000, fill_px: px } : null; // tenths of a point, as premium() prints
+// The premium, theoretical value and fill price of an earlier mark, read back from the meta; null before the first mark.
+export function twinFrozen(meta: Record<string, string>): { p0fill: number; fill_px: number; tv: number } | null {
+  const p0 = num(meta.twin_p0), px = num(meta.twin_fill), tv = num(meta.twin_tv);
+  if (!(p0 != null && p0 > 0 && px != null && px > 0)) return null;
+  return { p0fill: Math.round(p0 * 10) / 1000, fill_px: px, tv: Math.round((tv ?? p0) * 10) / 1000 }; // tenths of a point, as premium() prints
 }
 
 // One card's twin, from the trade row to what dash-mark stores. `raw` is the proxy's hourly history (6 months),
