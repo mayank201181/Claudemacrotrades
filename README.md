@@ -53,9 +53,20 @@ proposed and in force, weekly lessons).
   -20..+20) appended by `dash-trend` to the Trend Monitor's report after `END_TREND_MONITOR`; see `docs/carver_and_fxopt.md`.
 - `scripts/fxopt/` — FX option pricer for the digests (stdlib Python: vanillas, digitals, touches, barriers, delta
   conventions, vanna-volga smile), with `test_fxopt.py` cross-checking it against QuantLib-Python.
+- `scripts/marketpack/`, `scripts/predmkt/`, `scripts/fundpack/` — the daily market pack (price action, futures open
+  interest, positioning build-up, DTCC FX options, headlines, the weekly fundamentals block), the prediction-market
+  odds pull and the weekly fundamentals pack. Each is a copy of the file the scheduled task runs from the project
+  files folder of the same name; keep the two byte-identical. See `docs/fundpack.md`.
+- `scripts/fomc_presser/` — the FOMC press-conference reversal study behind rule R11.
+- `scripts/event_library/to_sql.py` — turns the event library's outputs into the SQL that `016_event_library.sql` loads.
+- `supabase/rules/` — the text of the digest rules as proposed through `dash.propose_rule` (R06 onward).
 - `supabase/migrations/` — the `dash` schema (in `macro-state-db`; never touches the routines' own tables).
 - `scripts/apps_script/Code.gs` — feeder that runs in the owner's Google account every 10 minutes and posts new
   emails and trade books to `dash-ingest`. The Gmail searches come from `dash.config.feeds`, so a new tab is a
   config change, not a script change (set `TOKEN`, run `setup` once after pasting a new version).
+- `scripts/apps_script/Spec.gs` — applies a staged `trade_book_spec_edits` file to the spec Doc on Drive and archives
+  the previous version.
+- `STATUS.md` — current state: what runs, the rules in force, open items. `docs/history.md` — the dated narrative
+  behind it, newest first, and summaries of work that never reached `main` as its own pull request.
 
 No trade or theme data lives in this repository (it is public); it all sits in Supabase behind the login.
