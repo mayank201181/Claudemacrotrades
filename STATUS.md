@@ -46,9 +46,9 @@ State read on 10 Nov 2026, about 12:45 SGT.
 
 | Task | Id | When | Notes |
 |---|---|---|---|
-| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (watchdog and site label follow the same day). Email due 08:15. Prompt at the 65,536-byte cap: changes go through `dash.rules` |
+| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt at the 65,536-byte cap: changes go through `dash.rules` |
 | Fable MT watchdog | `trig_01En26Xiwep91rAGjtWF68d2` | 07:20 daily | refires a dead run. It is a Claude task, so it dies with the usage limit |
-| YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways. The Podcast task reads its Podwise key from the YouTube task's prompt |
+| YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways, task names "Daily YouTube Digest" and "Daily Podcast Digest". The Podcast prompts find the Podwise key by the exact task name "Daily YouTube Digest": never rename it |
 | GDELT attention | `trig_01UvLHEc5HZn6cbcCtbsdGob` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04) |
 | Prediction-market odds | `trig_01Uz92j76ozWE1EJ3SHxbHWz` | 06:38 daily | writes Drive `predmkt_latest` (R12) |
 | Market pack | `trig_01KTuAEzuMfvBNr98nBEEfhk` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup |
