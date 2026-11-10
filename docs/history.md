@@ -6,6 +6,18 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 10 Nov 2026: database part of the audit applied
+
+The owner ran the one statement (project file `notes/audit_10nov2026_db.sql`) in the Supabase SQL editor at
+13:52 SGT, after the approval prompt raised by the database connector was cancelled by his app twice. Checked by
+read afterwards: R13 status `reverted`; no Opus card left open (three closed as `closed-view`, exit reason "book
+ended", booked on 2 Nov, the first hourly bar after the 31 Oct decision); ten Opus questions retired, none open;
+all 114 stored Email Digest subjects neutral and the `feeds_neutral_subject` trigger in place; the
+`cron-run-log-prune` job scheduled (Monday 03:17 SGT) and no run-log row older than 14 days; the
+`dash-trend-shadow-daily` job gone. This is what `018_audit_housekeeping.sql` holds, plus the one-off data changes.
+Lesson: a destructive statement sent through the connector asks the owner to confirm, and his app cannot answer
+that prompt; give him the tested file for the SQL editor instead.
+
 - **10 Nov 2026, audit follow-ups (owner: "Yes to all" on the fourteen review items; pull request #58).**
   Trend monitor: the month of TM1.1 shadow runs (25 runs from 7 Oct) was read pair by pair against TM1. For the G10
   pairs and KRW, SGD and TWD the two disagreed on 1 to 10 of 24 days and on most of those the New York clock simply

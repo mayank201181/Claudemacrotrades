@@ -100,7 +100,7 @@ email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/
 | R16 | KRW cards weigh the equity-flow channels | 8 Nov | 15 Dec |
 
 R03 (drivers engine) reverted 1 Nov. R15 (market pack as a rule) withdrawn 1 Nov; the pack went in as a prompt edit.
-R13 (question hunt evidence, scope opus) is being reverted on 10 Nov with the database items in Open items 2.
+R13 (question hunt evidence, scope opus) reverted 10 Nov; its only reader, the Opus Macro Takeaways, stopped on 31 Oct.
 
 ## Trade book spec (`trade_book_spec` on Drive, both books read it)
 
@@ -117,34 +117,28 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    pack, FX option twins, expression table, split-run shadow test, cheaper models by stage, one feeder task, weekly
    review must propose, housekeeping (stale times in feeder prompts, the Fable 5.2 relabel, connectors per task, two
    API keys out of prompt text). That thread records each outcome here; do not touch those pieces from elsewhere.
-2. **Database part of the 10 Nov audit, waiting for the owner's approval tap.** One statement, in project file
-   `notes/audit_10nov2026_db.sql`: revert R13, close the three Opus cards left open when that book stopped on
-   31 Oct (exit at the close of the first hourly bar after the decision) and retire its ten open questions, a
-   neutral stored subject for the Email Digest family, a weekly prune of the cron run log, and unscheduling the
-   TM1.1 trend shadow job. Until it runs, the shadow job still fires at 00:40 UTC (harmless) and
-   `018_audit_housekeeping.sql` is not applied.
-3. **After a change to `dash-trend/index.ts`, `trend.ts` or `forecast.ts`, re-pin the stub** to the new `main`
+2. **After a change to `dash-trend/index.ts`, `trend.ts` or `forecast.ts`, re-pin the stub** to the new `main`
    commit (one small deploy), then POST a dry run and read the reply in `net._http_response`. The branch
    `claude/project-thread-e80nxd` holds the rollback commit 64d1f84; keep it until the New York clock has run
    cleanly for a couple of weeks.
-4. **First stored runs on the New York FX clock:** check on 11 and 12 Nov that `dash.trend_run` is OK, that the
+3. **First stored runs on the New York FX clock:** check on 11 and 12 Nov that `dash.trend_run` is OK, that the
    twelve pairs carry `@ny17` sources in `dash.trend_px`, and that no pair fell back to daily bars
    (`fetch_errors`).
-5. **Rule reviews coming due:** R04, R05, R06 on 23 Nov; R07 on 28 Nov; R12 on 30 Nov. Month-end scorecard:
+4. **Rule reviews coming due:** R04, R05, R06 on 23 Nov; R07 on 28 Nov; R12 on 30 Nov. Month-end scorecard:
    count R08 and R14 conflict closes and whether they were premature; note that touch targets with hourly-close stops
    flatter realised R a little; judge the flow check again.
-6. **Thin-edge review at 30 closes** (spec v12). The fill-rule decision in item 1 changes its answer; settle that
+5. **Thin-edge review at 30 closes** (spec v12). The fill-rule decision in item 1 changes its answer; settle that
    first.
-7. **Crowd asymmetry calibration (R09):** after 20 closed with-crowd cards, compare realised R with the adjusted EV.
-8. **Event calendar in the database ends 8 Jan 2027.** Rebuild the calendar, rerun `scripts/event_library/to_sql.py`
+6. **Crowd asymmetry calibration (R09):** after 20 closed with-crowd cards, compare realised R with the adjusted EV.
+7. **Event calendar in the database ends 8 Jan 2027.** Rebuild the calendar, rerun `scripts/event_library/to_sql.py`
     and load with project file `event_library/016_event_library_and_rule.sql` before then.
-9. **Spec and rules disagree on one sentence:** fold the spec's TACTICAL WASHOUT sentence into the next spec version
+8. **Spec and rules disagree on one sentence:** fold the spec's TACTICAL WASHOUT sentence into the next spec version
     (a `trade_book_spec_edits` file) so that the Doc matches R08 and R14.
-10. **FOMC presser rule (R11):** recheck the post-May-2026 pressers as the new chair's sample grows.
-11. **Known data fragility in `dash-trend`:** MOF JGB file intermittently 404s (falls back to stored closes); CSI300
+9. **FOMC presser rule (R11):** recheck the post-May-2026 pressers as the new chair's sample grows.
+10. **Known data fragility in `dash-trend`:** MOF JGB file intermittently 404s (falls back to stored closes); CSI300
     on the 510300.SS ETF goes stale over China holidays; USDCNH vol percentile is short-sample until about Feb 2027;
     no second price source, so the cross-check always reads `XCHECK_NA`.
-12. **Housekeeping left over from the audit:** about forty merged or superseded branches (threads cannot delete
+11. **Housekeeping left over from the audit:** about forty merged or superseded branches (threads cannot delete
     branches; GitHub's "Automatically delete head branches" setting would stop new ones piling up); the scheduled
     task "TEMP merge test" can only be deleted by the owner (https://claude.ai/code/routines/trig_01NymU4Af4gkJGUAQUZz3DHK);
     the paused Fable Email Digest task is left to the workflow thread; the `dash-probe` stub can be deleted in the
