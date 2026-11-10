@@ -1,6 +1,6 @@
 # Claudemacrotrades — Macro Desk
 
-Private dashboard for the daily Macro Takeaways digests (Fable 5.1 and Opus 5.5): themes by date,
+Private dashboard for the daily Macro Takeaways digests (Fable 5.2 and Opus 5.5): themes by date,
 the trade books (entered trades with live marks; tested-but-not-entered ideas with shadow outcomes),
 the YouTube, Podcast, Grok and Substack digests by date and source, and three scoring tabs:
 Questions (the odds engine's calls, graded with lead time and against an always-NO baseline), Voices (each

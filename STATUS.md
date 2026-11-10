@@ -4,7 +4,7 @@ Hand-over file for Claude Code sessions. Read this first, then `README.md`. Upda
 every session: what changed, what is open, what was decided. Keep it short; the code and commit
 messages hold the detail.
 
-_Last updated: 2026-11-10._
+_Last updated: 2026-11-03._
 
 ## Where things are
 
@@ -36,18 +36,6 @@ Voices, Review, Positioning, Trend, Drivers.
 
 ## Live now (8 Oct) — waiting on the owner
 
-- **No Macro Takeaways on 8 and 9 Nov or on the morning of 10 Nov (Claude usage limit); workflow review delivered
-  10 Nov, decisions open.** The weekly Claude allowance ran out early Sun 8 Nov and the organisation's monthly
-  extra-usage cap was already spent, so every scheduled Claude run failed, including the 07:20 watchdog and the market
-  pack, odds and GDELT feeders. The feeders' task status still read "succeeded" because the wake was delivered: check
-  the file dates, not the task status. On the owner's decision card (10 Nov 11:24 SGT) the Takeaways task was moved to
-  the Fable 5.2 model with the prompt unchanged, and a catch-up run was fired at 11:38 SGT; the three data files were
-  rebuilt by hand and uploaded first. The subject tag, the task name and the watchdog still say "[Fable 5.1]" on purpose
-  until one coordinated relabel (prompt, watchdog, site `SOURCE_NAME`). Drive uploads can pass a file reference
-  (`sha256:<hex>:<absolute path>` in `base64Content`), which sends the file itself with no retyping. A review of the
-  whole Takeaways workflow went to the owner the same day as a private document with eleven yes/no decisions (Open
-  items 14). Open: confirm the 10 Nov catch-up and the Wed 11 Nov 06:33 run landed; the weekly allowance resets
-  Wed 11 Nov 22:00 SGT; nothing outside Claude yet tells the owner when a morning is missed.
 - **Fable Macro Takeaways missed again 5 Nov; start moved to 06:33 SGT, second reads cut, watchdog added.** The 06:59 run's
   cloud container disconnected at 07:06 SGT (infra, not the prompt or credits); a Fable catch-up fired 08:22 and landed
   09:54. Even with no waits a run takes ~85-90 min, so 06:58 cannot make 08:15. Live from Fri 6 Nov: cron 06:33 SGT; every
@@ -356,24 +344,6 @@ Voices, Review, Positioning, Trend, Drivers.
     (owner "Yes", proposed 11:35Z, put in force early by the owner's one-line update so it covers the 28 Oct FOMC;
     `supabase/rules/R11_fomc_presser_exit.sql`). Check the Wed 28 and Thu 29 Oct digests print FOMC EXIT lines. Recheck the 3 post-May-2026 pressers (all continued) as the
     new chair's sample grows. The v15 hourly-close stop lands on the 15:00 ET bar, which is mid-presser.
-14. **Takeaways workflow review (10 Nov 2026, thread "Improve macro takeaways workflow for trades"): eleven decisions
-    waiting on the owner.** Nothing live changes until he answers. (1) Raise the monthly usage cap. (2) Fill rule: 1R
-    is the planned reference-to-stop distance, and an adverse fill that has used more than half of it is void; the
-    scorer `dash-mark` divides by entry minus stop and must change with the rule. (3) A morning check outside Claude
-    (Apps Script on Gmail, 08:20 SGT) plus a dashboard banner when today's digest row is missing. (4) An implied vol
-    and skew table from the DTCC FX option prints in market pack section D (feasibility script in project files
-    `notes/dtcc_iv_test.py`; it still needs forward points and one check against a dealer screen). (5) A four-week
-    trial that scores the option named on each FX card beside the linear card. (6) An expression table per theme, with
-    rejected alternates tagged by theme in the shadow book. (7) A five-day shadow test of a split run: a cheaper model
-    writes one evidence file from every digest copy and the decision model reads that. (8) The Claude YouTube, Podcast
-    and Email digests on a cheaper model after three days side by side. (9) The three data feeders as one small task
-    using file-reference uploads. (10) The weekly review ends with up to two rule proposals or "none, because", and
-    its stale gate text is fixed. (11) Housekeeping: free prompt bytes, stale deadline times in the feeder prompts,
-    the relabel, connectors per task cut to those used, two API keys moved out of prompt text into environment
-    secrets. Closed by the review: the Trend tab gap (R10 and market pack section A carry trend) and the hedge bucket
-    (no hedge card has been written). Checked and not recommended: loosening the arithmetic test, breakeven stops or
-    scale-outs, repeats as a signal, relaxing no-chase on the favourable side, cutting a card class, restoring the
-    +0.3R floor.
 
 ## Questions still unanswered
 
