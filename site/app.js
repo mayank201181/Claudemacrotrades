@@ -146,7 +146,7 @@
     grok: { name: 'Grok Full Consolidated', open: /network pulse a|markets intel/i },
     substack: { name: 'Newsletters (from the Email Digest)', open: /market/i },
   };
-  const SOURCE_NAME = { fable: 'Fable 5.2', opus: 'Opus 5.5', chatgpt: 'ChatGPT', claude: 'Claude' };
+  const SOURCE_NAME = { fable: 'Fable 5.2', opus: 'Opus 5.5', chatgpt: 'ChatGPT', claude: 'Claude', crowding: 'Crowding check', grokbot: 'Grok Bot' };
   const feedState = {};
 
   async function renderFeed(family) {
@@ -178,7 +178,7 @@
     if (my !== seq || state.tab !== family) return;
     const rows = fs.rows[key] || [];
     const sources = [...new Set(rows.map((r) => r.source))];
-    const pref = [fs.source, state.model, 'opus', 'fable', 'chatgpt', 'claude'];
+    const pref = [fs.source, state.model, 'opus', 'fable', 'chatgpt', 'grokbot', 'claude'];
     const src = pref.find((s) => s && sources.includes(s)) || sources[0];
     fs.source = src;
     $('#sourceSeg').innerHTML = sources.length > 1 ? sources.map((s) => `<button data-src="${s}" class="${s === src ? 'active' : ''}">${esc(SOURCE_NAME[s] || s)}</button>`).join('') : '';
@@ -359,7 +359,7 @@
     const rows = ordered.map((t) => {
       if (isConvex(t)) return convexRow(t);
       const r = curR(t); const lv = t.live;
-      const flags = lv && t.status === 'open' ? [lv.stop_closed ? '<span class="neg">stop closed</span>' : lv.stop_touched ? '<span class="warn">stop touched intraday</span>' : '', lv.target_closed ? '<span class="pos">target closed</span>' : lv.target_touched ? '<span class="pos">target touched intraday</span>' : ''].filter(Boolean).join(' · ') : '';
+      const flags = lv && t.status === 'open' ? [lv.stop_closed_h ? '<span class="neg">stop closed (hourly)</span>' : lv.stop_closed ? '<span class="neg">stop closed (daily)</span>' : lv.stop_touched ? '<span class="warn">stop touched intraday</span>' : '', lv.target_touched ? '<span class="pos">target touched</span>' : lv.target_closed ? '<span class="pos">target closed</span>' : ''].filter(Boolean).join(' · ') : '';
       const id = `${t.model}-${t.pid}`; const isOpen = state.open.has(id);
       return `<tr class="click" data-id="${id}">
           <td class="mono">${esc(t.pid)}</td>

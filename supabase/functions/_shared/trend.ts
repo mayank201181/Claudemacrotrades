@@ -15,10 +15,12 @@
 //    final bar is more than 3 weekdays older than the run's previous weekday (no local calendars).
 // D4 CSI300: the Yahoo symbol (and its fallback) is configuration in the asset table, not logic here.
 // D5 run identity: run_date = the Singapore calendar date of run_utc (cron 00:30 UTC Tue–Sat).
-// D6 (TM1.1 only): an FX asset given an exch_close (17:00 New York) is on the New York close clock:
+// D6: an FX asset given an exch_close (17:00 New York) is on the New York close clock:
 //    its bar dated D is the 17:00 New York price on D, final once the run is 30 minutes past that
 //    close, and expected on the most recent New York business day that has closed (the US-listed
-//    rule). TM1's FX assets carry no exch_close, so TM1 keeps the spec's UTC-date rules unchanged.
+//    rule). The asset table here carries no exch_close for FX; dash-trend adds it at run time to the
+//    pairs it builds on that clock (all but USDCNH, USDINR and USDIDR since 10 Nov 2026; before that
+//    only the TM1.1 shadow did). An FX asset without one keeps the spec's UTC-date rules.
 import { normCdf } from './normal.ts';
 
 export type AssetClass = 'fx' | 'rates' | 'commodities' | 'equities';
