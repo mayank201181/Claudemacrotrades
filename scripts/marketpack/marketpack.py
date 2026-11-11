@@ -7,9 +7,10 @@ Sections
   B  PARTICIPATION  Yahoo futures quotes (the most-held contract per root): volume vs 20-day average,
                     open interest and its day-on-day change, and the price/OI read.
   C  POSITIONING    the SQL the digest runs itself (build-up over the msd positioning series).
-  D  FX OPTIONS     DTCC swap data repository (US-reported trades, T-1): option notional by pair vs
-                    its 20-day average, base-call share, NDF volume, large strikes expiring soon, and
-                    implied vol by tenor with a risk-reversal proxy, backed out of the reported premiums.
+  D  FX OPTIONS     DTCC swap data repository (US-reported trades, UTC days; the day that is ending is
+                    read from the intraday files): option notional by pair vs its 20-day average,
+                    base-call share, NDF volume, large strikes expiring soon, and implied vol by tenor
+                    with a risk-reversal proxy, backed out of the reported premiums.
   E  HEADLINES      wire and newspaper RSS headlines from the last 24 hours, plus the Fed's own feeds.
   F  SHORTS JP/AU   QuiVad republication of JFSA (fund-level) and ASIC (aggregate) disclosed short positions.
   G  FUNDAMENTALS   the weekly fundamentals pack (scripts/fundpack/fundpack.py), copied in when built within 9 days.
@@ -18,8 +19,8 @@ Usage: python3 -I marketpack.py --out /mnt/project-files/marketpack/ [--sql posb
 Writes market_pack_latest.md plus small history files (oi_history.csv, dtcc_daily.csv,
 dtcc_strikes.csv, dtcc_iv_obs.csv, shorts_history.csv) in --out. Every section fails soft: a failed source prints a line, never stops the run.
 """
-import argparse, bisect, csv, datetime as dt, email.utils, gzip, html, io, json, math, os, re, sys, time, zipfile
-import urllib.parse, urllib.request, http.cookiejar
+import argparse, bisect, concurrent.futures, csv, datetime as dt, email.utils, gzip, html, io, json, math, os, re, sys
+import time, urllib.error, urllib.parse, urllib.request, http.cookiejar, zipfile
 from xml.etree import ElementTree as ET
 
 SGT = dt.timezone(dt.timedelta(hours=8))
@@ -368,11 +369,57 @@ def num(s):
         return None
 
 
+DTCC_API = "https://pddata.dtcc.com/ppd/api"
+DTCC_BUCKET = "kgc0418-tdw-data-0"  # the public bucket DTCC's own dashboard reads; general/bucketname names it
+SLICE_FROM_HOUR = 21  # UTC. New York has closed by then in summer and all but closed in winter: the day is worth reading
+SLICE_THREADS = 16
+
+
 def dtcc_file(day):
     name = f"CFTC_CUMULATIVE_FOREX_{day:%Y_%m_%d}.zip"
-    data = get(f"https://pddata.dtcc.com/ppd/api/report/cumulative/cftc/{name}", timeout=120)
+    data = get(f"{DTCC_API}/report/cumulative/cftc/{name}", timeout=120)
     z = zipfile.ZipFile(io.BytesIO(data))
     return z.open(z.namelist()[0])
+
+
+def dtcc_slices(day):
+    """A UTC day whose full-day file is not out yet, read from DTCC's intraday files.
+    The full-day file of a UTC day appears at about 00:15 UTC on the next day, which is after the morning build,
+    so without this the pack is a New York session behind. The intraday files (about 3,000 a day, a few rows
+    each, numbered from 1) carry the same rows as they are published; Slice.json, the list the DTCC dashboard
+    itself reads, names the newest one. Returns (rows, 'HH:MMZ' end of the newest file, number of files).
+    Every file up to the newest must arrive, or this raises and the day is left to the full-day file."""
+    try:
+        bucket = get(DTCC_API + "/general/bucketname", timeout=20, tries=1).decode("ascii", "replace").strip()
+    except Exception:  # noqa: BLE001
+        bucket = ""
+    if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", bucket):
+        bucket = DTCC_BUCKET
+    base = f"https://{bucket}.s3.amazonaws.com/"
+    tag = f"CFTC_SLICE_FOREX_{day:%Y_%m_%d}_"
+    listed = {}
+    for x in json.loads(get(base + "dashboard/Slice.json", timeout=60)).get("CFTC_FX") or []:
+        m = re.fullmatch(re.escape(tag) + r"(\d+)\.zip", x.get("fileName") or "")
+        if m:
+            listed[int(m.group(1))] = x
+    if not listed:
+        raise ValueError("no intraday files listed for the day")
+    top = max(listed)
+    with concurrent.futures.ThreadPoolExecutor(SLICE_THREADS) as ex:
+        blobs = list(ex.map(lambda n: get(f"{base}cftc/slices/{tag}{n}.zip", timeout=30), range(1, top + 1)))
+
+    def rows():
+        seen = set()
+        for blob in blobs:
+            z = zipfile.ZipFile(io.BytesIO(blob))
+            for r in csv.DictReader(io.TextIOWrapper(z.open(z.namelist()[0]), encoding="utf-8", errors="replace")):
+                key = r.get("Dissemination Identifier")
+                if key and key in seen:  # the full-day file carries a row once
+                    continue
+                seen.add(key)
+                yield r
+
+    return rows(), (listed[top].get("endTs") or "")[11:16] + "Z", top
 
 
 # Implied vol from the premiums on DTCC vanilla prints (free; the only keyless FX vol source found).
@@ -578,18 +625,20 @@ def _med_se(xs, floor=0.0):
     return med, math.hypot(1.2533 * (q(0.75) - q(0.25)) / 1.349 / math.sqrt(n), floor), n
 
 
-def iv_table(obs):
-    """Observation history -> the table lines of section D."""
+def iv_table(obs, cuts=None):
+    """Observation history -> the table lines of section D. cuts = {date: 'HH:MMZ'} for a day read from the
+    intraday files, printed beside the date the prints run to."""
     dates = sorted({r[0] for r in obs})
     if not dates:
         return ["Implied vol from DTCC premiums: no usable prints"]
     last, prev = dates[-1], (dates[-2] if len(dates) > 1 else None)
     w5, p5 = set(dates[-5:]), set(dates[-10:-5])
-    out = [f"Implied vol from DTCC option premiums (vanilla and NDO prints to {last}; vol in %, (n) = prints; ATM = "
+    asof = last + (f" {cuts[last]}" if cuts and cuts.get(last) else "")
+    out = [f"Implied vol from DTCC option premiums (vanilla and NDO prints to {asof}; vol in %, (n) = prints; ATM = "
            "straddles, with the forward from put-call parity, plus single prints of 0.40-0.60 delta; ± = one standard "
            "error; ~ = 5-day pool; RR25 = 0.15-0.35 delta calls minus puts, 21-110 days, 5-day pool, + = base-currency "
            "calls over; BF25 = the wings' average minus ATM; fwd = parity-implied forward drift a year; * = a change "
-           "beyond two standard errors, anything else is noise; a US-reported sample at T-1, not a broker run):"]
+           "beyond two standard errors, anything else is noise; a US-reported sample, not a broker run):"]
     n_pairs = 0
     for pair in WATCH:
         rows = [r for r in obs if r[1] == pair]
@@ -666,11 +715,13 @@ def iv_table(obs):
     return out
 
 
-def iv_update(outdir, day_prints):
+def iv_update(outdir, day_prints, redo=(), cuts=None):
     """Add the new days' observations to dtcc_iv_obs.csv, keep IV_KEEP DTCC days, return the table lines.
-    Each processed day also gets one marker row (kind D), so a day without a usable print is not fetched again."""
+    Each processed day also gets one marker row (kind D), so a day without a usable print is not fetched again.
+    redo = days whose stored observations came from the intraday files and are replaced by day_prints."""
     path = os.path.join(outdir, "dtcc_iv_obs.csv")
     hist = [[r[k] for k in IV_FIELDS] for r in csv.DictReader(open(path))] if os.path.exists(path) else []
+    hist = [r for r in hist if not (r[0] in redo and r[0] in day_prints)]
     new = {d: p for d, p in day_prints.items() if d not in {r[0] for r in hist}}
     if new:
         IV_RANGE[0] = "1mo" if (NOW.date() - dt.date.fromisoformat(min(new))).days > 4 else "5d"
@@ -679,14 +730,16 @@ def iv_update(outdir, day_prints):
     hist = sorted((r for r in hist if r[0] in keep), key=lambda r: (r[0], r[1], r[3]))
     with open(path, "w", newline="") as f:
         w = csv.writer(f); w.writerow(IV_FIELDS); w.writerows(hist)
-    return iv_table(hist)
+    return iv_table(hist, cuts)
 
 
-def dtcc_summarise(day):
-    """One day's new trades -> per-pair option stats, NDF stats, strike buckets and vanilla prints with premiums."""
-    f = io.TextIOWrapper(dtcc_file(day), encoding="utf-8", errors="replace")
+def dtcc_summarise(day, rows=None):
+    """One day's new trades -> per-pair option stats, NDF stats, strike buckets and vanilla prints with premiums.
+    rows = the day's rows when they come from the intraday files; otherwise the full-day file is read."""
+    if rows is None:
+        rows = csv.DictReader(io.TextIOWrapper(dtcc_file(day), encoding="utf-8", errors="replace"))
     opt, ndf, strikes, prints = {}, {}, {}, {}
-    for r in csv.DictReader(f):
+    for r in rows:
         if r.get("Action type") != "NEWT" or r.get("Event type") != "TRAD":
             continue
         fisn = r.get("UPI FISN") or ""
@@ -744,11 +797,15 @@ def dtcc_summarise(day):
 
 def section_d(outdir, backfill_days=22):
     out = ["## D. FX OPTIONS AND NDFs (DTCC swap data repository: US-reported new trades only, a sample of the "
-           "market; T-1 US date; notionals capped by DTCC on block trades, so totals are floors)"]
+           "market; UTC days, and the day that is ending comes from the intraday files, see the Latest line; "
+           "notionals capped by DTCC on block trades, so totals are floors)"]
     dpath, spath = os.path.join(outdir, "dtcc_daily.csv"), os.path.join(outdir, "dtcc_strikes.csv")
     daily = list(csv.DictReader(open(dpath))) if os.path.exists(dpath) else []
     strikes = list(csv.DictReader(open(spath))) if os.path.exists(spath) else []
-    have = {r["date"] for r in daily}
+    # a day stored from the intraday files (marker row of kind "part") is fetched again, and replaced only if that works
+    part = {r["date"] for r in daily if r["kind"] == "part"}
+    have = {r["date"] for r in daily} - part
+    utc_today = NOW.date()
     # business days back from the most recent US date
     us_today = (NOW - dt.timedelta(hours=5)).date()
     days, d = [], us_today
@@ -758,9 +815,9 @@ def section_d(outdir, backfill_days=22):
         d -= dt.timedelta(days=1)
     latest, fetched, errors = None, 0, []
     ipath = os.path.join(outdir, "dtcc_iv_obs.csv")
-    iv_have = {r["date"] for r in csv.DictReader(open(ipath))} if os.path.exists(ipath) else set()
+    iv_have = ({r["date"] for r in csv.DictReader(open(ipath))} if os.path.exists(ipath) else set()) - part
     iv_days = {d.isoformat() for d in days[:IV_BACKFILL]}  # the implied vol table needs each recent day's prints once
-    day_prints = {}
+    day_prints, redo = {}, set()
     limit = backfill_days if not daily else (6 if iv_have else IV_BACKFILL + 1)
     for day in days:  # newest first
         iso = day.isoformat()
@@ -770,12 +827,29 @@ def section_d(outdir, backfill_days=22):
             continue
         if fetched >= limit:
             break
+        cut = files = None
         try:
-            opt, ndf, stk, prints = dtcc_summarise(day)
+            if day == utc_today:  # its full-day file comes out after midnight UTC
+                if NOW.hour < SLICE_FROM_HOUR:
+                    continue  # too little of the day to set beside full days
+                rows, cut, files = dtcc_slices(day)
+                opt, ndf, stk, prints = dtcc_summarise(day, rows)
+            else:
+                try:
+                    opt, ndf, stk, prints = dtcc_summarise(day)
+                except urllib.error.HTTPError as e:
+                    if e.code != 404 or day != utc_today - dt.timedelta(days=1):
+                        raise
+                    rows, cut, files = dtcc_slices(day)  # the first minutes after midnight UTC: the day is over, its file is not out
+                    opt, ndf, stk, prints = dtcc_summarise(day, rows)
         except Exception as e:  # noqa: BLE001
             errors.append(f"{iso} {type(e).__name__}")
             continue
         fetched += 1
+        if iso in part:
+            daily = [r for r in daily if r["date"] != iso]
+            strikes = [r for r in strikes if r["date"] != iso]
+            redo.add(iso)
         if need_iv:
             day_prints[iso] = prints
         if iso in have:
@@ -788,6 +862,8 @@ def section_d(outdir, backfill_days=22):
             daily.append({"date": iso, "kind": "ndf", "key": ccy, "n": n, "usd": round(usd), "call": 0, "put": 0, "exotic": 0})
         daily.append({"date": iso, "kind": "day", "key": "ALL", "n": sum(s["n"] for s in opt.values()),
                       "usd": 0, "call": 0, "put": 0, "exotic": 0})
+        if cut:
+            daily.append({"date": iso, "kind": "part", "key": cut, "n": files, "usd": 0, "call": 0, "put": 0, "exotic": 0})
         for (pair, k, exp), usd in stk.items():
             strikes.append({"date": iso, "pair": pair, "strike": k, "expiry": exp, "usd": round(usd)})
         have.add(iso)
@@ -807,7 +883,10 @@ def section_d(outdir, backfill_days=22):
     def series(kind, key, field):
         m = {r["date"]: float(r[field]) for r in daily if r["kind"] == kind and r["key"] == key}
         return m
-    out.append(f"Latest DTCC day: {last} (US) · history {len(dates)} days" +
+    cuts = {r["date"]: r["key"] for r in daily if r["kind"] == "part"}
+    span = (f"UTC day to {cuts[last]}, from the intraday files: the whole New York session, and the full-day file "
+            "replaces it at the next build") if last in cuts else "UTC day, full-day file"
+    out.append(f"Latest DTCC day: {last} ({span}) · history {len(dates)} days" +
                (f" · fetch errors: {', '.join(errors[:3])}" if errors else ""))
     out.append("Options by pair: pair | trades | USD notional (vs 20d avg) | base-call share of notional (20d avg) "
                "| barrier/digital trades")
@@ -862,7 +941,7 @@ def section_d(outdir, backfill_days=22):
         if sum(per_pair.values()) >= 24:
             break
     try:
-        out += iv_update(outdir, day_prints)
+        out += iv_update(outdir, day_prints, redo, cuts)
     except Exception as e:  # noqa: BLE001
         out.append(f"Implied vol from DTCC option premiums: unavailable ({type(e).__name__})")
     return out, last
@@ -1050,7 +1129,7 @@ HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026
 2. PRICE ACTION: every theme and every trade card names its main proxy's line from A in one clause: trend (vs MA50/MA200), the 1w move in sigma, ext, and any flag, e.g. "price: above 50/200, 1w +1.8 sigma, ext +1.9, 20d HIGH". A BUILD-UP flag is the trade_book_spec washout screen's test on the same bars; price alone is never crowding.
 3. POSITIONING BUILD-UP: undo Drive's backslash escapes in the section C query (\\_ to _, \\* to *, and so on: the query itself has no backslash), then run it with execute_sql (project diiwqbxyhtgvozhncoef) in the same pass as R02. In each theme's Positioning line cite the series for its market whose 4-week change |d4| is 25 points or more, as "<series>: 3y pct <pct> (4w <d4>)". A build-up is not an extreme: R02 alone decides HARD POSITIONING and R09's crowd field.
 4. PARTICIPATION: from section B cite, in the Positioning line of a theme or on a card whose proxy is one of these futures, the price/OI read and volume vs its 20-day average. A move on falling OI (short covering, long liquidation) is weaker evidence of conviction than one on rising OI.
-5. FX OPTIONS: from section D cite, on FX themes and FX cards, the pair's option notional vs its 20-day average and the base-call share against its 20-day share (a demand-for-calls proxy, not a risk reversal), and any large strike expiring before the card's horizon within about 1% of spot. On an R01 convexity card name a large strike or expiry near its strike or barrier. US-reported trades only: say "DTCC sample" when you cite it. IMPLIED VOL (added 10 Nov 2026): the last table of D gives, per pair, ATM implied vol by tenor, a 25-delta risk-reversal proxy (RR25, + = base-currency calls over) and the parity-implied forward drift, all backed out of the premiums on DTCC prints. For the R10 pricer it is an implied vol with its source and time: for a pair it prints, pass vol = the ATM of the tenor nearest the expiry (atm, rr25 and bf25 when all three are printed, with bf_type smile) in place of rv20, and print "vol <x>% DTCC-implied <date>"; a same-day broker or exchange vol found on the web is printed beside it as a cross-check. Cite a vol or skew CHANGE only when it carries a star; an unstarred change is noise. Never fill a tenor or a pair the table does not print. It is a US-reported sample one day old, good to about half a vol, not a broker run.
+5. FX OPTIONS: from section D cite, on FX themes and FX cards, the pair's option notional vs its 20-day average and the base-call share against its 20-day share (a demand-for-calls proxy, not a risk reversal), and any large strike expiring before the card's horizon within about 1% of spot. On an R01 convexity card name a large strike or expiry near its strike or barrier. US-reported trades only: say "DTCC sample" when you cite it. IMPLIED VOL (added 10 Nov 2026): the last table of D gives, per pair, ATM implied vol by tenor, a 25-delta risk-reversal proxy (RR25, + = base-currency calls over) and the parity-implied forward drift, all backed out of the premiums on DTCC prints. For the R10 pricer it is an implied vol with its source and time: for a pair it prints, pass vol = the ATM of the tenor nearest the expiry (atm, rr25 and bf25 when all three are printed, with bf_type smile) in place of rv20, and print "vol <x>% DTCC-implied <date>"; a same-day broker or exchange vol found on the web is printed beside it as a cross-check. Cite a vol or skew CHANGE only when it carries a star; an unstarred change is noise. Never fill a tenor or a pair the table does not print. It is a US-reported sample that runs to the day and time in its header (the New York session just ended when D's Latest line names the intraday files, one session older when it names only the full-day file), good to about half a vol, not a broker run.
 6. HEADLINES: section E is a lead list for the COMPLETENESS SWEEP's reconcile step (completeness_sweep_spec B): a material headline the feeds missed is checked at its source and only then added with "[sweep]" and its link (for a line printed without a link, search the title and cite the source's own link). A headline is never a fact, a number or an odds arrow by itself.
 7. DISCLOSED SHORTS (added 1 Nov 2026, reference only): section F lists the most shorted Japanese and Australian names. Cite it only on a card or theme whose proxy is one of those names or a Nikkei/ASX single-stock expression, as "JFSA/ASIC shorts: <name> <pct>% (<funds> funds, 1w chg)". Never a reason for an index or FX view by itself.
 8. FUNDAMENTALS (added 6 Nov 2026): section G is the weekly fundamentals pack (inflation, cycle, trade, reserves, credit, real rates for G10 and Asia). Follow its own HOW TO USE: a slow anchor for each theme's top-down view and its risks line, never a trigger, never a reason to raise p.
