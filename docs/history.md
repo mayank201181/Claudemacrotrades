@@ -6,6 +6,14 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 11 Nov 2026: first stored trend run on the New York FX clock is clean
+
+Read from the database after the 00:30 UTC run of 11 Nov (the first stored run since `dash-trend` v8): status OK,
+38 of 38 assets, none stale or suspect, `fetch_errors` empty. The twelve pairs moved on 10 Nov carry `@ny17`
+sources in `dash.trend_px` for 10 Nov; USDCNH, USDINR and USDIDR are on their old sources as intended. No pair
+fell back to daily bars. The open item is closed; the rollback note (stub pinned to 64d1f84) stays in Open items 2
+for a couple of weeks.
+
 ### 11 Nov 2026: why the Takeaways came out short, and the DTCC day made current (pull request #65)
 
 **Short edition.** The 06:33 SGT run of 11 Nov mailed at 07:45 SGT, on time, but as a short edition (the stored

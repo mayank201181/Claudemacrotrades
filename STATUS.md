@@ -168,35 +168,32 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    deploy the stub with the new commit, POST a dry run through `pg_net` and read the reply in `net._http_response`.
    The branch `claude/project-thread-e80nxd` holds the `dash-trend` rollback commit 64d1f84; keep it until the New
    York clock has run cleanly for a couple of weeks.
-3. **First stored runs on the New York FX clock:** check on 11 and 12 Nov that `dash.trend_run` is OK, that the
-   twelve pairs carry `@ny17` sources in `dash.trend_px`, and that no pair fell back to daily bars
-   (`fetch_errors`).
-4. **Rule reviews coming due:** R04, R05, R06 on 23 Nov; R07 on 28 Nov; R12 on 30 Nov. Month-end scorecard:
+3. **Rule reviews coming due:** R04, R05, R06 on 23 Nov; R07 on 28 Nov; R12 on 30 Nov. Month-end scorecard:
    count R08 and R14 conflict closes and whether they were premature; note that touch targets with hourly-close stops
    flatter realised R a little; judge the flow check again.
-5. **Thin-edge review at 30 closes** (spec v12). R17 changes how a gapped fill is scored, so judge it on the
+4. **Thin-edge review at 30 closes** (spec v12). R17 changes how a gapped fill is scored, so judge it on the
    weekly review's cuts (`cum_r` as booked, `cum_r_planned` as the lens), not on the scorecard line alone.
-6. **Crowd asymmetry calibration (R09):** after 20 closed with-crowd cards, compare realised R with the adjusted EV.
-7. **Event calendar in the database ends 8 Jan 2027.** Rebuild the calendar, rerun `scripts/event_library/to_sql.py`
+5. **Crowd asymmetry calibration (R09):** after 20 closed with-crowd cards, compare realised R with the adjusted EV.
+6. **Event calendar in the database ends 8 Jan 2027.** Rebuild the calendar, rerun `scripts/event_library/to_sql.py`
     and load with project file `event_library/016_event_library_and_rule.sql` before then.
-8. **Spec and rules disagree on one sentence:** fold the spec's TACTICAL WASHOUT sentence into the next spec version
+7. **Spec and rules disagree on one sentence:** fold the spec's TACTICAL WASHOUT sentence into the next spec version
     (a `trade_book_spec_edits` file) so that the Doc matches R08 and R14.
-9. **FOMC presser rule (R11):** recheck the post-May-2026 pressers as the new chair's sample grows.
-10. **Known data fragility in `dash-trend`:** MOF JGB file intermittently 404s (falls back to stored closes); CSI300
+8. **FOMC presser rule (R11):** recheck the post-May-2026 pressers as the new chair's sample grows.
+9. **Known data fragility in `dash-trend`:** MOF JGB file intermittently 404s (falls back to stored closes); CSI300
     on the 510300.SS ETF goes stale over China holidays; USDCNH vol percentile is short-sample until about Feb 2027;
     no second price source, so the cross-check always reads `XCHECK_NA`.
-11. **Housekeeping left over from the audit:** about forty merged or superseded branches (threads cannot delete
+10. **Housekeeping left over from the audit:** about forty merged or superseded branches (threads cannot delete
     branches; GitHub's "Automatically delete head branches" setting would stop new ones piling up); the scheduled
     task "TEMP merge test" can only be deleted by the owner (https://claude.ai/code/routines/trig_01NymU4Af4gkJGUAQUZz3DHK);
     the `dash-probe` stub can be deleted in the Supabase dashboard whenever convenient.
-12. **Data problems the weekly review's dry runs found (10 Nov), none fixed yet.** For whoever next touches the
+11. **Data problems the weekly review's dry runs found (10 Nov), none fixed yet.** For whoever next touches the
     scorer: a daily bar series that disagrees with the hourly bars and sets a stop flag in `live_marks`; a bad
     hourly tick that sets a target flag; the daily fields of `live_marks` one bar behind on US-session proxies;
     `dash.bars` at `1d` holding several rows for one date; two questions that left the digest unscored after
     26 Oct; scorecard subtotals and hit counts that differ from the database; one malformed `dash.tested` row;
     `review_inputs` counting a void card as missed; no `dash.trend_run` row for 4 or 9 Nov; `first_seen` is a UTC
     date. The review prints these under their own heading each week (`docs/weekly_review.md`).
-13. **GDELT second sources from the cloud address.** Wikipedia views now arrive in two requests (action API) with
+12. **GDELT second sources from the cloud address.** Wikipedia views now arrive in two requests (action API) with
     a per-article fallback; the DOC API still refuses most requests, so its column in the table is usually blank.
     If R04's review on 23 Nov finds the DOC column is needed, route it through the `dash-gdelt` relay.
 
