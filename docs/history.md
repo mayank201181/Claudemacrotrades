@@ -64,6 +64,16 @@ first try (attention table 05:49, odds 06:23, market pack 06:54 SGT; `feeders/st
 stored the day's digest and stored the two "[Gemini]" copies under the source `gemini`. The GDELT DOC API
 answered 429 again, a known limit (Open items 13). Laptop visits by the owner: none.
 
+**Later that morning (pull request #66).** The extra-usage cap ran out at about 08:49 SGT. It killed the first
+re-run 20 minutes in, cut one of the Sonnet test copies and stalled the build thread until the owner made room
+again at about 09:30. The re-run was fired again at 09:34 SGT with no text and finished in 18 minutes as a "second
+edition" (09:51 SGT): it read what the short edition had missed and replaced the day's dashboard row, but it left
+the trade book as written at 07:40 SGT, did not apply the rules in force and ran a weaker accuracy gate. Its own
+closing note shows why: it saw two firings in one day and could not tell whether the second was meant. A re-fire
+now carries a note that says what is wanted (Working conventions in `STATUS.md`). The owner installed the morning
+alert the same morning; his first paste had gone inside the editor's empty `myFunction` stub, where it installs
+nothing, and the second attempt ran `setupTakeawaysAlert` and mailed the confirmation.
+
 ### 10 Nov 2026: split-run shadow test set up; Gemini source name (pull requests #63 and #64)
 
 Decision 7 of the workflow review, the last of the eleven to be built. The question: could a cheaper model read

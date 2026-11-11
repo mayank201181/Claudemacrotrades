@@ -6,9 +6,9 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-11 morning (the Takeaways' short edition of 11 Nov traced and fixed, a full edition re-run the
-same morning; the market pack's DTCC day made current: Open items 1). Scheduled tasks and rules were read from the
-live systems on 10 Nov._
+_Last updated: 2026-11-11 mid-morning (the Takeaways' short edition of 11 Nov traced and fixed; the same-day re-run
+came out as a second, fuller edition, not a full one; the morning alert installed; the market pack's DTCC day made
+current: Open items 1). Scheduled tasks and rules were read from the live systems on 10 Nov._
 
 ## Where things are
 
@@ -31,7 +31,7 @@ live systems on 10 Nov._
 |---|---|---|
 | `scripts/apps_script/Code.gs` | Gmail and Drive feeder in the owner's Google account, posts to `dash-ingest`. Uses a Grok Bot HTML attachment as the body and mails one inline copy for the digests. Opens the trade book with DocumentApp, so a plain-text `trade_book_current` is skipped | every 10 min |
 | `scripts/apps_script/Spec.gs` | applies a staged `trade_book_spec_edits` JSON to the spec Doc, archiving it first | every 10 min |
-| `scripts/apps_script/Alert.gs` | the morning check outside Claude: mails the owner when no Macro Takeaways email has arrived. **Not installed yet**: it needs the owner's one visit (Open items 1) | daily 08:15 to 08:45 SGT once installed |
+| `scripts/apps_script/Alert.gs` | the morning check outside Claude: mails the owner when no Macro Takeaways email has arrived. Installed by the owner on 11 Nov (file `alert.gs` in the Apps Script project of `Code.gs`, `setupTakeawaysAlert` run once, confirmation mail received). The file must hold only that code: pasted inside the editor's empty `myFunction` stub it installs nothing | daily 08:15 to 08:45 SGT, first check 12 Nov |
 | `dash-ingest` (v10) | raw payloads into the `dash` tables (digests, trade books, feeds, questions). Since 10 Nov it keeps a card's `risk` key (R17) and its TWIN line (R18), and stores a "[Gemini]" digest copy under the source `gemini` (it had been stored as `claude`). The deployed function is a stub importing this repo at `main` commit 08a5516; rollback is the same stub pinned to 9fcaed6 | on post |
 | `dash-mark` (v7) | live R per open trade (one R = the card's planned risk when it carries a `risk` key, R17), hourly-close stop flag (spec v15), option twins priced on the smile and marked hourly (R18, `twin_*` keys in the card's meta), shadow outcomes in ATR(20) units. Stub pinned to 9fcaed6, rollback fe335fd | pg_cron `7 * * * *` |
 | dashboard banner (`site/app.js`) | a red banner on every tab when today's Fable digest row is still absent at 08:20 SGT | on page load |
@@ -126,15 +126,20 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
 
 1. **Takeaways workflow review (10 Nov): all eleven decisions approved and built that day by the thread "Improve
    macro takeaways workflow for trades". What is left:**
-   - *Waiting on the owner, one visit* (click-by-click directions are in that thread): install `Alert.gs` in the
-     Apps Script project and run `setupTakeawaysAlert` once; in the ChatGPT red-team task and the Grok crowding
-     check change the subject match "MACRO TAKEAWAYS [Fable 5.1]" to "MACRO TAKEAWAYS [Fable"; the two API keys in
+   - *Waiting on the owner, one visit* (click-by-click directions are in that thread; the morning alert was
+     installed on 11 Nov): in the ChatGPT red-team task and the Grok crowding check change the subject match "MACRO TAKEAWAYS [Fable 5.1]" to "MACRO TAKEAWAYS [Fable"; the two API keys in
      the YouTube digest prompts and the seven "Fable 5.1" labels in the Fable YouTube prompt (a thread cannot retype
      a prompt that holds a key); connectors per digest task cut to the four it uses, and the evidence-pass task cut
      to Gmail and Google Drive. Optional, one paste in the SQL editor: the line that puts R17 to R19 in force before
      Sunday, and `019_gemini_source.sql` (relabels the 86 Gemini rows stored as `claude`).
-   - *First runs to check:* the full edition of 11 Nov, re-run at the owner's yes and fired at 08:40 SGT (email in
-     the inbox, the day's `dash.digests` row replaced by one with themes, the trade book written once); the
+   - *Same-day re-run of 11 Nov (owner's yes):* the first try (08:40 SGT) died at 09:00 when the extra-usage cap
+     ran out (the owner made room again by 09:30; the build thread on the largest model at max effort had been the
+     biggest draw). The second try (09:34 SGT) finished in 18 minutes and mailed a "second edition" at 09:51 SGT. It
+     read the inputs the short edition had missed and replaced the day's `dash.digests` row (themes present), but
+     it did not redo the trade book, did not apply the rules in force and ran a weaker accuracy gate: fired without
+     a note, it saw that the day's edition and trade book already existed and topped up. The trade book of 11 Nov
+     stands as written at 07:40 SGT. The owner was told and offered a rebuild; nothing more runs unless he asks.
+   - *First runs to check:* the alert's first check on 12 Nov (silent when the Takeaways has arrived); the
      Takeaways of 12 Nov, the first scheduled run on the corrected launch sentence (in its transcript both workers
      start in one message after the leans, none earlier); the market pack of 12 Nov (section D dated 11 Nov, "from
      the intraday files"); the weekly review of 14 Nov under the new prompt; the Takeaways of 16 Nov under R17 to
@@ -144,9 +149,10 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      disabled old feeder tasks after a clean week).
    - *Sonnet 5.5 side by side* for the YouTube, Podcast and Email digests, mornings of 11 to 13 Nov: notes and
      results in project files `notes/model_tests_nov2026/`. On a pass the two Opus digest tasks move to Sonnet 5.5
-     on 13 Nov and the three test tasks are restored (names, models) and left paused. Morning 1: the Email and
-     Podcast copies were fired at 08:45 SGT; the YouTube copy goes after the day's Takeaways has landed, because
-     its prompt cannot be edited and so rests on the note alone.
+     on 13 Nov and the three test tasks are restored (names, models) and left paused. Morning 1: the Email copy
+     ran at 08:45 SGT; the Podcast copy was cut off by the cap and ran again at 09:35; the YouTube copy was fired
+     at 10:16, after the day's second edition (its prompt cannot be edited, so it rests on the note alone). The
+     comparison is written after the weekly reset (Wed 22:00 SGT).
    - *Split-run shadow test* (decision 7), mornings of 12 to 16 Nov: a cheaper reader writes one evidence file from
      every input, and an audit thread checks each morning whether the live digest rested on anything the file lost
      (`docs/shadow_test.md`; hand-over in project files `shadow_test/README.md`). Two dry runs on the evening of
@@ -204,7 +210,8 @@ a compliance view). Details in `docs/history.md`.
   the TM1.1 shadow retired; R13 reverted and the question hunt stopped; the frozen Opus cards closed out at the first
   hourly bar after the book ended; new threads default to Opus 5.5 at high effort; old position names in the
   public repo's history are left as they are.
-- 11 Nov: after the short edition the owner asked for a full edition of the same day (decision card, 08:17 SGT).
+- 11 Nov: after the short edition the owner asked for a full edition of the same day (decision card, 08:17 SGT);
+  the re-run came out as a top-up (Open items 1).
 - 10 Nov: Takeaways task runs on the Fable 5.2 model and label; all eleven workflow-review decisions approved.
   Models by stage: Takeaways and weekly review on Fable 5.2; YouTube, Podcast and Email digests on Sonnet 5.5 after
   three mornings side by side; feeders on Haiku 5.5; studies and builds on Opus 5.5. The fundamentals pack stays on
@@ -265,6 +272,11 @@ a compliance view). Details in `docs/history.md`.
   store the test as a paused task's prompt, fire it with no text, then put the prompt back and byte-compare: a
   note passed with a manual run is one more user message, and a prompt that says only it carries instructions
   ignores it.
+- A manual re-fire of the Takeaways on a day that already has an edition must carry a note that says what is
+  wanted: every step again, the trade book and the rules included, or only a top-up. Fired with no text on 11 Nov,
+  the run could not tell an intended re-run from a schedule fault and topped up in 18 minutes.
+- Before a long thread on the largest model at max effort, say what it is likely to cost: the 10 to 11 Nov build
+  thread was the biggest draw on the extra-usage cap, which ran out mid-morning on 11 Nov and cut three runs.
 - A scheduled task bound to a thread keeps that thread's model, and its prompt can be changed only from that
   thread; switching it off works from any thread. A task that starts a new project thread at each run cannot be
   changed or switched back on by a thread at all (delete and create again). A task made in Cowork that starts a
