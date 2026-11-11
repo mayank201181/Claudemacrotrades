@@ -6,9 +6,9 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-10 late evening (audit and its fourteen follow-ups; then the workflow review's eleven approved
-changes, built the same day, the split-run shadow test last: Open items 1). Scheduled tasks and rules were read from
-the live systems that day._
+_Last updated: 2026-11-11 morning (the Takeaways' short edition of 11 Nov traced and fixed, a full edition re-run the
+same morning; the market pack's DTCC day made current: Open items 1). Scheduled tasks and rules were read from the
+live systems on 10 Nov._
 
 ## Where things are
 
@@ -48,12 +48,12 @@ the live systems that day._
 
 | Task | Id | When | Notes |
 |---|---|---|---|
-| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt at the 65,536-byte cap: changes go through `dash.rules` |
+| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 65,502 of 65,536 bytes: changes go through `dash.rules`. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions) |
 | Fable MT watchdog | `trig_01En26Xiwep91rAGjtWF68d2` | 07:20 daily | refires a dead run. It is a Claude task, so it dies with the usage limit |
 | YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways, task names "Daily YouTube Digest" and "Daily Podcast Digest". The Podcast prompts find the Podwise key by the exact task name "Daily YouTube Digest": never rename it |
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
 | Feeder: prediction-market odds | `trig_019jXUYgtu3beS5Zt6yxb8tH` | 06:20 daily | writes Drive `predmkt_latest` (R12); moved from 06:38 so that it lands before the 06:33 start |
-| Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup |
+| Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup. Since 11 Nov section D and the implied vol table carry the UTC day that is ending, read from DTCC's intraday files (`docs/marketpack.md`) |
 | Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | 06:33 on 12 to 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`): mails nothing, writes Drive `evidence_<date>`. It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`). Switch it off after 16 Nov |
 | Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | 09:05 on 12 to 16 Nov | wakes the thread "Audit the split Takeaways shadow test" (Opus 5.5), which compares the evidence file with the live digest; results in project files `shadow_test/` |
 | Weekly fundamentals pack | `trig_019siN4tMsZfsPNPCiLUqvYr` | Sun 18:41 | market pack section G. Stays in its own Opus thread (owner, 6 Nov) |
@@ -63,7 +63,8 @@ the live systems that day._
 | MSD brief email | `trig_01RrYqBatUV8ZdiGCFBUqtXk` | 06:30 daily | `brief.today()` |
 | Weekly STATUS digest | `trig_01MYWHLQohf1qjDVYepNpfEd` | Mon 08:45 | reads this file |
 
-Disabled: Question Hunt `trig_01E1MeWdsE7x7z79XC4gcZo9` (paused 10 Nov), the Opus Email Digest, and the three old
+Disabled: Question Hunt `trig_01E1MeWdsE7x7z79XC4gcZo9` (paused 10 Nov; borrowed once on 11 Nov as a test vehicle, its
+prompt put back and byte-compared), the Opus Email Digest, and the three old
 feeder tasks that the Haiku thread replaced on 10 Nov (`trig_01UvLHEc5HZn6cbcCtbsdGob`,
 `trig_01Uz92j76ozWE1EJ3SHxbHWz`, `trig_01KTuAEzuMfvBNr98nBEEfhk`; delete them after a clean week). The paused Fable
 YouTube `trig_01X6SstZSnanyjyrfyhirx85`, Fable Podcast `trig_011qkFh4EkgsNgQbxm5a1tRK` and Fable Email
@@ -82,7 +83,7 @@ limit. Check the output file's date, not the task status.
 
 `scripts/marketpack/`, `scripts/fundpack/`, `scripts/predmkt/`, `scripts/gdelt/` and `scripts/feeders/` are copies of
 the running files in `/mnt/project-files/<name>/`. Edit both and keep them byte-identical (all five matched on
-10 Nov). `/mnt/project-files/feeders/status.csv` has one line per build and upload: read it, not a thread, to see
+11 Nov). `/mnt/project-files/feeders/status.csv` has one line per build and upload: read it, not a thread, to see
 whether a morning ran. The weekly review's prompt is built by `scripts/weekly_review/build_prompt.py`.
 
 ## Rules in force (`dash.rules`, read 10 Nov 2026)
@@ -132,14 +133,20 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      a prompt that holds a key); connectors per digest task cut to the four it uses, and the evidence-pass task cut
      to Gmail and Google Drive. Optional, one paste in the SQL editor: the line that puts R17 to R19 in force before
      Sunday, and `019_gemini_source.sql` (relabels the 86 Gemini rows stored as `claude`).
-   - *First runs to check:* the Takeaways of 11 Nov under `dash-ingest` v10 (and a "[Gemini]" copy stored as
-     `gemini`); the Haiku feeder thread's first scheduled morning on 11 Nov (`feeders/status.csv`; delete the three
-     disabled old feeder tasks after a clean week); the weekly review of 14 Nov under the new prompt; the Takeaways
-     of 16 Nov under R17 to R19 (the `risk` key, TWIN lines and the expression table in the digest, `twins` above
-     zero in the `dash-mark` reply).
+   - *First runs to check:* the full edition of 11 Nov, re-run at the owner's yes and fired at 08:40 SGT (email in
+     the inbox, the day's `dash.digests` row replaced by one with themes, the trade book written once); the
+     Takeaways of 12 Nov, the first scheduled run on the corrected launch sentence (in its transcript both workers
+     start in one message after the leans, none earlier); the market pack of 12 Nov (section D dated 11 Nov, "from
+     the intraday files"); the weekly review of 14 Nov under the new prompt; the Takeaways of 16 Nov under R17 to
+     R19 (the `risk` key, TWIN lines and the expression table in the digest, `twins` above zero in the `dash-mark`
+     reply). Done on 11 Nov: `dash-ingest` v10 stored the digest and two "[Gemini]" copies as `gemini`; the feeder
+     thread's first scheduled morning built and uploaded all three files on the first try (delete the three
+     disabled old feeder tasks after a clean week).
    - *Sonnet 5.5 side by side* for the YouTube, Podcast and Email digests, mornings of 11 to 13 Nov: notes and
      results in project files `notes/model_tests_nov2026/`. On a pass the two Opus digest tasks move to Sonnet 5.5
-     on 13 Nov and the three test tasks are restored (names, models) and left paused.
+     on 13 Nov and the three test tasks are restored (names, models) and left paused. Morning 1: the Email and
+     Podcast copies were fired at 08:45 SGT; the YouTube copy goes after the day's Takeaways has landed, because
+     its prompt cannot be edited and so rests on the note alone.
    - *Split-run shadow test* (decision 7), mornings of 12 to 16 Nov: a cheaper reader writes one evidence file from
      every input, and an audit thread checks each morning whether the live digest rested on anything the file lost
      (`docs/shadow_test.md`; hand-over in project files `shadow_test/README.md`). Two dry runs on the evening of
@@ -197,6 +204,7 @@ a compliance view). Details in `docs/history.md`.
   the TM1.1 shadow retired; R13 reverted and the question hunt stopped; the frozen Opus cards closed out at the first
   hourly bar after the book ended; new threads default to Opus 5.5 at high effort; old position names in the
   public repo's history are left as they are.
+- 11 Nov: after the short edition the owner asked for a full edition of the same day (decision card, 08:17 SGT).
 - 10 Nov: Takeaways task runs on the Fable 5.2 model and label; all eleven workflow-review decisions approved.
   Models by stage: Takeaways and weekly review on Fable 5.2; YouTube, Podcast and Email digests on Sonnet 5.5 after
   three mornings side by side; feeders on Haiku 5.5; studies and builds on Opus 5.5. The fundamentals pack stays on
@@ -251,6 +259,12 @@ a compliance view). Details in `docs/history.md`.
   old version, or renames the file `_rejected_<date>`. The Drive connector cannot edit a Doc's body.
 - Upload a file to Drive without retyping it: `create_file` with `base64Content` = `sha256:<hex>:<absolute path>`,
   the file sitting in the session's scratchpad. `feeders/feeder.py` does the staging and prints the call.
+- In a scheduled-task session a sub-agent holds its caller until it returns: there is no background there, and
+  `run_in_background` is ignored. Workers meant to run side by side go out in ONE message, and no worker may wait
+  for something its caller writes later (the short edition of 11 Nov). To test how that kind of session behaves,
+  store the test as a paused task's prompt, fire it with no text, then put the prompt back and byte-compare: a
+  note passed with a manual run is one more user message, and a prompt that says only it carries instructions
+  ignores it.
 - A scheduled task bound to a thread keeps that thread's model, and its prompt can be changed only from that
   thread; switching it off works from any thread. A task that starts a new project thread at each run cannot be
   changed or switched back on by a thread at all (delete and create again). A task made in Cowork that starts a

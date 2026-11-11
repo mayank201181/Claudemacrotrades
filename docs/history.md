@@ -6,6 +6,64 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 11 Nov 2026: why the Takeaways came out short, and the DTCC day made current (pull request #65)
+
+**Short edition.** The 06:33 SGT run of 11 Nov mailed at 07:45 SGT, on time, but as a short edition (the stored
+row has the sixty-second section and the trade block, and no theme). Its transcript shows why. Two minutes in, the
+run launched its trade-book worker and told it to wait for a file of the day's leans that the run itself would
+write later. In a scheduled-task session a sub-agent call holds the caller until the worker returns, so the run
+could not write that file, the worker waited until its own time limit, and 66 minutes went (22:35:45Z to
+23:42:00Z). The run then assembled what the remaining half hour allowed.
+
+**Cause.** A sentence added to the prompt on 5 Nov told the run to launch the stance payload and the trade book
+"as background sub-agents". That kind of session has none. A test run in the same environment on 11 Nov (the
+paused Question Hunt task as the vehicle) showed: the Agent tool there has no background option; a launch that
+passes `run_in_background: true` is accepted and still returns only when the worker has finished (46 s and 159 s
+in the two tries, each the worker's whole run); a worker told to wait for a file its caller writes later never
+sees it; several Agent calls sent in ONE message do run side by side. Earlier mornings got through because their
+workers did not wait for the caller for long.
+
+**Fix.** The sentence now reads: "SPEED: sub-agents block you until they return (no background here). Launch the
+3a(e) stance payload and trade book (STEP 3E) workers in ONE message, before B10, once their inputs (leans
+included) are on disk; no worker waits for you." Five date stamps elsewhere in the prompt paid for the extra
+words (65,502 bytes, 34 spare of the 65,536 cap). It was stored at 08:39 SGT and compared byte for byte with the
+built text. The trade-book spec already places the book after the leans, so nothing else changed.
+
+**Re-run.** The owner said yes on a decision card at 08:17 SGT to a full edition of the same day. It was fired at
+08:40 SGT with no added text: the prompt and the spec already cover a same-day re-run (the day's question entries
+are replaced, sightings merge, the scorecard is keyed on the card id). In its first minutes it read the rebuilt
+market pack and every feed and launched no worker that waits. Its landing is the first item under "First runs to
+check" in `STATUS.md`.
+
+**A note passed with a manual run is not always obeyed.** The first try at the test fired the paused Question
+Hunt task with a note asking for a different job. That prompt says that only the prompt carries instructions, so
+the run treated the note as data and ran one Question Hunt: it wrote a file `question_hunt_2026-11-11` with no
+items into the Question Hunt folder on Drive (a thread cannot trash a file; the trial that read that folder ended
+on 10 Nov), sent no email, and cost about US$1. The test then went in as the task's stored prompt, was fired with
+no text, and the task's own prompt was put back and compared byte for byte (12,511 bytes); the task stayed
+switched off throughout. The test vehicles of the Sonnet side by side obey their notes because their prompts say
+nothing of the kind (Podcast and Email, 10 and 11 Nov); the YouTube vehicle is still unproven and is fired only
+after the day's Takeaways has landed.
+
+**DTCC day made current.** DTCC publishes the full-day file of a UTC day at about 00:15 UTC on the next day,
+after the 06:52 SGT build, so section D of the market pack and its implied vol table were a New York session
+behind every morning (the 06:54 pack of 11 Nov carried 9 Nov). The pack now reads the UTC day that is ending from
+DTCC's intraday files (the same rows, published through the day), marks it as a part day with the time of the
+last file, and replaces it with the full-day file at the next build; a failed read falls back to the last full
+day as before. Checked against the full-day file on two real days: 9 Nov, 59,412 rows against 59,410 and
+identical summaries; 10 Nov, 3,066 intraday files to 23:57Z, 56,245 rows, strikes and vanilla prints identical,
+option summaries identical to float precision, one NDF count out by two rows in about 12,000. A build at
+06:53 SGT on 11 Nov would have held 99.6% of that day's option trades and 99.9% of its vanilla prints with a
+premium. The running copy was replaced at 08:25 SGT on 11 Nov (the old script and its state files are in project
+files `marketpack_backup/`), and the pack was rebuilt and uploaded at 08:27 SGT (49,638 bytes, section D on
+10 Nov) so that the re-run read the complete New York session. `test_marketpack_iv.py` gained checks 6 and 7 on a
+made-up file server.
+
+**First scheduled morning of the 10 Nov changes.** The feeder thread built and uploaded all three files on the
+first try (attention table 05:49, odds 06:23, market pack 06:54 SGT; `feeders/status.csv`). `dash-ingest` v10
+stored the day's digest and stored the two "[Gemini]" copies under the source `gemini`. The GDELT DOC API
+answered 429 again, a known limit (Open items 13). Laptop visits by the owner: none.
+
 ### 10 Nov 2026: split-run shadow test set up; Gemini source name (pull requests #63 and #64)
 
 Decision 7 of the workflow review, the last of the eleven to be built. The question: could a cheaper model read
