@@ -45,8 +45,8 @@ function unwrapGoogle(href: string): string {
 
 const ALLOWED_TAGS = new Set(['a', 'b', 'strong', 'i', 'em', 'span', 'p', 'br', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'h3', 'h4', 'pre', 'code', 'sup', 'sub', 'u']);
 
-// Allow-list sanitiser: every tag is rebuilt from scratch (only href on <a> and a few
-// style properties survive); comments, unknown tags and all other attributes are dropped.
+// Allow-list sanitiser: every tag is rebuilt from scratch (only href on <a>, colspan on <td>/<th>
+// and a few style properties survive); comments, unknown tags and all other attributes are dropped.
 export function sanitize(html: string): string {
   const out = html
     .replace(/<(\/?)div\b/gi, '<$1p')
@@ -62,7 +62,9 @@ export function sanitize(html: string): string {
       while ((a = re.exec(attrs))) {
         const name = a[1].toLowerCase();
         const val = a[3] ?? a[4] ?? '';
-        if (t === 'a' && name === 'href') {
+        if ((t === 'td' || t === 'th') && name === 'colspan' && /^[1-9]\d?$/.test(val)) {
+          keep.push(`colspan="${val}"`);
+        } else if (t === 'a' && name === 'href') {
           const u = unwrapGoogle(val);
           if (/^https?:\/\/[^\s"'<>]+$/i.test(u)) keep.push(`href="${u.replace(/"/g, '%22')}" target="_blank" rel="noopener noreferrer"`);
         } else if (name === 'style') {
