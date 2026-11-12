@@ -7,7 +7,7 @@ tables or lists below. Before a session ends, merge its STATUS change; a STATUS 
 file went stale between 8 Oct and 10 Nov 2026.
 
 _Last updated: 2026-11-12 morning (the OPEN AND PENDING table laid out for the phone: spec v17, prompt TABLES rule,
-`dash-ingest` v11; see docs/history.md). Scheduled tasks and rules were read from the live systems on 10 Nov._
+the site spans it; see docs/history.md). Scheduled tasks and rules were read from the live systems on 10 Nov._
 
 ## Where things are
 
@@ -31,7 +31,7 @@ _Last updated: 2026-11-12 morning (the OPEN AND PENDING table laid out for the p
 | `scripts/apps_script/Code.gs` | Gmail and Drive feeder in the owner's Google account, posts to `dash-ingest`. Uses a Grok Bot HTML attachment as the body and mails one inline copy for the digests. Opens the trade book with DocumentApp, so a plain-text `trade_book_current` is skipped | every 10 min |
 | `scripts/apps_script/Spec.gs` | applies a staged `trade_book_spec_edits` JSON to the spec Doc, archiving it first | every 10 min |
 | `scripts/apps_script/Alert.gs` | the morning check outside Claude: mails the owner when no Macro Takeaways email has arrived. Installed by the owner on 11 Nov (file `alert.gs` in the Apps Script project of `Code.gs`, `setupTakeawaysAlert` run once, confirmation mail received). The file must hold only that code: pasted inside the editor's empty `myFunction` stub it installs nothing | daily 08:15 to 08:45 SGT, first check 12 Nov |
-| `dash-ingest` (v10) | raw payloads into the `dash` tables (digests, trade books, feeds, questions). Since 10 Nov it keeps a card's `risk` key (R17) and its TWIN line (R18), and stores a "[Gemini]" digest copy under the source `gemini` (it had been stored as `claude`). Since 12 Nov (v11) the sanitiser keeps `colspan` on table cells, for the digest's full-width Next rows. The deployed function is a stub importing this repo at `main` commit 009d343; rollback is the same stub pinned to 08a5516 | on post |
+| `dash-ingest` (v10) | raw payloads into the `dash` tables (digests, trade books, feeds, questions). Since 10 Nov it keeps a card's `risk` key (R17) and its TWIN line (R18), and stores a "[Gemini]" digest copy under the source `gemini` (it had been stored as `claude`). On `main` since 12 Nov the sanitiser keeps `colspan` on table cells (for the digest's full-width Next rows; not yet deployed, the site spans such rows by CSS instead). The deployed function is a stub importing this repo at `main` commit 08a5516; rollback is the same stub pinned to 9fcaed6 | on post |
 | `dash-mark` (v7) | live R per open trade (one R = the card's planned risk when it carries a `risk` key, R17), hourly-close stop flag (spec v15), option twins priced on the smile and marked hourly (R18, `twin_*` keys in the card's meta), shadow outcomes in ATR(20) units. Stub pinned to 9fcaed6, rollback fe335fd | pg_cron `7 * * * *` |
 | dashboard banner (`site/app.js`) | a red banner on every tab when today's Fable digest row is still absent at 08:20 SGT | on page load |
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rule inputs | pg_cron `40 22 * * *` UTC |
@@ -164,7 +164,7 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    - *Standing decisions the weekly review carries every week until made:* thin edge at 30 closed cards, the option
      twin trial (ten finished pairs or 13 Dec), the expression table (15 cards or six weeks).
 2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to d334277), `dash-mark`
-   (9fcaed6) and `dash-ingest` (009d343) are one-file stubs that import this repo at a `main` commit: merge,
+   (9fcaed6) and `dash-ingest` (08a5516; `main` has the colspan change since 009d343, a deploy from a thread was refused by the permission classifier on 12 Nov, so re-pin it with the next function change) are one-file stubs that import this repo at a `main` commit: merge,
    deploy the stub with the new commit, POST a dry run through `pg_net` and read the reply in `net._http_response`.
    The branch `claude/project-thread-e80nxd` holds the `dash-trend` rollback commit 64d1f84; keep it until the New
    York clock has run cleanly for a couple of weeks.
