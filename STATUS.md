@@ -8,7 +8,7 @@ file went stale between 8 Oct and 10 Nov 2026.
 
 _Last updated: 2026-11-12 midday (the Takeaways of 12 Nov landed at 08:21 SGT: spec v18 takes out the 08:10 wait for
 marks; the option pricer on Drive is now a loader; the Opus YouTube run died, was fired again and mailed at 09:30
-SGT, and a top-up edition of the Takeaways was fired at 10:05 to take it in; the Opus Podcast digest reads the live
+SGT, and a top-up edition of the Takeaways took it in at 10:17; the Opus Podcast digest reads the live
 stance ledger from 13 Nov; two mornings of the Sonnet side by side are judged; earlier the same morning the OPEN AND
 PENDING table was laid out for the phone, spec v17. See docs/history.md). Scheduled tasks and rules were read from
 the live systems on 10 Nov._
@@ -154,10 +154,10 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      died at 05:34 with two workers out and was fired again at 08:37 SGT with the scheduled window in a note (it
      mailed at 09:30 SGT, 52 items on 21 of 52 searches because the dead run had spent the API quota, and wrote its
      hand-off file; the 06:33 Takeaways had no Claude YouTube copy that morning, so at the owner's ask a top-up
-     edition was fired at 10:05 SGT with a note: that one copy folded into the 08:21 edition, trade book untouched;
-     check that it mailed and that the day's `dash.digests` row lost nothing); the option pricer could not run
-     because a Drive text read now garbles code (fixed: the Drive file `fxopt.py` is a loader,
-     `docs/carver_and_fxopt.md`).
+     edition was fired at 10:05 SGT with a note and mailed at 10:17 (13 minutes, about US$11): that one copy folded
+     into the 08:21 edition, every line of which is kept, the trade book untouched, 16 stance rows added; the numbers
+     it added are attributed to their speakers, not checked); the option pricer could not run because a Drive text
+     read now garbles code (fixed: the Drive file `fxopt.py` is a loader, `docs/carver_and_fxopt.md`).
    - *First runs to check:* the Takeaways of 13 Nov, the first under spec v18 (email before 08:15 SGT, no worker
      asleep in the transcript, cost back near US$55, a PRICER line that ran through the Drive loader); the Opus
      YouTube digest of 13 Nov at its usual time; the Opus Podcast digest of 13 Nov, the first on the live stance
@@ -309,7 +309,10 @@ a compliance view). Details in `docs/history.md`.
   lifts the deadlines that have passed and says what the dead run already spent (API quota, transcriptions).
   If its copy lands after the Takeaways, fire the Takeaways once more the same morning with a top-up note (the
   note of 12 Nov is described in `docs/history.md`): the run reads today's SGT date only, so a copy that lands
-  late is never read by a later run.
+  late is never read by a later run. Give the note no clock time (the run of 12 Nov printed a send time built
+  on a wrong one) and say that added numbers are attributed to their speaker unless verified. Afterwards
+  compare the two editions with project file `notes/topup/edition_diff.py` (12 Nov: 13 minutes, about US$11,
+  every line of the first edition kept).
 - In a scheduled-task session a sub-agent holds its caller until it returns: there is no background there, and
   `run_in_background` is ignored. Workers meant to run side by side go out in ONE message, and no worker may wait
   for something its caller writes later (the short edition of 11 Nov). To test how that kind of session behaves,
