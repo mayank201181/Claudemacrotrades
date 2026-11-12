@@ -2,7 +2,7 @@
 // Run: npx -y tsx --test supabase/functions/_shared/parse.test.ts
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTradeBook } from './parse.ts';
+import { parseTradeBook, sanitize } from './parse.ts';
 import { type ConvexCard, cardFromMeta } from './convexity.ts';
 import { twinCard } from './twin.ts';
 
@@ -121,4 +121,9 @@ SECTION LOG
   assert.equal(b.meta.twin, undefined, 'a "none" line stores nothing');
   assert.equal(b.structure, 'linear');
   assert.equal(c.meta.twin, undefined);
+});
+
+test('sanitize keeps colspan on table cells (the digest\'s full-width Next row) and nothing else', () => {
+  const html = '<table><tr><td colspan="7" style="font-size:12px;color:#555555" onclick="x()">next</td><th colspan="x">h</th></tr></table>';
+  assert.equal(sanitize(html), '<table><tr><td colspan="7" style="color:#555555">next</td><th>h</th></tr></table>');
 });
