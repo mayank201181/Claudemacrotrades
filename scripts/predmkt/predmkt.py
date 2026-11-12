@@ -9,12 +9,13 @@ Polymarket Gamma API and Kalshi trade API, and writes to --out:
 
 Usage: python3 -I predmkt.py --out DIR
 """
-import argparse, csv, json, os, re, sys, time, urllib.parse, urllib.request
+import argparse, csv, gzip, json, os, re, sys, time, urllib.parse, urllib.request
 from datetime import datetime, timezone, timedelta
 
 GAMMA = "https://gamma-api.polymarket.com/events"
 KALSHI = "https://api.elections.kalshi.com/trade-api/v2/events"
-UA = {"User-Agent": "macro-desk-predmkt/1.0"}
+# Polymarket /events serves limit>50 pages gzip-only (HTTP 406 without this header, from 13 Nov 2026).
+UA = {"User-Agent": "macro-desk-predmkt/1.0", "Accept-Encoding": "gzip", "Accept": "application/json"}
 
 # Polymarket tags to sweep, and the bucket each lands in (first match wins on title/tags below).
 PM_TAGS = ["fed-rates", "Global-Rates", "economy", "inflation", "oil", "commodities", "japan",
@@ -57,7 +58,10 @@ def get(url, tries=4):
     for i in range(tries):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=40) as r:
-                return json.load(r)
+                body = r.read()
+                if r.headers.get("Content-Encoding", "").lower() == "gzip" or body[:2] == b"\x1f\x8b":
+                    body = gzip.decompress(body)
+                return json.loads(body)
         except Exception as e:  # noqa: BLE001 - network flake or 429
             if i == tries - 1:
                 print(f"WARN fetch failed {url[:120]}: {e}", file=sys.stderr)
