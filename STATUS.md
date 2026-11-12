@@ -6,8 +6,10 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-12 morning (the OPEN AND PENDING table laid out for the phone: spec v17, prompt TABLES rule,
-the site spans it; see docs/history.md). Scheduled tasks and rules were read from the live systems on 10 Nov._
+_Last updated: 2026-11-12 morning (the Takeaways of 12 Nov landed at 08:21 SGT: spec v18 takes out the 08:10 wait
+for marks; the option pricer on Drive is now a loader; the Opus YouTube run died and was fired again; earlier the
+same morning the OPEN AND PENDING table was laid out for the phone, spec v17. See docs/history.md). Scheduled tasks
+and rules were read from the live systems on 10 Nov._
 
 ## Where things are
 
@@ -47,7 +49,7 @@ the site spans it; see docs/history.md). Scheduled tasks and rules were read fro
 
 | Task | Id | When | Notes |
 |---|---|---|---|
-| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 65,536 of 65,536 bytes (at the cap since 12 Nov, when a one-line TABLES rule went into the FORMAT ADDENDUM): changes go through `dash.rules` or the trade_book_spec. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions) |
+| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 65,536 of 65,536 bytes (at the cap since 12 Nov, when a one-line TABLES rule went into the FORMAT ADDENDUM): changes go through `dash.rules` or the trade_book_spec. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions). No step waits for a clock time: the spec's 08:10 wait for marks made the 12 Nov email late and went out with spec v18 |
 | Fable MT watchdog | `trig_01En26Xiwep91rAGjtWF68d2` | 07:20 daily | refires a dead run. It is a Claude task, so it dies with the usage limit |
 | YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways, task names "Daily YouTube Digest" and "Daily Podcast Digest". The Podcast prompts find the Podwise key by the exact task name "Daily YouTube Digest": never rename it |
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
@@ -100,7 +102,7 @@ email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/
 | R07 | cash FX cards carded, filled and scored as outright forwards | 18 Oct | 28 Nov |
 | R08 | a lean opposite to an open card is first a review of that card | 25 Oct | 4 Dec |
 | R09 | crowd asymmetry: with-crowd cards EV = p x r/r x 0.75 - (1 - p) x 1.5 | 25 Oct | 5 Dec |
-| R10 | Carver trend/carry forecast line; FX option pricer for option cards | 1 Nov | 6 Dec |
+| R10 | Carver trend/carry forecast line; FX option pricer for option cards (the Drive file `fxopt.py` is a loader since 12 Nov, `docs/carver_and_fxopt.md`) | 1 Nov | 6 Dec |
 | R11 | FOMC days: the presser is the event; take profit or halve at 14:20 ET | 26 Oct | 30 Jun 2027 |
 | R12 | prediction-market odds as what's-priced evidence | 1 Nov | 30 Nov |
 | R14 | one direction per underlying | 1 Nov | 11 Dec |
@@ -116,8 +118,10 @@ R17 to R19 were proposed on 10 Nov (the owner approved all three in the workflow
 
 ## Trade book spec (`trade_book_spec` on Drive, both books read it)
 
-Version 17 (12 Nov: the OPEN AND PENDING table keeps seven short columns and prints each trade's Next text as a
-full-width row under the trade, PRINT (b3); printing only). Gate: EV > 0; cards between 0 and +0.3R are "thin edge", scored apart, reviewed at 30 closes (v12).
+Version 18 (12 Nov: the mark script runs as soon as its inputs are on disk and never sleeps; the 08:10 SGT wait of
+versions 4 to 17 is withdrawn, and before 08:00 SGT the FX or crypto daily bar dated yesterday is used as it
+stands). Version 17 (12 Nov: the OPEN AND PENDING table keeps seven short columns and prints each trade's Next text
+as a full-width row under the trade, PRINT (b3); printing only). Gate: EV > 0; cards between 0 and +0.3R are "thin edge", scored apart, reviewed at 30 closes (v12).
 A thesis-dead or reader close exits at the close of the first hourly bar after the decision (v13). Target on a touch
 of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention: T lines two days, LOG 14 days, cap
 60,000 characters (v16). A rule in force wins over the spec on the point it covers.
@@ -127,7 +131,7 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
 1. **Takeaways workflow review (10 Nov): all eleven decisions approved and built that day by the thread "Improve
    macro takeaways workflow for trades". What is left:**
    - *Waiting on the owner, one visit* (click-by-click directions are in that thread; the morning alert was
-     installed on 11 Nov): in the ChatGPT red-team task and the Grok crowding check change the subject match "MACRO TAKEAWAYS [Fable 5.1]" to "MACRO TAKEAWAYS [Fable"; the two API keys in
+     installed on 11 Nov): in the Grok crowding check change the subject match "MACRO TAKEAWAYS [Fable 5.1]" to "MACRO TAKEAWAYS [Fable" (not yet checked whether it needs it; the ChatGPT red team does not, its 12 Nov run read the "[Fable 5.2]" edition of 11 Nov); the two API keys in
      the YouTube digest prompts and the seven "Fable 5.1" labels in the Fable YouTube prompt (a thread cannot retype
      a prompt that holds a key); connectors per digest task cut to the four it uses, and the evidence-pass task cut
      to Gmail and Google Drive. Optional, one paste in the SQL editor: the line that puts R17 to R19 in force before
@@ -139,20 +143,28 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      it did not redo the trade book, did not apply the rules in force and ran a weaker accuracy gate: fired without
      a note, it saw that the day's edition and trade book already existed and topped up. The trade book of 11 Nov
      stands as written at 07:40 SGT. The owner was told and offered a rebuild; nothing more runs unless he asks.
-   - *First runs to check:* the alert's first check on 12 Nov (silent when the Takeaways has arrived); the
-     Takeaways of 12 Nov, the first scheduled run on the corrected launch sentence (in its transcript both workers
-     start in one message after the leans, none earlier); the market pack of 12 Nov (section D dated 11 Nov, "from
-     the intraday files"); the weekly review of 14 Nov under the new prompt; the Takeaways of 16 Nov under R17 to
-     R19 (the `risk` key, TWIN lines and the expression table in the digest, `twins` above zero in the `dash-mark`
-     reply). Done on 11 Nov: `dash-ingest` v10 stored the digest and two "[Gemini]" copies as `gemini`; the feeder
-     thread's first scheduled morning built and uploaded all three files on the first try (delete the three
-     disabled old feeder tasks after a clean week).
+   - *12 Nov, three faults (`docs/history.md`):* the email went at 08:21 SGT and the run cost about US$90 because
+     the spec made the trade book worker sleep until 08:10 before marking (fixed: spec v18); the 05:00 Opus YouTube
+     run died at 05:34 with two workers out and was fired again at 08:37 SGT with the scheduled window in a note
+     (check that it mailed and wrote its hand-off file); the option pricer could not run because a Drive text read
+     now garbles code (fixed: the Drive file `fxopt.py` is a loader, `docs/carver_and_fxopt.md`).
+   - *First runs to check:* the Takeaways of 13 Nov, the first under spec v18 (email before 08:15 SGT, no worker
+     asleep in the transcript, cost back near US$55, a PRICER line that ran through the Drive loader); the Opus
+     YouTube digest of 13 Nov at its usual time; the weekly review of 14 Nov under the new prompt; the Takeaways of
+     16 Nov under R17 to R19 (the `risk` key, TWIN lines and the expression table in the digest, `twins` above zero
+     in the `dash-mark` reply). Checked on 12 Nov: the corrected launch sentence worked (five workers left within
+     two minutes of each other once the leans were on disk, none earlier); the market pack carried section D dated
+     11 Nov and the implied vol table; no alert mail came, and with the digest in at 08:21 the mailbox cannot show
+     whether the 08:15 to 08:45 check ran before or after it. Done on 11 Nov: `dash-ingest` v10 stored the digest
+     and two "[Gemini]" copies as `gemini`; the feeder thread's first scheduled morning built and uploaded all
+     three files on the first try (delete the three disabled old feeder tasks after a clean week).
    - *Sonnet 5.5 side by side* for the YouTube, Podcast and Email digests, mornings of 11 to 13 Nov: notes and
      results in project files `notes/model_tests_nov2026/`. On a pass the two Opus digest tasks move to Sonnet 5.5
      on 13 Nov and the three test tasks are restored (names, models) and left paused. Morning 1: the Email copy
      ran at 08:45 SGT; the Podcast copy was cut off by the cap and ran again at 09:35; the YouTube copy was fired
-     at 10:16, after the day's second edition (its prompt cannot be edited, so it rests on the note alone). The
-     comparison is written after the weekly reset (Wed 22:00 SGT).
+     at 10:16, after the day's second edition (its prompt cannot be edited, so it rests on the note alone). Morning 2
+     (12 Nov): the three copies were fired at 08:35 to 08:38 SGT, the YouTube one beside a production copy that is
+     itself a re-run. The comparison blocks for both mornings go into `results.md` once the copies are in.
    - *Split-run shadow test* (decision 7), mornings of 12 to 16 Nov: a cheaper reader writes one evidence file from
      every input, and an audit thread checks each morning whether the live digest rested on anything the file lost
      (`docs/shadow_test.md`; hand-over in project files `shadow_test/README.md`). Two dry runs on the evening of
@@ -185,7 +197,9 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
 10. **Housekeeping left over from the audit:** about forty merged or superseded branches (threads cannot delete
     branches; GitHub's "Automatically delete head branches" setting would stop new ones piling up); the scheduled
     task "TEMP merge test" can only be deleted by the owner (https://claude.ai/code/routines/trig_01NymU4Af4gkJGUAQUZz3DHK);
-    the `dash-probe` stub can be deleted in the Supabase dashboard whenever convenient.
+    the `dash-probe` stub can be deleted in the Supabase dashboard whenever convenient; three Drive files a thread
+    cannot trash: the empty `question_hunt_2026-11-11` left by the 11 Nov test run, and the two retired pricer
+    copies in the spec folder (`zz_retired_option_pricer_full_2026-10-26.txt`, `fxopt_v1_25oct_superseded.py`).
 11. **Data problems the weekly review's dry runs found (10 Nov), none fixed yet.** For whoever next touches the
     scorer: a daily bar series that disagrees with the hourly bars and sets a stop flag in `live_marks`; a bad
     hourly tick that sets a target flag; the daily fields of `live_marks` one bar behind on US-session proxies;
@@ -263,6 +277,18 @@ a compliance view). Details in `docs/history.md`.
   old version, or renames the file `_rejected_<date>`. The Drive connector cannot edit a Doc's body.
 - Upload a file to Drive without retyping it: `create_file` with `base64Content` = `sha256:<hex>:<absolute path>`,
   the file sitting in the session's scratchpad. `feeders/feeder.py` does the staging and prints the call.
+- Read a file from Drive: `read_file_content` returns rendered text, not bytes (seen 12 Nov): `_ * [ ] < > # !`
+  come back with a backslash in front, backslashes doubled, indentation flattened and two spaces after each line,
+  and a file read within seconds of its creation can come back empty. Prose and tables survive; code does not.
+  Exact bytes come from `download_file_content` (base64). Code that a run must execute sits on Drive as a short
+  loader that survives the read and fetches the real file from this repo at a pinned commit
+  (`scripts/fxopt/fxopt_loader.py`). `update_file` renames a Drive file without a prompt; nothing a thread has
+  changes a file's content in place or trashes it.
+- No step of a scheduled run waits for a clock time. When a task's start time moves, search its prompt, the spec
+  and the rules for every time of day: the 08:10 wait for marks dated from the 07:45 start and made the 12 Nov
+  email late.
+- A digest run that died can be fired again by hand with a note that gives the window the scheduled run had,
+  lifts the deadlines that have passed and says what the dead run already spent (API quota, transcriptions).
 - In a scheduled-task session a sub-agent holds its caller until it returns: there is no background there, and
   `run_in_background` is ignored. Workers meant to run side by side go out in ONE message, and no worker may wait
   for something its caller writes later (the short edition of 11 Nov). To test how that kind of session behaves,
@@ -283,7 +309,8 @@ a compliance view). Details in `docs/history.md`.
   section in the plain-text part and nothing there says it is cut; `scripts/shadow_test/ev.py read` picks the
   complete part of a saved result.
 - Tests: `npx -y tsx --test supabase/functions/_shared/*.test.ts` (39 tests on 10 Nov; Deno is not preinstalled in
-  cloud sessions); `python3 scripts/fxopt/test_fxopt.py` needs QuantLib; `ev.py selftest` and `audit.py selftest`.
+  cloud sessions); `python3 scripts/fxopt/test_fxopt.py` needs QuantLib; `python3 -I scripts/fxopt/test_loader.py`
+  needs nothing and fails while the loader's pin is stale; `ev.py selftest` and `audit.py selftest`.
 - Migrations: the next number is 020. `019_gemini_source.sql` is not applied yet (Open items 1). `015` exists twice
   (`015_drivers.sql`, `015_grokbot_source.sql`); both are applied, so neither is renamed. 006 to 009 and 015 to 017
   were applied through the SQL editor or `execute_sql`, so the database's own migration list does not show them all.

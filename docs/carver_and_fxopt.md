@@ -61,6 +61,24 @@ for every R01 card and named option expression, run from the Drive copy of `fxop
 premium stays the card's p0; the pricer is a cross-check. Model probabilities are never printed as market
 odds.
 
+## 4. The Drive copy is a loader (12 Nov 2026)
+
+Since 12 Nov 2026 the Drive connector's text read returns a file as rendered text: `_ * [ ] < > # !` escaped with
+a backslash, backslashes doubled, indentation flattened to one space and two spaces after every line. Prose
+survives that; a 500-line Python file does not, and the Takeaways of 12 Nov could not run the pricer. A run has no
+other way to get exact bytes onto its disk without retyping them, so the file titled `fxopt.py` in the spec folder
+is now `scripts/fxopt/fxopt_loader.py`: sixteen unindented lines with none of the escaped characters. It fetches
+`fxopt.py` from this repository at a pinned `main` commit (curl from raw.githubusercontent.com, then a git clone
+as the fallback), checks its SHA-256 and runs it with the caller's arguments and stdin, so R10's instruction
+works word for word (`python3 -I fxopt.py '<json>'`). `python3 -I fxopt.py usage` prints the pricer's usage text.
+
+After any change to `fxopt.py`: merge it; in the loader set `c` to a `main` commit that holds it and `h` to its
+SHA-256; run `python3 -I scripts/fxopt/test_loader.py` (no network, no QuantLib; it fails while the pin is
+stale); upload the loader to the spec folder under a staging title, read it back with `read_file_content` and run
+the text as read; then rename the old loader away and the new one to `fxopt.py` (`update_file` changes a title
+without a prompt; a thread cannot trash a Drive file). The repository must stay public for this, as it must for
+`dash-trend`. The full pricer of 26 Oct is still in the folder as `zz_retired_option_pricer_full_2026-10-26.txt`.
+
 ## Live (25 Oct 2026)
 
 On the owner's yes: `dash-trend` v7 is a one-line stub that imports `supabase/functions/dash-trend/index.ts` from

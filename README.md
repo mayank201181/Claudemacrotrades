@@ -54,7 +54,8 @@ proposed and in force, weekly lessons).
 - `supabase/functions/_shared/forecast.ts` — Carver forecasts (EWMAC trend at four speeds, FX carry from BIS policy rates,
   -20..+20) appended by `dash-trend` to the Trend Monitor's report after `END_TREND_MONITOR`; see `docs/carver_and_fxopt.md`.
 - `scripts/fxopt/` — FX option pricer for the digests (stdlib Python: vanillas, digitals, touches, barriers, delta
-  conventions, vanna-volga smile), with `test_fxopt.py` cross-checking it against QuantLib-Python.
+  conventions, vanna-volga smile), with `test_fxopt.py` cross-checking it against QuantLib-Python. The copy on Drive
+  is `fxopt_loader.py`, which fetches the pricer at a pinned commit (`test_loader.py`, `docs/carver_and_fxopt.md`).
 - `scripts/marketpack/`, `scripts/predmkt/`, `scripts/fundpack/` — the daily market pack (price action, futures open
   interest, positioning build-up, DTCC FX options, headlines, the weekly fundamentals block), the prediction-market
   odds pull and the weekly fundamentals pack. Each is a copy of the file the scheduled task runs from the project
