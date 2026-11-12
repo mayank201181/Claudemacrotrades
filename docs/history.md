@@ -6,6 +6,65 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 12 Nov 2026: the Takeaways landed at 08:21 SGT; three faults that morning and their fixes
+
+**Late email.** The 06:33 SGT run mailed at 08:21 SGT, six minutes after the 08:15 deadline, and cost about US$90
+against about US$55 on a usual morning. Its transcript shows why. The launch fix of 11 Nov worked: five workers
+went out within two minutes of each other, at 07:12 to 07:14 SGT, once the leans were on disk. But the brief to
+the trade book worker carried a "HARD TIMING" line taken from `trade_book_spec`: the mark script may not run
+before 08:10 SGT, sleep until then. The worker did its reading and then slept in a loop; it ran the marks at
+08:10 to 08:12 and returned at 08:13. A scheduled-task session resumes only when every worker launched in the
+same message has returned, so the run was held for an hour. The other workers used the hour (the late-pickup
+worker made about 37 web calls), which is most of the extra cost. The run had planned an 08:30 send around the
+wait and said so in its footer.
+
+**Cause.** The spec sentence "run the mark script no earlier than 08:10 SGT ... and sleep until then if you are
+early" dates from spec version 4, when the run started at 07:45 SGT and 08:10 was minutes away: Yahoo's daily FX
+bar runs on the UTC day and closes at 08:00 SGT. The deadline moved to 08:15 on 4 Nov and the start to 06:33 on
+6 Nov, and the sentence stayed. The runs of 6, 7 and 11 Nov wrote the book at 07:26 to 07:40 SGT (archive file
+times), so they had not obeyed it; the run of 12 Nov did.
+
+**Fix: spec version 18**, applied at 08:55 SGT through a `trade_book_spec_edits` file and compared word for word
+with the intended text once `Spec.gs` had applied it (archive `trade_book_spec_archive_v17_2026-11-12`). The mark
+script runs as soon as its inputs are on disk and never sleeps. Before 08:00 SGT the daily bar of an FX cross or
+a crypto pair dated yesterday is still forming: it is used as it stands, its last price (after the 17:00 New York
+close, before Tokyo opens) being that day's close for the mark and for a time-stop; the weekend rule is
+unchanged; every other proxy has its complete daily bar well before the run starts. A first draft marked FX at
+the hourly bar ending 17:00 New York; it was dropped because the same run reported that Yahoo had no hourly FX
+bars for 05:00 to 08:00 SGT and an hourly print for one Asian pair outside the daily range, and Yahoo cannot be
+tested from a cloud thread (HTTP 429). The Takeaways prompt was not touched: it is at its 65,536-byte cap and its
+START GATE already says never wait. Known and left alone: before 08:00 SGT Yahoo's hourly FX bars lag, so an FX
+REF on a card can be two to three hours old.
+
+**Opus YouTube digest.** The 05:00 SGT run launched two transcript-reading workers at 05:31 and its last event is
+at 05:34 SGT: the session died with both out, a platform fault, and sent nothing. The Takeaways used the Gemini
+and ChatGPT copies. The task was fired again by hand at 08:37 SGT with a note: use the window the scheduled run
+had (the 24 hours to 21:00 UTC on 11 Nov); the deadlines that have passed do not apply; the dead run already
+spent most of the key's API quota for the day, so stop searching on `quotaExceeded` and say so in the footer;
+find out whether a video is already transcribed before submitting it again.
+
+**Option pricer.** The run could not execute `fxopt.py`. The Drive connector's text read now returns rendered
+text: `_ * [ ] < > # !` escaped with a backslash, backslashes doubled, indentation flattened to one space, two
+spaces after every line. A 500-line Python file does not survive that, and a run has no other way to get exact
+bytes onto its disk without retyping them. The file titled `fxopt.py` in the spec folder is now a sixteen-line
+loader (`scripts/fxopt/fxopt_loader.py`) with no indentation and none of the escaped characters: it fetches the
+pricer from this repository at a pinned `main` commit (curl, then a git clone), checks its SHA-256 and runs it
+with the caller's arguments, so R10's instruction works word for word. Tested in a cloud thread: the loader was
+uploaded under a staging title and read back with `read_file_content` (the first read, seconds after creation,
+came back empty; the second was the file with two spaces after each line), saved as read and run on three legs
+with output identical to the repository pricer's; the curl path, the git path, a corrupted cache and both sources
+failing were each exercised. The full file of 26 Oct was renamed `zz_retired_option_pricer_full_2026-10-26.txt`
+(a thread can rename a Drive file but not trash it). Not yet proven: that the Takeaways task's own environment
+reaches GitHub. The Podcast task clones a public repository there every morning, and the run of 13 Nov is the
+test.
+
+**Also read that morning.** The ChatGPT red-team email of 12 Nov worked from the "[Fable 5.2]" edition of 11 Nov,
+so its subject match needs no edit and that item leaves the owner's list. The 07:20 watchdog ran on 11 and
+12 Nov and ended quietly both times. The market pack of 12 Nov carried section D dated 11 Nov and the implied vol
+table. No alert mail came; the digest arrived at 08:21, inside the alert's 08:15 to 08:45 window, so the mailbox
+cannot show when the check ran. The Sonnet 5.5 side by side had its second morning (all three test copies fired
+at 08:35 to 08:38 SGT).
+
 ### 12 Nov 2026: the OPEN AND PENDING table laid out for the phone
 
 The owner's iPhone screenshots of the 12 Nov digest showed each trade row a screen tall: the Next column (review
