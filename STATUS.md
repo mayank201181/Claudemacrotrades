@@ -86,7 +86,7 @@ limit. Check the output file's date, not the task status.
 
 `scripts/marketpack/`, `scripts/fundpack/`, `scripts/predmkt/`, `scripts/gdelt/` and `scripts/feeders/` are copies of
 the running files in `/mnt/project-files/<name>/`. Edit both and keep them byte-identical (all five matched on
-11 Nov). `/mnt/project-files/feeders/status.csv` has one line per build and upload: read it, not a thread, to see
+11 Nov; `predmkt.py` changed on 13 Nov for Polymarket's gzip-only pages, both copies updated). `/mnt/project-files/feeders/status.csv` has one line per build and upload: read it, not a thread, to see
 whether a morning ran. The weekly review's prompt is built by `scripts/weekly_review/build_prompt.py`.
 
 ## Rules in force (`dash.rules`, read 10 Nov 2026)

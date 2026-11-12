@@ -6,6 +6,15 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 13 Nov 2026: Polymarket 406, odds feeder fixed
+
+Polymarket's Gamma `/events` endpoint began answering HTTP 406 `gzip_required` to every page with `limit` above 50
+unless the request carries `Accept-Encoding: gzip`. `predmkt.py` asks for `limit=100` with a plain urllib request, so
+the 13 Nov SGT builds had 0 Polymarket events (24 Kalshi); the feeder correctly did not upload them, and that morning's
+Takeaways read the 12 Nov odds. Fix: the request now sends `Accept-Encoding: gzip` and `Accept: application/json`
+and gunzips the body; Kalshi is unaffected. Re-run 12 Nov 23:2xZ: 62 Polymarket (45 kept) + 24 Kalshi events,
+uploaded to Drive. Both copies of the script updated and byte-identical.
+
 ### 12 Nov 2026, later that morning: the YouTube re-run, the stance-ledger key, two mornings of the Sonnet side by side
 
 **Opus YouTube re-run.** The task fired again at 08:37 SGT finished and mailed at 09:30 SGT (about 53 minutes,
