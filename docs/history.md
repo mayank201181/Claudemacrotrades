@@ -6,6 +6,85 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 12 Nov 2026, later that morning: the YouTube re-run, the stance-ledger key, two mornings of the Sonnet side by side
+
+**Opus YouTube re-run.** The task fired again at 08:37 SGT finished and mailed at 09:30 SGT (about 53 minutes,
+about US$15): 52 items on 21 of 52 searches, the dead 05:00 run having spent most of the API quota; it reused the
+18 transcripts that run had made. The hand-off file was written at 09:26 and the copy was in `dash.feeds` by
+09:44 SGT, three hours after the 06:33 Takeaways, which therefore had no Claude YouTube copy on 12 Nov. All 14
+clips it cited from the day's window came from the Gemini copy; 4 of them are in the Opus copy that landed later.
+On 11 Nov, with the Opus copy on time, 14 of the 17 cited clips were in it. The two copies overlap little (long
+interviews in the Claude copies, short TV clips with time stamps in Gemini's), so a morning without the Claude
+copy loses a kind of source, not a duplicate.
+
+**Top-up edition at the owner's ask.** At 09:58 SGT the owner asked whether the Takeaways should not take in the
+digest that had arrived at 09:30. It should, and nothing would have done it: the run searches `newer_than:1d`,
+today's SGT date only, so a later run never reads a copy that landed late, and of the 55 videos in the Opus copy
+32 were in neither copy the morning run had read (15 are in the Gemini copy, 19 in ChatGPT's; counted on video
+ids in `dash.feeds`). The Takeaways task was fired at 10:05 SGT with a note that says what is wanted: a same-day
+top-up, not a new run; one new input, the Opus copy, named by its Gmail id; the base is the 08:21 edition, read
+with FULL_CONTENT; fold the copy in by the prompt's SOURCE COPIES rules (highest-trust copy of the feed, an odds
+arrow only for evidence the morning run had not already counted, new stance rows, the accuracy gate on every
+number added); send a second edition that carries everything the first did, with a first 60-second bullet saying
+what the copy changed and "(added 2nd ed.)" on each addition; no trade book step, no re-mark and no new card (a
+lean the copy argues against keeps its card and is reviewed by the next run); the brief state written as a
+same-day re-run; at most the stance payload worker. The prompt already provides for a same-day re-run (question
+entries and sightings merge on the date). The run of 11 Nov that topped up without a note took 18 minutes and
+about US$19. From now on a digest that is restarted and lands after the Takeaways gets this top-up the same
+morning.
+
+**Stance ledger read under a key that nobody writes.** Rows in `stance.*` carry a pipeline key. `opus` was written
+by the Opus Macro Takeaways, which was switched off on 31 Oct: `stance.meta` shows its last update at 07:46 SGT
+that day. `fable` is written every morning by the Fable run. The Opus YouTube and Podcast digests went on reading
+`opus`, so for twelve days their stance-shift blocks compared each speaker with priors that ended on 31 Oct (both
+footers of 11 Nov say the ledger is stale). It showed up in the side by side because the test tasks read `fable`
+and the shift calls differed. The effect on the Takeaways is small: it computes its own shifts against the
+`fable` ledger. The Podcast task's prompt was changed at 09:27 SGT: five places plus one dated sentence, applied
+by script with each find asserted, the stored prompt compared byte for byte (28,720 bytes), the prompt before and
+after kept in project files `notes/prompt_backups/` (undo: store the "before" file). Its first run on the live
+ledger is 13 Nov 06:00 SGT. The YouTube task's prompt holds API keys, which a thread may not retype, so it stays
+on `opus` until the keys are out of the prompt.
+
+**Sonnet 5.5 side by side, mornings 1 and 2.** Detail and the scripts' counts are in project files
+`notes/model_tests_nov2026/results.md`. Pass rule: no cited item lost, no wrong number that the production copy
+had right, no skipped step, on all three mornings.
+- Morning 1 (11 Nov). Podcast: pass, at least as complete as production. YouTube: not a pass (one clip the
+  Takeaways cited was missing, transcripts read selectively by its own account, 11 new transcriptions against the
+  note's limit of 8). Email: not a pass (seven threads read in full in two minutes, six of ten cited items lost
+  in substance).
+- Morning 2 (12 Nov). Podcast: not a pass (nothing cited lost and no wrong number, but one of eight digested
+  transcripts read end to end, by its own choice). YouTube: not a pass on the strict rule (nothing cited lost, no
+  wrong number, the transcription limit held, a full sweep of 53 searches against the handicapped production
+  run's 21, but closing levels for FX and oil left unverified where production verified its own). Email: not a
+  pass on the strict rule (93 threads read in full in ten minutes; six details the Takeaways used were missing
+  and most levels unverified).
+- Reading. No kind can pass on all three mornings any more. The weakness is the same in all three: the copy reads
+  less than the prompt orders, and how much less swings between mornings on an unchanged prompt and note (Email:
+  7 threads, then 93). Cost on morning 2: YouTube about US$9 against about US$15 for the Opus re-run, Podcast
+  about US$3.70, Email about US$4.20; what the production runs cost on the three mornings is still to collect.
+  Morning 3 runs on 13 Nov with `note_youtube.txt` item 8 tightened (never a batch of transcriptions larger than
+  the allowance left).
+
+**Found on the way.**
+- The Gemini copy of the Email digest of 12 Nov misquoted twenty figures in thirteen of twenty rows of one
+  newsletter's table of market levels (checked against the mail, whose text and HTML parts agree); the test copy
+  quoted the table exactly. None of the wrong figures reached the Takeaways of 11 or 12 Nov, whose levels come
+  from the market pack and its own checks. That copy is the only email feed while the Claude Email digest is
+  paused: its levels count as unverified. Names and arguments held up on every item compared.
+- Some newsletter platforms put only a stub in the plain-text part of a mail and the content in the HTML part.
+  The test copy listed one such 51 KB mail as "body empty". If the Claude Email digest is brought back, its prompt
+  should open the HTML part when the plain part is a stub.
+- A Gmail message id is the arrival time: the id shifted right by 20 bits is milliseconds since 1970.
+  `internalDate` can differ by hours (one briefing: 07:00 against 17:53 SGT). Two mails that the ChatGPT copy
+  carried and the test copy did not had simply arrived before the test's window.
+- Both Podcast prompts find the Podwise key by listing the scheduled tasks and reading the prompt of the task
+  named exactly "Daily YouTube Digest". On 12 Nov the list came back paginated and too large for the test run,
+  which took the same key from another task's prompt. The 06:00 production run worked, so nothing is broken, but
+  the lookup weakens with every task added. It ends when the keys leave the prompts.
+- A disputed quote is settled fastest at the source: central bank speech pages can be fetched with curl from a
+  cloud thread. One date correction the test copy made was half right (the speaker had said the same thing on
+  both dates), and one remark it listed as having no primary source was on the central bank's own site.
+
 ### 12 Nov 2026: the Takeaways landed at 08:21 SGT; three faults that morning and their fixes
 
 **Late email.** The 06:33 SGT run mailed at 08:21 SGT, six minutes after the 08:15 deadline, and cost about US$90
