@@ -33,6 +33,23 @@ entries and sightings merge on the date). The run of 11 Nov that topped up witho
 about US$19. From now on a digest that is restarted and lands after the Takeaways gets this top-up the same
 morning.
 
+**Outcome.** The run took 13 minutes (10:05 to 10:18 SGT), cost about US$11 and launched no worker. The second
+edition was sent at 10:17 SGT and ingested at 10:19: the day's `dash.digests` row grew (60-second block 8,364 to
+8,841 characters, themes 45,844 to 61,279, sections 15,925 to 21,470) and its trade block kept its length. The two
+emails were compared line by line (`notes/topup/edition_diff.py` in project files): of the 131 lines of the
+morning edition 120 are in the second verbatim, 10 are extended (four Sources lines, six ledger lines) and one
+footer line has an insertion; none is altered or missing, the order is the same, and the trade book lines are
+among the verbatim ones. `trade_book_current` on Drive was not rewritten (last change 08:12 SGT). The stance
+ledger gained 16 rows and 5 voices; the brief state was rewritten as a same-day re-run with the morning file
+renamed to the day's archive. The run moved no odds and changed no lean; it queued one new theme and, the theme
+list being at its cap of 35, removed one that the morning edition had asked the owner about. Three shortfalls:
+the roughly 40 numbers it added were attributed to their speakers but not checked at a second source, though the
+note asked for the accuracy gate (none carries an odds arrow, a lean or a card); the body was sent as a
+hand-copied 89 KB string and not read back (the comparison above covers the morning lines, not the wording of
+the additions); and the footer gives the send time as 10:32, built on the note's "fired at about 10:15", which
+was ten minutes out. The note for the next top-up gives no clock time and says how unverified numbers are to be
+marked.
+
 **Stance ledger read under a key that nobody writes.** Rows in `stance.*` carry a pipeline key. `opus` was written
 by the Opus Macro Takeaways, which was switched off on 31 Oct: `stance.meta` shows its last update at 07:46 SGT
 that day. `fable` is written every morning by the Fable run. The Opus YouTube and Podcast digests went on reading
