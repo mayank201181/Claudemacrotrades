@@ -71,6 +71,9 @@ details > summary::before { content: '▸ '; } details[open] > summary::before {
 .sixty li { margin: 0 0 14px; }
 .rich .hl { border-radius: 3px; padding: 1px 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; } .rich table { border-collapse: collapse; font-size: 12px; } .rich td, .rich th { border-bottom: 1px solid var(--line); padding: 2px 6px; text-align: left; vertical-align: top; }
 .rich span[style*="background"] { border-radius: 3px; padding: 0 2px; }
+/* A table row holding one cell is a full-width note under the row above it (the digest's OPEN AND PENDING "Next"
+   row from 12 Nov 2026); the sanitiser of the stored copy may have dropped its colspan, so span it by layout. */
+.rich tr:has(> td:only-child) { display: block; } .rich tr:has(> td:only-child) > td { display: block; }
 .section-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-top: 18px; }
 .subject { font-size: 13px; color: var(--muted); margin: -6px 0 12px; }
 h2.sec { font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin: 0 0 6px; }

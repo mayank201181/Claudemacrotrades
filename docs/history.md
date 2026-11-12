@@ -16,9 +16,11 @@ nowrap) and prints the Next text as a second row under each trade, one cell span
 (`td colspan="7"`, 12px, grey); R01 item 7's Next for a convexity row prints in the same place; the plain-text rows
 are unchanged; printing only, no RULES rewrite. (2) The Takeaways prompt gained a one-line TABLES rule in the FORMAT
 ADDENDUM (item 4; the old item 4 is now 5), paid for by tightening the EXTREME CHECK wording; the prompt is now
-exactly 65,536 bytes, byte-compared after the write. (3) `dash-ingest` v11: the sanitiser keeps `colspan` on
-`td`/`th` (a one- or two-digit value), with a test, so the dashboard's digest view shows the same row; stub pinned
-to `main` commit 009d343, rollback 08a5516. The dashboard's own Trades tab already prints a detail row under each
+exactly 65,536 bytes, byte-compared after the write. (3) The sanitiser in `_shared/parse.ts` keeps `colspan` on
+`td`/`th` (a one- or two-digit value), with a test, so the dashboard's digest view can show the same row; the
+`dash-ingest` stub was NOT re-pinned (the deploy call was refused by the thread's permission classifier; it stays
+at 08a5516 until the next function change), so the site spans any one-cell table row by CSS instead
+(`site/style.css`, PR #69), which also covers digests stored before the deploy. The dashboard's own Trades tab already prints a detail row under each
 open trade and needed nothing. First run under the new layout: the Takeaways of 13 Nov.
 
 ### 11 Nov 2026: first stored trend run on the New York FX clock is clean
