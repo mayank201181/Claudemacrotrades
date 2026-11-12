@@ -6,6 +6,21 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 12 Nov 2026: the OPEN AND PENDING table laid out for the phone
+
+The owner's iPhone screenshots of the 12 Nov digest showed each trade row a screen tall: the Next column (review
+date, FORWARD and CARVER lines, the review's a to e verdicts) wrapped in a narrow cell beside six numeric columns.
+Three changes, no Mac visit. (1) `trade_book_spec` version 17, applied through a `trade_book_spec_edits` file
+(Apps Script `Spec.gs`): PRINT (b3) keeps the seven short columns (#, Trade, Entry, Mark, R, Stop, Target, numbers
+nowrap) and prints the Next text as a second row under each trade, one cell spanning the seven columns
+(`td colspan="7"`, 12px, grey); R01 item 7's Next for a convexity row prints in the same place; the plain-text rows
+are unchanged; printing only, no RULES rewrite. (2) The Takeaways prompt gained a one-line TABLES rule in the FORMAT
+ADDENDUM (item 4; the old item 4 is now 5), paid for by tightening the EXTREME CHECK wording; the prompt is now
+exactly 65,536 bytes, byte-compared after the write. (3) `dash-ingest` v11: the sanitiser keeps `colspan` on
+`td`/`th` (a one- or two-digit value), with a test, so the dashboard's digest view shows the same row; stub pinned
+to `main` commit 009d343, rollback 08a5516. The dashboard's own Trades tab already prints a detail row under each
+open trade and needed nothing. First run under the new layout: the Takeaways of 13 Nov.
+
 ### 11 Nov 2026: first stored trend run on the New York FX clock is clean
 
 Read from the database after the 00:30 UTC run of 11 Nov (the first stored run since `dash-trend` v8): status OK,

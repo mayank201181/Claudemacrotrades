@@ -6,9 +6,8 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-11 mid-morning (the Takeaways' short edition of 11 Nov traced and fixed; the same-day re-run
-came out as a second, fuller edition, not a full one; the morning alert installed; the market pack's DTCC day made
-current: Open items 1). Scheduled tasks and rules were read from the live systems on 10 Nov._
+_Last updated: 2026-11-12 morning (the OPEN AND PENDING table laid out for the phone: spec v17, prompt TABLES rule,
+`dash-ingest` v11; see docs/history.md). Scheduled tasks and rules were read from the live systems on 10 Nov._
 
 ## Where things are
 
@@ -32,7 +31,7 @@ current: Open items 1). Scheduled tasks and rules were read from the live system
 | `scripts/apps_script/Code.gs` | Gmail and Drive feeder in the owner's Google account, posts to `dash-ingest`. Uses a Grok Bot HTML attachment as the body and mails one inline copy for the digests. Opens the trade book with DocumentApp, so a plain-text `trade_book_current` is skipped | every 10 min |
 | `scripts/apps_script/Spec.gs` | applies a staged `trade_book_spec_edits` JSON to the spec Doc, archiving it first | every 10 min |
 | `scripts/apps_script/Alert.gs` | the morning check outside Claude: mails the owner when no Macro Takeaways email has arrived. Installed by the owner on 11 Nov (file `alert.gs` in the Apps Script project of `Code.gs`, `setupTakeawaysAlert` run once, confirmation mail received). The file must hold only that code: pasted inside the editor's empty `myFunction` stub it installs nothing | daily 08:15 to 08:45 SGT, first check 12 Nov |
-| `dash-ingest` (v10) | raw payloads into the `dash` tables (digests, trade books, feeds, questions). Since 10 Nov it keeps a card's `risk` key (R17) and its TWIN line (R18), and stores a "[Gemini]" digest copy under the source `gemini` (it had been stored as `claude`). The deployed function is a stub importing this repo at `main` commit 08a5516; rollback is the same stub pinned to 9fcaed6 | on post |
+| `dash-ingest` (v10) | raw payloads into the `dash` tables (digests, trade books, feeds, questions). Since 10 Nov it keeps a card's `risk` key (R17) and its TWIN line (R18), and stores a "[Gemini]" digest copy under the source `gemini` (it had been stored as `claude`). Since 12 Nov (v11) the sanitiser keeps `colspan` on table cells, for the digest's full-width Next rows. The deployed function is a stub importing this repo at `main` commit 009d343; rollback is the same stub pinned to 08a5516 | on post |
 | `dash-mark` (v7) | live R per open trade (one R = the card's planned risk when it carries a `risk` key, R17), hourly-close stop flag (spec v15), option twins priced on the smile and marked hourly (R18, `twin_*` keys in the card's meta), shadow outcomes in ATR(20) units. Stub pinned to 9fcaed6, rollback fe335fd | pg_cron `7 * * * *` |
 | dashboard banner (`site/app.js`) | a red banner on every tab when today's Fable digest row is still absent at 08:20 SGT | on page load |
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rule inputs | pg_cron `40 22 * * *` UTC |
@@ -48,7 +47,7 @@ current: Open items 1). Scheduled tasks and rules were read from the live system
 
 | Task | Id | When | Notes |
 |---|---|---|---|
-| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 65,502 of 65,536 bytes: changes go through `dash.rules`. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions) |
+| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 65,536 of 65,536 bytes (at the cap since 12 Nov, when a one-line TABLES rule went into the FORMAT ADDENDUM): changes go through `dash.rules` or the trade_book_spec. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions) |
 | Fable MT watchdog | `trig_01En26Xiwep91rAGjtWF68d2` | 07:20 daily | refires a dead run. It is a Claude task, so it dies with the usage limit |
 | YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways, task names "Daily YouTube Digest" and "Daily Podcast Digest". The Podcast prompts find the Podwise key by the exact task name "Daily YouTube Digest": never rename it |
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
@@ -117,7 +116,8 @@ R17 to R19 were proposed on 10 Nov (the owner approved all three in the workflow
 
 ## Trade book spec (`trade_book_spec` on Drive, both books read it)
 
-Version 16. Gate: EV > 0; cards between 0 and +0.3R are "thin edge", scored apart, reviewed at 30 closes (v12).
+Version 17 (12 Nov: the OPEN AND PENDING table keeps seven short columns and prints each trade's Next text as a
+full-width row under the trade, PRINT (b3); printing only). Gate: EV > 0; cards between 0 and +0.3R are "thin edge", scored apart, reviewed at 30 closes (v12).
 A thesis-dead or reader close exits at the close of the first hourly bar after the decision (v13). Target on a touch
 of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention: T lines two days, LOG 14 days, cap
 60,000 characters (v16). A rule in force wins over the spec on the point it covers.
@@ -164,7 +164,7 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    - *Standing decisions the weekly review carries every week until made:* thin edge at 30 closed cards, the option
      twin trial (ten finished pairs or 13 Dec), the expression table (15 cards or six weeks).
 2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to d334277), `dash-mark`
-   (9fcaed6) and `dash-ingest` (08a5516) are one-file stubs that import this repo at a `main` commit: merge,
+   (9fcaed6) and `dash-ingest` (009d343) are one-file stubs that import this repo at a `main` commit: merge,
    deploy the stub with the new commit, POST a dry run through `pg_net` and read the reply in `net._http_response`.
    The branch `claude/project-thread-e80nxd` holds the `dash-trend` rollback commit 64d1f84; keep it until the New
    York clock has run cleanly for a couple of weeks.
