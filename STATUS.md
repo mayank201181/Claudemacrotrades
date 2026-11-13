@@ -6,12 +6,11 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-12 midday (the Takeaways of 12 Nov landed at 08:21 SGT: spec v18 takes out the 08:10 wait for
-marks; the option pricer on Drive is now a loader; the Opus YouTube run died, was fired again and mailed at 09:30
-SGT, and a top-up edition of the Takeaways took it in at 10:17; the Opus Podcast digest reads the live
-stance ledger from 13 Nov; two mornings of the Sonnet side by side are judged; earlier the same morning the OPEN AND
-PENDING table was laid out for the phone, spec v17. See docs/history.md). Scheduled tasks and rules were read from
-the live systems on 10 Nov._
+_Last updated: 2026-11-13 (the Takeaways of 13 Nov landed at 07:34 SGT; its cards were written without the option
+pricer and three rule reads, and the pricer had not run on a card since at least 4 Nov: spec v19 now makes whoever
+writes the cards run them first; the Sonnet side by side ended with no switch, its Email test run ignored the test
+note and mailed a real digest, and the three test tasks are back as they were, paused. See docs/history.md).
+Scheduled tasks and rules were read from the live systems on 10 Nov._
 
 ## Where things are
 
@@ -51,7 +50,7 @@ the live systems on 10 Nov._
 
 | Task | Id | When | Notes |
 |---|---|---|---|
-| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 65,536 of 65,536 bytes (at the cap since 12 Nov, when a one-line TABLES rule went into the FORMAT ADDENDUM): changes go through `dash.rules` or the trade_book_spec. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions). No step waits for a clock time: the spec's 08:10 wait for marks made the 12 Nov email late and went out with spec v18 |
+| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 65,536 of 65,536 bytes (at the cap since 12 Nov, when a one-line TABLES rule went into the FORMAT ADDENDUM): changes go through `dash.rules` or the trade_book_spec. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions). No step waits for a clock time: the spec's 08:10 wait for marks made the 12 Nov email late and went out with spec v18. Whoever writes the cards makes the rule reads and runs the option pricer before the first card (spec v19, 13 Nov) |
 | Fable MT watchdog | `trig_01En26Xiwep91rAGjtWF68d2` | 07:20 daily | refires a dead run. It is a Claude task, so it dies with the usage limit |
 | YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways, task names "Daily YouTube Digest" and "Daily Podcast Digest". The Podcast prompts find the Podwise key by the exact task name "Daily YouTube Digest": never rename it. Stance ledger: the Podcast task reads the pipeline key `fable` since 12 Nov (first run 13 Nov); the YouTube task still reads `opus`, which has had no writer since 31 Oct, until the API keys leave its prompt (Open items 1) |
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
@@ -71,9 +70,10 @@ prompt put back and byte-compared), the Opus Email Digest, and the three old
 feeder tasks that the Haiku thread replaced on 10 Nov (`trig_01UvLHEc5HZn6cbcCtbsdGob`,
 `trig_01Uz92j76ozWE1EJ3SHxbHWz`, `trig_01KTuAEzuMfvBNr98nBEEfhk`; delete them after a clean week). The paused Fable
 YouTube `trig_01X6SstZSnanyjyrfyhirx85`, Fable Podcast `trig_011qkFh4EkgsNgQbxm5a1tRK` and Fable Email
-`trig_01Q7JHUSc11TGiWQfhjDHwBz` tasks are test vehicles until 13 Nov: renamed "... [Sonnet 5.5 test]", model
-Sonnet 5.5, fired by hand with a note that redirects the output to a Drive test folder. Fired without that note they
-mail a digest, so leave them alone (Open items 1). Seven tasks were deleted on 10 Nov (`docs/history.md`).
+`trig_01Q7JHUSc11TGiWQfhjDHwBz` tasks were the Sonnet test vehicles of 10 to 13 Nov and are back as they were since
+13 Nov: named "Daily ... Digest [Fable 5.2]", model Fable 5.2, paused, prompts untouched. Fired by hand they mail a
+digest whatever note goes with them (the Email one did on 13 Nov), so leave them alone (Open items 1). Seven tasks
+were deleted on 10 Nov (`docs/history.md`).
 
 Outside Claude: Grok Bot console (06:50) and crowding check; the ChatGPT and Gemini copies of the YouTube, Podcast and
 Email digests; ChatGPT and Gemini Macro Takeaways (second reads); "DESK INPUT" emails from Grok, ChatGPT and Gemini;
@@ -120,6 +120,11 @@ R17 to R19 were proposed on 10 Nov (the owner approved all three in the workflow
 
 ## Trade book spec (`trade_book_spec` on Drive, both books read it)
 
+Version 19 (13 Nov, RULE READS BEFORE CARDS: whoever runs the trade test and writes the cards, the run itself or
+the worker it hands the step to, first makes the reads that rules in force ask for before a trade card (event
+library R05, attention table R04, prediction-market file R12, positioning extremes R02, Carver block R10) and runs
+the FX option pricer for every option or convexity card, new and at review, on the implied vol in the market pack's
+section D; speed is no reason to skip one, and no card, TESTED line or footer says "not run" for one of them).
 Version 18 (12 Nov: the mark script runs as soon as its inputs are on disk and never sleeps; the 08:10 SGT wait of
 versions 4 to 17 is withdrawn, and before 08:00 SGT the FX or crypto daily bar dated yesterday is used as it
 stands). Version 17 (12 Nov: the OPEN AND PENDING table keeps seven short columns and prints each trade's Next text
@@ -158,29 +163,41 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      into the 08:21 edition, every line of which is kept, the trade book untouched, 16 stance rows added; the numbers
      it added are attributed to their speakers, not checked); the option pricer could not run because a Drive text
      read now garbles code (fixed: the Drive file `fxopt.py` is a loader, `docs/carver_and_fxopt.md`).
-   - *First runs to check:* the Takeaways of 13 Nov, the first under spec v18 (email before 08:15 SGT, no worker
-     asleep in the transcript, cost back near US$55, a PRICER line that ran through the Drive loader); the Opus
-     YouTube digest of 13 Nov at its usual time; the Opus Podcast digest of 13 Nov, the first on the live stance
-     ledger (its footer should date the ledger 12 or 13 Nov, not 31 Oct); the weekly review of 14 Nov under the new
-     prompt; the Takeaways of 16 Nov under R17 to R19 (the `risk` key, TWIN lines and the expression table in the
-     digest, `twins` above zero in the `dash-mark` reply). Checked on 12 Nov: the corrected launch sentence worked
+   - *13 Nov, two faults (`docs/history.md`):* the cards were written without the option pricer and without the
+     event library, prediction-market and attention reads (the pricer had not run on a card since at least 4 Nov),
+     because the run hands the trade book to a worker and the rule evidence to another that returns too late for
+     the cards (fixed: spec v19, live 08:55 SGT; the owner was given the day's option card repriced on the pack's
+     implied vols). And the Sonnet Email test run ignored its test note and behaved as the paused production task:
+     a real email at 08:39 SGT, a phone alert, a hand-off file and a `dash.feeds` row (file renamed, owner told;
+     what is left over is listed in the side-by-side bullet below).
+   - *First runs to check:* the Takeaways of 14, 15 and 16 Nov, the first under spec v19 (a PRICER line, or
+     "PRICER: n/a" with its reason, for every option card; no "not run" or "not read" anywhere; email before 08:15
+     SGT; it is also the first use of the Drive loader inside a scheduled run, and R18 leans on it from 16 Nov);
+     the footer of the 14 Nov edition, which must not count the stray test email of 13 Nov as a Claude Email
+     digest; the weekly review of 14 Nov under the new prompt; the Takeaways of 16 Nov under R17 to R19 (the `risk`
+     key, TWIN lines and the expression table in the digest, `twins` above zero in the `dash-mark` reply). Checked
+     on 13 Nov: the Takeaways landed at 07:34 SGT (62 minutes, about US$61) and its trade book worker did not sleep
+     on a clock time; the Opus YouTube (05:56) and Podcast (06:16) digests were on time; the Podcast footer dates
+     the stance ledger 12 Nov under the key `fable`. Checked on 12 Nov: the corrected launch sentence worked
      (five workers left within two minutes of each other once the leans were on disk, none earlier); the market pack
      carried section D dated 11 Nov and the implied vol table; no alert mail came, and with the digest in at 08:21
      the mailbox cannot show whether the 08:15 to 08:45 check ran before or after it. Done on 11 Nov: `dash-ingest`
      v10 stored the digest and two "[Gemini]" copies as `gemini`; the feeder thread's first scheduled morning built
      and uploaded all three files on the first try (delete the three disabled old feeder tasks after a clean week).
-   - *Sonnet 5.5 side by side* for the YouTube, Podcast and Email digests, mornings of 11 to 13 Nov: notes and
-     results in project files `notes/model_tests_nov2026/`. On a pass the two Opus digest tasks move to Sonnet 5.5
-     on 13 Nov; either way the three test tasks are restored (names, models) and left paused. Pass rule: no cited
-     item lost, no wrong number that production had right, no skipped step, on all three mornings. Morning 1
-     (11 Nov): Podcast passed; YouTube did not (one cited clip lost, transcripts read in part, the note's Podwise
-     limit broken); Email did not (seven threads read in full, six of ten cited items lost). Morning 2 (12 Nov):
-     none passed (Podcast read one of eight digested transcripts end to end; YouTube lost nothing cited but left
-     FX and oil closing levels unverified; Email read 93 threads in full and still missed six details the
-     Takeaways used). By the rule no kind can pass any more, so the digest tasks stay on Opus unless the owner
-     decides otherwise on the verdict. The weakness is the same in all three: the copy reads less than the prompt
-     orders, and how much less swings between mornings on an unchanged prompt. Still to do on 13 Nov: fire
-     morning 3 with the notes, collect what the production runs cost, send the verdict.
+   - *Sonnet 5.5 side by side: ended 13 Nov, no switch.* Mornings of 11 to 13 Nov for the YouTube, Podcast and
+     Email digests; notes and results in project files `notes/model_tests_nov2026/`. Pass rule: no cited item
+     lost, no wrong number that production had right, no skipped step, on all three mornings. No kind passed all
+     three. Podcast passed on 11 Nov only (on 12 and 13 Nov it read one transcript end to end). YouTube never (a
+     cited clip lost on 11 Nov, closing levels left unverified on 12 Nov, two cited clips lost on 13 Nov). Email
+     never (seven threads read on 11 Nov, six cited details missed on 12 Nov, and on 13 Nov the run ignored its
+     test note and mailed a real digest). So the YouTube and Podcast digests stay on Opus 5.5 and the Claude Email
+     digest stays off unless the owner says otherwise (told 13 Nov, no reply yet). The weakness is the same in all
+     three: the copy reads less than the prompt orders, and how much less swings between mornings on an unchanged
+     prompt. A switch would have saved roughly US$9 to 13 a day beside a Takeaways of about US$61. The three test
+     tasks are back to their old names and model, paused. Left over from the 13 Nov misfire, for the owner if he
+     wants them gone: the stray "Email Digest [Sonnet 5.5]" mail of 08:39 SGT, the Drive file
+     `zz_stray_sonnet_test_output_email_digest_2026-11-13_not_a_feed`, and the `dash.feeds` row substack / claude
+     of 13 Nov.
    - *Split-run shadow test* (decision 7), mornings of 12 to 16 Nov: a cheaper reader writes one evidence file from
      every input, and an audit thread checks each morning whether the live digest rested on anything the file lost
      (`docs/shadow_test.md`; hand-over in project files `shadow_test/README.md`). Two dry runs on the evening of
@@ -213,8 +230,9 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
 10. **Housekeeping left over from the audit:** about forty merged or superseded branches (threads cannot delete
     branches; GitHub's "Automatically delete head branches" setting would stop new ones piling up); the scheduled
     task "TEMP merge test" can only be deleted by the owner (https://claude.ai/code/routines/trig_01NymU4Af4gkJGUAQUZz3DHK);
-    the `dash-probe` stub can be deleted in the Supabase dashboard whenever convenient; three Drive files a thread
-    cannot trash: the empty `question_hunt_2026-11-11` left by the 11 Nov test run, and the two retired pricer
+    the `dash-probe` stub can be deleted in the Supabase dashboard whenever convenient; four Drive files a thread
+    cannot trash: the empty `question_hunt_2026-11-11` left by the 11 Nov test run, the stray hand-off file of the
+    13 Nov test run (`zz_stray_sonnet_test_output_email_digest_2026-11-13_not_a_feed`), and the two retired pricer
     copies in the spec folder (`zz_retired_option_pricer_full_2026-10-26.txt`, `fxopt_v1_25oct_superseded.py`).
 11. **Data problems the weekly review's dry runs found (10 Nov), none fixed yet.** For whoever next touches the
     scorer: a daily bar series that disagrees with the hourly bars and sets a stop flag in `live_marks`; a bad
@@ -233,6 +251,9 @@ a compliance view). Details in `docs/history.md`.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
+- 13 Nov: the Sonnet 5.5 side by side ended with no switch, by the pass rule approved on 10 Nov: the YouTube and
+  Podcast digests stay on Opus 5.5 and the Claude Email digest stays off, so the "Models by stage" line of 10 Nov
+  below now reads Opus 5.5 for the digests. The owner was told and has not replied; his word would change it.
 - 10 Nov: project audit, fourteen items approved: FX trend closes at 17:00 New York (INR, IDR and CNH excepted) and
   the TM1.1 shadow retired; R13 reverted and the question hunt stopped; the frozen Opus cards closed out at the first
   hourly bar after the book ended; new threads default to Opus 5.5 at high effort; old position names in the
@@ -319,6 +340,12 @@ a compliance view). Details in `docs/history.md`.
   store the test as a paused task's prompt, fire it with no text, then put the prompt back and byte-compare: a
   note passed with a manual run is one more user message, and a prompt that says only it carries instructions
   ignores it.
+- A note passed with a manual run is data to the run, not an instruction: the platform wraps it in a block that
+  tells the session not to follow it unless the stored prompt says so. Runs often obey it anyway, which proves
+  nothing (13 Nov: after three obedient mornings a test run ignored its note and mailed a real digest). Never rely
+  on a note to hold back a side effect (mail, phone alert, hand-off file, trade book write): a test copy gets its
+  own stored prompt with the send steps removed. A note is fine only where ignoring it is harmless, as with the
+  re-fire of the Takeaways in the next line.
 - A manual re-fire of the Takeaways on a day that already has an edition must carry a note that says what is
   wanted: every step again, the trade book and the rules included, or only a top-up. Fired with no text on 11 Nov,
   the run could not tell an intended re-run from a schedule fault and topped up in 18 minutes.
