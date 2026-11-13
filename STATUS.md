@@ -50,7 +50,7 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 
 | Task | Id | When | Notes |
 |---|---|---|---|
-| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 65,536 of 65,536 bytes (at the cap since 12 Nov, when a one-line TABLES rule went into the FORMAT ADDENDUM): changes go through `dash.rules` or the trade_book_spec. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions). No step waits for a clock time: the spec's 08:10 wait for marks made the 12 Nov email late and went out with spec v18. Whoever writes the cards makes the rule reads and runs the option pricer before the first card (spec v19, 13 Nov) |
+| Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 64,787 of 65,536 bytes (749 spare since 13 Nov; it had been at the cap since 12 Nov): changes go through `dash.rules` or the trade_book_spec. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions). No step waits for a clock time: the spec's 08:10 wait for marks made the 12 Nov email late and went out with spec v18. Whoever writes the cards makes the rule reads and runs the option pricer before the first card (spec v19, 13 Nov) |
 | Fable MT watchdog | `trig_01En26Xiwep91rAGjtWF68d2` | 07:20 daily | refires a dead run. It is a Claude task, so it dies with the usage limit |
 | YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways, task names "Daily YouTube Digest" and "Daily Podcast Digest". The Podcast prompts find the Podwise key by the exact task name "Daily YouTube Digest": never rename it. Stance ledger: the Podcast task reads the pipeline key `fable` since 12 Nov (first run 13 Nov); the YouTube task still reads `opus`, which has had no writer since 31 Oct, until the API keys leave its prompt (Open items 1) |
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
@@ -208,21 +208,19 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      09:45 SGT); then switch the evidence task off.
    - *Standing decisions the weekly review carries every week until made:* thin edge at 30 closed cards, the option
      twin trial (ten finished pairs or 13 Dec), the expression table (15 cards or six weeks).
-1a. **Scheduled-task prompt audit (13 Nov, read only, nothing changed).** All 27 recurring tasks and 2 one-shots read
-   from `list_triggers`; `dash.rules` matches the rules table above. Ranked fixes, waiting on the owner's yes:
-   (1) the Opus YouTube prompt still holds two API keys and reads the stance ledger under `opus`, whose last entry is
-   30 Oct, so its "Stance shifts" and Ledger lines compare against two-week-old history (owner's visit, then a thread
-   moves the key to `fable`); (2) both Podcast prompts find the Podwise key by listing every task by name, a listing
-   that now runs to nine pages, several too large to print: switch to `get_trigger trig_0194QEVwffX6ozu7t2WvhJmz`
-   (no key in the Podcast prompt, so a thread can make this edit); (3) the Fable Takeaways prompt is at 65,536 bytes:
-   about 1.4 KB of dated amendment notes in its first paragraph can go with no change in behaviour, giving headroom;
-   (4) the watchdog's catch-up note cites a "START GATE re-search" that no longer exists and an ETA of 85 minutes
-   (runs take about 60); (5) the weekly fundamentals pack still uploads by retyping 13 KB as textContent, the route
-   the feeders dropped: move it to the file-reference upload; (6) 21 to 26 connectors on the digest, evidence-pass,
-   MSD brief, Research Radar and Longevity tasks, six with expired sign-ins (owner's visit, already listed in item 1);
-   (7) delete after a clean week: the three old feeder tasks and the paused Question Hunt. Stale times (07:15, 07:45)
-   in sibling prompts are cosmetic. The shadow tasks' crons would recur in Nov 2027; the 16 Nov verdict task already
-   switches them off.
+1a. **Scheduled-task prompt audit (13 Nov).** All 27 recurring tasks and 2 one-shots read; `dash.rules` matches the
+   table above. Owner said yes to fixes 2 to 5 and 7 the same day. Done 13 Nov: the Opus Podcast digest gets the
+   Podwise key with `get_trigger trig_0194QEVwffX6ozu7t2WvhJmz`, no longer by a name search of the full task list
+   (the paused Fable Podcast prompt was left untouched); the Fable Takeaways prompt is 64,787 bytes (749 spare: dated
+   amendment notes folded into one sentence, two stale references removed, read back byte-identical). The watchdog
+   edit (catch-up note, ETA 60 min) can only be made by the thread its task posts into ("Fix missing Fable takeaways
+   email"); it was asked to make it. Not done: moving the fundamentals pack to the feeder route, because
+   `feeder.py fundpack` timed out in a test on 13 Nov (the build outlasts the feeder's time budget), so the Sunday
+   task keeps its direct build and textContent upload. Waiting on the owner's visit: the Opus YouTube prompt's two
+   API keys and `opus` ledger key (last entry 30 Oct), and 21 to 26 connectors on the digest, evidence-pass, MSD
+   brief, Research Radar and Longevity tasks. A reminder on 17 Nov 10:30 SGT deletes the three old feeder tasks and
+   the paused Question Hunt if the feeders ran cleanly all week. The shadow tasks' crons recur in Nov 2027; the
+   16 Nov verdict task switches them off.
 2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to d334277), `dash-mark`
    (9fcaed6) and `dash-ingest` (08a5516; `main` has the colspan change since 009d343, a deploy from a thread was refused by the permission classifier on 12 Nov, so re-pin it with the next function change) are one-file stubs that import this repo at a `main` commit: merge,
    deploy the stub with the new commit, POST a dry run through `pg_net` and read the reply in `net._http_response`.
