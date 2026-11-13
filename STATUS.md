@@ -208,6 +208,21 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      09:45 SGT); then switch the evidence task off.
    - *Standing decisions the weekly review carries every week until made:* thin edge at 30 closed cards, the option
      twin trial (ten finished pairs or 13 Dec), the expression table (15 cards or six weeks).
+1a. **Scheduled-task prompt audit (13 Nov, read only, nothing changed).** All 27 recurring tasks and 2 one-shots read
+   from `list_triggers`; `dash.rules` matches the rules table above. Ranked fixes, waiting on the owner's yes:
+   (1) the Opus YouTube prompt still holds two API keys and reads the stance ledger under `opus`, whose last entry is
+   30 Oct, so its "Stance shifts" and Ledger lines compare against two-week-old history (owner's visit, then a thread
+   moves the key to `fable`); (2) both Podcast prompts find the Podwise key by listing every task by name, a listing
+   that now runs to nine pages, several too large to print: switch to `get_trigger trig_0194QEVwffX6ozu7t2WvhJmz`
+   (no key in the Podcast prompt, so a thread can make this edit); (3) the Fable Takeaways prompt is at 65,536 bytes:
+   about 1.4 KB of dated amendment notes in its first paragraph can go with no change in behaviour, giving headroom;
+   (4) the watchdog's catch-up note cites a "START GATE re-search" that no longer exists and an ETA of 85 minutes
+   (runs take about 60); (5) the weekly fundamentals pack still uploads by retyping 13 KB as textContent, the route
+   the feeders dropped: move it to the file-reference upload; (6) 21 to 26 connectors on the digest, evidence-pass,
+   MSD brief, Research Radar and Longevity tasks, six with expired sign-ins (owner's visit, already listed in item 1);
+   (7) delete after a clean week: the three old feeder tasks and the paused Question Hunt. Stale times (07:15, 07:45)
+   in sibling prompts are cosmetic. The shadow tasks' crons would recur in Nov 2027; the 16 Nov verdict task already
+   switches them off.
 2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to d334277), `dash-mark`
    (9fcaed6) and `dash-ingest` (08a5516; `main` has the colspan change since 009d343, a deploy from a thread was refused by the permission classifier on 12 Nov, so re-pin it with the next function change) are one-file stubs that import this repo at a `main` commit: merge,
    deploy the stub with the new commit, POST a dry run through `pg_net` and read the reply in `net._http_response`.
