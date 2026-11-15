@@ -28,56 +28,332 @@ A|UU-cIKFgYC3BO6XqSfNteHaw|ReSolve Mini Riffs|MKT
 A|UUgDN4Enbsjd8u7HZwGh3omg|Kevin Muir (MacroTourist)|MKT
 A|UUP37ZqE3gN9Jxl2jtnvO8eA|Crowded Market Report|MKT
 A|UUPYvx_y92dvI1PSdiho0ALw|Excess Returns|MKT
+B|UU9T_qxz0g7FKhj6sXz2LKyQ|The Jay Martin Show|MKT
+B|UUY57f59mDzjS4fmFnCDRvmQ|In Gold We Trust|MKT
+B|UUUb-ua-LxOZ1d6WhThgMGRA|Mauldin Economics|MKT
+B|UUkDxvN-bcxsKkvJ3yyiGSVQ|Hedgeye|MKT
+B|UU43_LTf5Z4lbRjKCq0sIAVg|WiM Media (Breedlove)|MKT
+B|UUAl9Ld79qaZxp9JzEOwd3aA|Bankless|MKT
+B|UULo66QVfEod0nNM_GzKNxmQ|Nugget's News|MKT
+B|UUpvyOqtEc86X8w8_Se0t4-w|George Gammon|MKT
+B|UUq4ajL72ndl4yPxyzSMLeMg|Sohn Conference|MKT
+B|UU3odlwF02oBS6KByzyNLHhQ|Library of Mistakes|MKT
+B|UUiwCh0HWIHN8FPSNlijhd5Q|NABE Webinars|MKT
+B|UULc8rFIHO-toJ2Qu4a3dJXQ|Foundation for the Study of Cycles|MKT
+B|UU34Gij3JMmoLh9-YZgEokbA|AIM Summit|MKT
+B|UUDGiWd_SCy69UiOUUQe6kCA|Peter Brandt|MKT
+B|UUGgauuUKz0NLHFZlixy96jg|Anthony Crudele|MKT
+B|UUOHxDwCcOzBaLkeTazanwcw|Bravos Research|MKT
+B|UUNZsZHRF2WA-4fy1mjH3vnQ|The RO Show|MKT
+B|UU_W-lpqcFo7IuUKsFDvKNng|Haymaker (David Hay)|MKT
+B|UU2M6QcrnIbFMAi1a5iXXbfA|LaDucTrading|MKT
+B|UU_ywfvIR2JrnMuZt33y7QYQ|CiovaccoCapital|MKT
+B|UUoxmJkN7QnmYF55ukvekSuA|The Chart Report|MKT
+B|UUg3B_joekBGJ1s_4fRjsMKA|SMB Capital|MKT
+B|UUBP0QGCn6bKRHJRsEmh7Q5A|Quantified Strategies|MKT
+B|UUOErWFfNOQzXsgE7f5S_ULw|Rational Reminder|MKT
+B|UUjk7F5CZSPE2PubqQgcgNqw|Open Dialogue by Axis Bank|MKT
+B|UUpG9n9ToMGIlr_7CUvoH19g|Rajeev Suri Investor Series|MKT
+B|UUVRZ75ihzAZFihD1dS8qvwg|Chamath Palihapitiya|MKT
+B|UUh_dVD10YuSghle8g6yjePg|Naval|LEAD
+B|UUqvaXJ1K3HheTPNjH-KpwXQ|Principles by Ray Dalio|LEAD
+B|UUzQUP1qoWDoEbmsQxvdjxgQ|PowerfulJRE|LEAD
+B|UUbmNph6atAoGfqLoCL_duAg|Talks at Google|LEAD
+B|UUGwuxdEeCf0TIA2RbPOj-8g|Stanford GSB|LEAD
+B|UU-EnprmCZ3OXyAoG7vjVNCA|Stanford|LEAD
+B|UULv7Gzc3VTO6ggFlXY0sOyw|Harvard University|LEAD
+B|UUK08_B5SZwoEUk2hDPMOijQ|LSE|LEAD
+B|UUY7dD6waquGnKTZSumPMTlQ|OxfordUnion|LEAD
+B|UUWEltXtreNDBJ52MJkedq4g|MIT VC & Innovation|LEAD
+B|UUi7jxgIOxcRaF4Q54U7lF3g|Brookings Institution|LEAD
+B|UUznv7Vf9nBdJYvBagFdAHWw|Tim Ferriss|LEAD
+B|UUJLMboBYME_CLEfwsduI0wQ|Tony Robbins|LEAD
+B|UUab3eZ-9h8YQU8qCQzZwCew|David Epstein|LEAD
+B|UUBqFKDipsnzvJdt6UT0lMIg|Sandeep Maheshwari|LEAD
+B|UU-CSyyi47VX1lD9zyeABW3w|Dhruv Rathee|IND
+B|UUbfYPyITQ-7l4upoX8nvctg|Two Minute Papers|AI
+B|UUqufIGIYauviVaKyJUzKvQw|tanmay bakshi|AI
+B|UUteBj6K-B3PSaOYsqLVs3XQ|Amazon Science|AI
+B|UU7vVhkEfw4nOGp8TyDk7RcQ|Boston Dynamics|AI
+B|UUHnyfMqiRRG1u-2MsSQLbXA|Veritasium|SCI
+B|UU2LZO6swZ9SLUEOks3WnsfA|2veritasium|SCI
+B|UUsXVk37bltHxD1rDPwtNM8Q|Kurzgesagt|SCI
+B|UU6107grRI4m0o2-emgoDnAA|SmarterEveryDay|SCI
+B|UUUHW94eEFW7hkUMVaZz4eDg|minutephysics|SCI
+B|UUwmFOfFuvRPI112vR5DNnrA|Vsauce3|SCI
+B|UU7_gcs09iThXybpVgjHZ_7g|PBS Space Time|SCI
+B|UUvBqzzvUBLCs8Y7Axb-jZew|Sixty Symbols|SCI
+B|UUtESv1e7ntJaLJYKIO1FoYw|Periodic Videos|SCI
+B|UU_xYMXx_-mAzheKyEtwtCAQ|Scientific American|SCI
+B|UU415bOPUcGSamy543abLmRA|Cleo Abram|SCI
+B|UU6s-1TYa-1fBrUUIGijshCQ|Complexity Explorer|SCI
+B|UUJG8N5P1RFX29JTKt_6R21A|Ergodicity TV|SCI
+B|UU8uY6yLP9BS4BUc9BSc0Jww|N N Taleb Probability|SCI
+B|UUIJF5m5y70ZQoDCXVq0k50A|The Abel Prize|SCI
+B|UU2m77KGMIKZCD0Kw35-4shQ|Yuval Noah Harari|PHIL
+B|UUH_zYYXkJpULueOVZTkY4Bw|Richard Dawkins Foundation|SCI
+B|UULHKyx7IhZ_esCs4TSWAjEg|Ultimate Human (Brecka)|HLTH
+B|UUEzSFZRs8zJb5x5depOtUHA|Dan Go|HLTH
+B|UUvpDtH669K1a6s0Elmn6OIQ|Doctor Sethi|HLTH
+B|UUMgapddJymOC6MBOiOqia1A|Acharya Prashant|PHIL
+B|UUcYzLCs3zrQIBVHYA1sK2sw|Sadhguru|PHIL
+B|UU88A5W9XyWx7WSwthd5ykhw|J. Krishnamurti|PHIL
+B|UUBj2I1l_ubQuWrdJV2Ns_Tg|Adyashanti|PHIL
+B|UUAYslZlNuBDD7FMvpjWLtoQ|Francis Lucille|PHIL
+B|UUG9_3MP30-PDAMuEte8HUNw|Science and Nonduality|PHIL
+B|UUS0s6BFzIcvC2gTH52_vBEA|OSHO International|PHIL
+B|UU4qz5w2M-Xmju7WC9ynqRtw|Gurudev Sri Sri Ravi Shankar|PHIL
+B|UU_IQ8YUXS8qqeWQ5mOXBfUA|Chopra|PHIL
+B|UUSTTPGPS-lm0YVb4DMJ3lTA|Dr Joe Dispenza|PHIL
+B|UUkFEUSoaEO5ZIUCjZzaX7Yg|Shubha Vilas|PHIL
+F|UUIALMKvObZNtJ6AmdCLP7Lg|Bloomberg Television|MKT
 A|UUhF5O40UBqAc82I7-i5ig6A|Bloomberg Podcasts (Odd Lots etc)|MKT
+F|UUrp_UI8XtuYfpiqluWLD7Lw|CNBC Television|MKT
+F|UUo7a6riBFJ3tkeHjvkXPn1g|CNBC International|MKT
+F|UUEAZeUIeJs0IjQiqTCdVSIg|Yahoo Finance|MKT
 A|UUGXWKlq1Oxr3ddEtmKhAkPg|Real Vision|MKT
 A|UUKMeK-HGHfUFFArZ91rzv5A|Wealthion|MKT
+B|UUD2-QVBQi48RRQTD4Jhxu8w|Peak Prosperity|MKT
+F|UUqoSrYgusd8ZddtMoWhjHYA|Schwab Network|MKT
+F|UUoUxsWakJucWg46KW5RsvPw|Financial Times|BUS
+F|UU0p5jTq6Xx_DosDFxVXnWaQ|The Economist|BUS
+F|UUK7tptUDHh-RYDsdxO1-5QQ|Wall Street Journal|BUS
+F|UUhqUTb7kYRX8-EiaN3XFrSQ|Reuters|GEO
+B|UUBnFes2U2diA3QfR5m8l_Tw|JPMorgan Chase|MKT
+B|UUz6RzD6KG_hH_oHb2kyW5jQ|Morgan Stanley|MKT
+B|UU61MWzrpcsazp23LOxCsTcg|BlackRock|MKT
+B|UU-JgvPzskk5sc7LzSA0uExw|PIMCO|MKT
+B|UUhddg9J9S18jJJDbRFY-dZQ|UBS|MKT
+B|UUPnyEf4lc5_RF4QY4bT2KRw|Deutsche Bank|MKT
+B|UUTbuSzdKMgyVRjlr1EWE-gg|HSBC|MKT
+B|UU5IAqa7FQ7353r2YygV9_JQ|Standard Chartered|MKT
 A|UUIYhr3JsLYfKkCM7-W5B6DA|IMF|MKT
 A|UUXB8fM4VyQubRu3UVGhd3wA|European Central Bank|MKT
 A|UUSZUJbkRxBMOOkR8IAHRKxw|Kansas City Fed (Jackson Hole)|MKT
+B|UUEz-5n2ShUnYBQ4SMiwSAaA|St. Louis Fed|MKT
+B|UURaZvHGHxLMtWDu1XAUuG-w|Atlanta Fed|MKT
+B|UUPiLTBJPBw8AUyKDpkol6yQ|Chicago Fed|MKT
+B|UU4EZ3SeI-rKff-TCXuFqxCg|Monetary Authority of Singapore|MKT
+B|UULmY5OEuQPrgub9Kg7jnP7Q|Swiss National Bank|MKT
 A|UURnLlxwOaxeplsJ8On583Vw|Peterson Institute (PIIE)|MKT
+B|UUIRzxohZ6SbwsPqHFQGMJ7A|Milken Institute|BUS
 A|UUzWwWbbKHg4aodl0S35R6XA|Hoover Institution|GEO
+B|UUtTl-3zAWIkEb-WmI9a8ITQ|Chicago Booth|BUS
+B|UUU9Z1eLsDa_meEfsmx-Ys0w|Wharton School|BUS
+B|UUwWeR7z1tDD-SFkWjQrUrQA|Columbia Business School|BUS
+B|UUlBMLpP3UHXLmgEypMmXPuA|David Lin Report|MKT
 A|UUZ16AHnlKm7vCu6O4usxMog|Steno Research (Andreas Steno)|MKT
 A|UUrXNkk4IESnqU-8GMad2vyA|Eurodollar University (Snider)|MKT
+B|UUsHvbh9xvK12_1-A6GeY3qQ|Bianco Research|MKT
+B|UUf1HQ-YiJRTNUowEmfJMPdw|Variant Perception|MKT
+B|UUUqWCc74OV5GN7oggdsheVw|WisdomTree|MKT
+F|UULJiSMXJ9K-1AOTqIqdXJgQ|tastylive|VOL
+B|UURa4yF0KVctjFkaKWAKvopg|SpotGamma|VOL
+B|UUzUglpeCW0mUzbfAQoE80bw|Cboe|VOL
+B|UULC4PuFlyKwK03Sc29YLEGQ|CME Group|MKT
+B|UU7fQs5Toc9ODEQG0ih54W2w|MenthorQ|VOL
+B|UUBRpqrzuuqE8TZcWw75JSdw|The Compound|MKT
+B|UUfzbRPUn_YvJCl6npbZKXJA|Oaktree Capital (Marks)|MKT
+B|UU5xZQPnkw1zsrpYpHenaWBw|Crescat Capital|MKT
+B|UUlnRIMiqpGha91ld0Zs4mwg|World Gold Council|MKT
+B|UUtZDzcHrtCDpCWeVid1qSRQ|Topdown Charts|MKT
+B|UUw9Yjk4De_l21-sxLUvCbTw|Hedge Fund Tips|MKT
+B|UUkrwgzhIBKccuDsi_SvZtnQ|Forward Guidance|MKT
+B|UUKtFwcQCsl1ttW2CgOqFMUQ|Mercatus Center|MKT
+B|UUvwFhI0mrIWDiZUabRapS5Q|Investopedia|MKT
+B|UU5vAhRqHufSZNB9coZG5t6Q|Columbia Center on Global Energy Policy|ENERGY
+B|UURsn6DJQZtj-bdZVuafOnLg|OPEC|ENERGY
+B|UURBwLPbXGsI2cJe9W1zfSjQ|Just Have a Think|ENERGY
+B|UUlu8Q445-ZAG1dzzP1mHiAw|Engineering with Rosie|ENERGY
+B|UUzz4CoEgSgWNs9ZAvRMhW2A|Fully Charged|ENERGY
+B|UUBaoncRxZ_qtV2h9EhRhwrw|Resource Talks|ENERGY
+B|UUDmY09g5tiR0ocNXvEnOddg|Uranium Insider|ENERGY
 A|UUr5jq6MC_VCe1c5ciIZtk_w|CSIS|GEO
 A|UUL_A4jkwvKuMyToAPy3FQKQ|Council on Foreign Relations|GEO
 A|UUDeDd29TrRzAkSKXBCtGhxA|Carnegie Endowment|GEO
 A|UUq2C-2ncAhp_e9scyJNatpw|Hudson Institute|GEO
+B|UUYygxNuTTlq2neh6Fu6rP4Q|IISS|GEO
 A|UURgFUxxVSDOrPFfWqs6yUiw|Lowy Institute|GEO
 A|UU3iVde7DUj4hOQgnHbxVuew|Asia Society|GEO
+B|UUajgcgjxXLZ_z817H5JnOzQ|Belfer Center|GEO
+B|UUYB1ercr0h50goIy2yEMvIA|FPRI|GEO
+B|UU8JvbbaLkEvasinD1WDnWfA|ISEAS Yusof Ishak|GEO
+B|UUAwZChE_HL5ueY6Zb9VKGpw|RSIS Singapore|GEO
 A|UUwnKziETDbHJtx78nIkfYug|Caspian Report|GEO
+B|UUXW9oUSOwt7mcTT5d_5hQcA|Good Times Bad Times|GEO
+B|UU-uhvujip5deVcEtLxnW8qg|TLDR News Global|GEO
+B|UU-eegKVWEgBCa4OzjnK_PtA|TLDR News EU|GEO
+B|UUGg5QDOcFZYS3FbLVHRvJUw|TLDR News US|GEO
 A|UUCInRC_-mCbDo0XvLArVV3Q|Foreign Affairs|GEO
+F|UULXo7UDZvByw2ixzpQCufnA|Vox|GEO
+F|UUknLrEdhRCp1aegoMqRaCZg|DW News|GEO
+F|UUNye-wNBqNL5ZzHSJj3l8Bg|Al Jazeera English|GEO
+F|UU16niRr50-MSBwiO3YDb3RA|BBC News|GEO
+F|UU4SUWizzKc1tptprBkWjX2Q|South China Morning Post|APAC
+B|UUg5HQ8yI3f43ogvFJyVMfhQ|Nikkei Asia|APAC
+B|UUy287hC44mRWpFLj4hK8gKA|China Update (Tony Nash)|APAC
+B|UUXOtILmQEo3pL_1bJfUOFWw|ChinaTalk (Schneider)|APAC
+B|UULCXXX3rL3bX6sB6SYGwbBg|Sinica Podcast|APAC
+B|UUC3ehuUksTyQ7bbjGntmx3Q|Perun|GEO
+B|UUoooV8TQKY3Llh_Llcp9Asg|CNAS|GEO
+B|UUR-Ja1yBcjkhuQblxnroZJg|OECD|MKT
+B|UUHlEaKbepQ_S9iIoZPKVQew|NATO|GEO
+F|UUYxRlFDqcWM4y7FfpiAN3KQ|The White House|GEO
+B|UU6ZhpmNnLxlOYipqh8wbM3A|US State Department|GEO
+F|UUb--64Gl51jIEVE-GLDAVTg|C-SPAN|GEO
+F|UU6ZFN9Tx6xh-skXCuRHCDpQ|PBS NewsHour|GEO
+B|UUsN32BtMd0IoByjJRNF12cw|60 Minutes|GEO
+F|UUDRIjKy6eZOvKtOELtTdeUA|Breaking Points|GEO
+B|UUMxiv15iK_MFayY_3fU9loQ|UnHerd|PHIL
+F|UUGttrUON87gWfU6dMWm1fcA|Tucker Carlson|GEO
+B|UUihQxW838FMa_fWhGsK9F0Q|Carnegie India|APAC
+F|UUJEDFSxHHOW1PpBccdSxOTA|Indian Express|APAC
+F|UU3uJIdRFTGgLWrUziaHbzrg|NDTV Profit|APAC
+B|UULvnJL8htRR1T9cbSccaoVw|Aswath Damodaran|MKT
+F|UUSPEjw8F2nQDtmUKPFNF7_A|NHK World Japan|APAC
+B|UUML-IRb2g66A44iK1y_OLeQ|Australian Financial Review|APAC
 A|UUXl4i9dYBrFOabk0xGmbkRA|Dwarkesh Patel|AI
 A|UUSHZKyawb77ixDdsGog4iWA|Lex Fridman|AI
 A|UUSI7h9hydQ40K5MJHnCrQvw|No Priors|AI
+B|UUxBcwypKK-W3GHd_RZ9FZrQ|Latent Space|AI
 A|UUNJ1Ymd5yFuUPtn21xtRbbw|AI Explained|AI
+B|UUawZsQWqfGSbCI5yjkdVkTA|Matthew Berman|AI
+B|UUqcbQf6yw5KzRoDDcZ_wBSw|Wes Roth|AI
+B|UUZHmQk67mSJgfCCTn7xBfew|Yannic Kilcher|AI
 A|UUXUPKJO5MZQN11PqgIvyuvQ|Andrej Karpathy|AI
 A|UUYO_jab_esuFRV4b17AJtAw|3Blue1Brown|SCI
 A|UUXZCJLdBC09xxGZ6gcdrc6A|OpenAI|AI
 A|UUrDwWp7EBBv4NwvScIpBDOA|Anthropic|AI
+B|UUHuiy8bXnmK5nisYHUd1J5g|NVIDIA|AI
 A|UU9cn0TuPq4dnbTY-CBsm8XA|a16z|AI
+B|UUWrF0oN6unbXrWsTN7RctTw|Sequoia Capital|AI
+B|UUcefcZRL2oaA_uBNeo5UOWg|Y Combinator|AI
+B|UUf0PBRjhf0rF8fWBIxTuoWA|20VC (Harry Stebbings)|BUS
+B|UUaKiCexVhZ459j9sZ2e7XdQ|Big Technology|AI
+B|UUZcR2SVWaGWNlMqPxvQS3vw|Hard Fork (NYT)|AI
+B|UUMLtBahI5DMrt0NPvDSoIRQ|Machine Learning Street Talk|AI
+B|UUjNRVMBVI30Sak_p6HRWhIA|Cognitive Revolution|AI
+B|UUKelCK4ZaO6HeEI1KQjqzWA|The AI Daily Brief|AI
+B|UU7kjWIK1H8tfmFlzZO-wHMw|TWIML AI|AI
+B|UU6t1O76G0jYXOAoYCm153dA|Lenny's Podcast|BUS
 A|UUyFqFYfTW2VoIQKylJ04Rtw|Acquired|BUS
 A|UUfnHKTFEryHWyqr4Xjsjb3w|Colossus (Invest Like the Best)|BUS
 A|UU-yRDvpR99LUc5l7i7jLzew|Bg2 Pod (Gerstner/Gurley)|AI
+B|UU9-y-6csu5WGm29I7JiwpnA|Computerphile|AI
+B|UUsBjURrPoezykLs9EqgamOA|Fireship|AI
+B|UUCb9_Kn8F_Opb3UCGm-lILQ|Microsoft Research|AI
+B|UUKWaEZ-_VweaEx1j62do_vQ|IBM Technology|AI
+B|UU-rCCy3FQ-GItDimSR9lhzw|Future of Life Institute|AI
+B|UULB7AzTwc6VFZrBsO2ucBMg|Robert Miles AI Safety|AI
 A|UU1LpsuAUaKoMzzJSEt5WImw|Asianometry|AI
+B|UU1r0DG-KEPyqOeW6o79PByw|TechTechPotato (Cutress)|AI
+B|UUhugFTK0KyrES9terTid8vA|Stanford HAI|AI
+B|UUBpxspUNl1Th33XbugiHJzw|MIT CSAIL|AI
+B|UUf_KhBXw5TIV0A7butjgFhg|SemiAnalysis|AI
+B|UUbY9xX3_jW5c2fjlZVBI4cg|TheAIGRID|AI
+B|UUjIMtrzxYc0lblGhmOgC_CA|Every|AI
+B|UUUyeluBRhGPCW4rPe_UvBZQ|ThePrimeagen|AI
+B|UUbRP3c757lWg9M-U7TyEkXA|Theo t3.gg|AI
+B|UUhJM-mF-4w_61Z6eCyl0eKQ|All-In Podcast|BUS
+B|UURPdsCVuH53rcbTcEkuY4uQ|Moore's Law Is Dead|AI
 A|UU2D2CMWXMOVWx7giW1n3LIg|Huberman Lab|HLTH
 A|UU8kGsMa0LygSX9nkBcBH1Sg|Peter Attia MD|HLTH
 A|UUWF8SqJVNlx-ctXbLswcTcA|FoundMyFitness (Rhonda Patrick)|HLTH
 A|UU1yNl2E66ZzKApQdRuTQ4tw|Sabine Hossenfelder|SCI
 A|UUTpmmkp1E4nmZqWPS-dl5bg|Quanta Magazine|SCI
+B|UUYeF244yNGuFefuFKqxIAXw|The Royal Institution|SCI
+B|UU7c8mE90qCtu11z47U0KErg|Nature|SCI
+B|UUZYTClx2T1of7BRZ86-8fow|SciShow|SCI
+B|UUciQ8wFcVoIIMi-lfu8-cjQ|Anton Petrov|SCI
+B|UUYNbYGl89UUowy8oXkipC-Q|Dr. Becky|SCI
 A|UURhV1rWIpm_pU19bBm_2RXw|Sean Carroll (Mindscape)|PHIL
 A|UUl9StMQ79LtEvlrskzjoYbQ|Closer To Truth|PHIL
 A|UUvQECJukTDE2i6aCoMnS-Vg|Big Think|PHIL
+B|UUnRVL1-HJnXWB_Xi2dAoTcg|Bryan Johnson|HLTH
+B|UUpjlh0e319ksmoOD7bQFSiw|Rich Roll|HLTH
+B|UUhRSPNKMRhZxBmbivC8L_FA|The Proof (Simon Hill)|HLTH
+B|UUa09am-cOsC-FSgr_nLkFFA|ZOE|HLTH
 A|UUosmc75v-B2Dk7GWyEyFFMw|Nutrition Made Simple (Gil Carvalho)|HLTH
+B|UUDnwlb3IQDPJtFysPUJbDFQ|Dr Rangan Chatterjee|HLTH
+B|UU5IuDMmKWSsBFB0iKky6aEQ|Mark Hyman|HLTH
+B|UU68TLK0mAEzUyHx5x5k-S1Q|Jeff Nippard|HLTH
+B|UUfQgsKhHjSyRLOp9mnffqVg|Renaissance Periodization|HLTH
 A|UUIaH-gZIVC432YRjNVvnyCA|Modern Wisdom (Williamson)|LEAD
 A|UUGq-a57w-aPwyi3pW7XLiHw|Diary of a CEO|LEAD
+B|UUShHFwKyhcDo3g7hr4f1R8A|World Science Festival|SCI
+B|UUddn8dUxYdgJz3Qr5mjADtA|NutritionFacts.org (Greger)|HLTH
+B|UUt5OA3LingpZBeEyPYmputQ|New Scientist|SCI
+B|UULA_DiR1FfKNvjuUpBHmylQ|NASA|SCI
+B|UUtI0Hodo5o5dUb67FeUjDeA|SpaceX|SCI
+B|UUrHXK2A9JtiexqwHuWGeSMg|CERN|SCI
+B|UUoxcjq-8xIDTYp3uz647V5A|Numberphile|SCI
+B|UUSju5G2aFaWMqn-_0YBtq5A|Stand-up Maths|SCI
+B|UUpMcsdZf2KkAnfmxiq2MfMQ|Arvin Ash|SCI
+B|UUGHZpIpAWJQ-Jy_CeCdXhMA|Cool Worlds|SCI
+B|UUz3qvETKooktNgCvvheuQDw|Event Horizon (Godier)|SCI
+B|UUR1IuLEqb6UEA_zQ81kwXfg|Real Engineering|SCI
+B|UUMOqf8ab-42UUQIdVoKwjlQ|Practical Engineering|SCI
+B|UU8aRaZ6_0weiS50pvCmo0pw|Institute for Advanced Study|SCI
+B|UUZVjCmJOQRpAQ_EruAIPqXg|Simons Foundation|SCI
+B|UUDrQaGaHpOav5y7m1SCSJRg|Stanford Medicine|HLTH
+B|UU_NQ14VoXhmabaSZ4RWgKWw|NIH|HLTH
 A|UUNAxrHudMfdzNi6NxruKPLw|Sam Harris|PHIL
 A|UUL_f53ZEJxp8TtlOkHwMV9Q|Jordan Peterson|PHIL
 A|UU7IcJI8PUf5Z3zKxnZvTBog|The School of Life|PHIL
+B|UUybBViio_TH_uiFFDJuz5tg|Einzelgänger|PHIL
+B|UUiRiQGCHGjDLT9FQXFW0I3A|Academy of Ideas|PHIL
+B|UUT1yd7gEOrja_gecmA1lT0Q|Long Now Foundation|PHIL
 A|UUdWIQh9DGG6uhJk8eyIFl1w|Theories of Everything (Jaimungal)|PHIL
+B|UUtCTSf3UwRU14nYWr_xm-dQ|Jonathan Pageau|PHIL
+B|UUHKZdDf09_8vVHm102fu0sg|Essentia Foundation (Kastrup)|PHIL
+B|UUxXWjjtATq3OM545gMh9PUg|Rupert Spira|PHIL
+B|UUj9fPezLH1HUh7mSo-tB1Mg|Eckhart Tolle|PHIL
+B|UU3wxPA1Sph--HxKGdOGVjrg|Alan Watts Organization|PHIL
+B|UUkUaT0T03TJvafYkfATM2Ag|Daily Stoic|PHIL
 A|UUZOKv_xnTzyLD9RJmbBUV9Q|Vedanta Society NY (Sarvapriyananda)|PHIL
+B|UUclfz6zVWWOpsQsg3OheI3g|Swami Mukundananda|PHIL
+B|UU-tLyAaPbRZiYrOJxAGB7dQ|Pursuit of Wonder|PHIL
+B|UUDETFHKteb-C_EaXmRKvP4w|Sisyphus 55|PHIL
+B|UUUyu6aCBNcyi9jsz_p1hHpA|The Living Philosophy|PHIL
+B|UUnEuIogVV2Mv6Q1a3nHIRsQ|Carefree Wandering (Moeller)|PHIL
+B|UUpvhlSLzg2LT89FNUuN-Sig|Wireless Philosophy|PHIL
+B|UUw1Sl_jFYRl2gbkBLp7w4lg|Jim Rutt Show|PHIL
+B|UU88WrCBH7BJi1je9q5AMf4Q|Aeon|PHIL
+B|UUK0z0_5uL7mb9IjntOKi5XQ|The Atlantic|PHIL
+B|UUsD-Qms-AkXDrsU962OicLw|The New Yorker|PHIL
+B|UUoiTVuiMdqBRMSBGMEcmxCw|Aspen Institute|LEAD
+B|UUpqDUjTsof-kTNpnyWper_Q|John Vervaeke|PHIL
+B|UUfTRIf4-HYqucAxDx99rQig|The Weekend University|PHIL
+F|UUCZVmatSqIMTTB8uExk8xEg|London Real|LEAD
+B|UU-qsP49Ai2GymJgyKX38l1w|Robert Greene|PHIL
+B|UU2PA-AKmVpU6NKCGtZq_rKQ|Philosophy Tube|PHIL
+B|UUimiUgDLbi6P17BdaCZpVbg|exurb1a|PHIL
+B|UUZFipeZtQM5CKUjx6grh54g|Isaac Arthur|SCI
+B|UUWo4IA01TXzBeGJJKWHOG9g|Harvard Business Review|BUS
+B|UUQMqUlg362Hhar_iCZ9tcjQ|McKinsey|BUS
+B|UULtTf_uKt0Itd0NG7txrwXA|The Knowledge Project (Parrish)|BUS
 A|UUASM0cgfkJxQ1ICmRilfHLw|Patrick Boyle|MKT
+B|UUFCEuCsyWP0YkP3CZ3Mr01Q|The Plain Bagel|MKT
+B|UUgNg3vwj3xt7QOrcIDaHdFg|PolyMatter|GEO
+B|UUCKpicnIwBP3VPxBAZWDeNA|Money & Macro|MKT
+B|UUZ4AMrDcNrfy3X6nsU8-rPg|Economics Explained|MKT
+B|UU9AHywQeW9BOcOl7dg-YMqA|Stratechery (Ben Thompson)|BUS
+F|UUmh7afBz-uWwOSSNTqUBAhg|Forbes|BUS
+B|UU9aeQQ-NqjHS3nfiod2PMSA|INSEAD|BUS
+B|UURPKXKBG8n6r6vIXoxsD2pQ|London Business School|BUS
+B|UUaUvoQTl3-vcwSgcHQlvGKg|MIT Sloan|BUS
+B|UU-FLdSMY1eGwn-pzA8e4qHw|Kellogg School|BUS
+B|UUj_tqYfFGDByQV8LWIDMBIw|HKEX|APAC
+B|UUjDnt2b8-I7bu4MRF9Uwf-A|NSE India|APAC
+B|UUyaN6mg5u8Cjy2ZI4ikWaug|My First Million|BUS
+B|UUwlvY6_2iza-QkE5CIWpIFA|Planet Money|BUS
+B|UUp4CBeq4nzeg9smAvdjPrig|Prof G Markets|MKT
+B|UU1E1SVcVyU3ntWMSQEp38Yw|The Prof G Pod|BUS
+F|UUqnbDFdCpuN8CMEg0VuEBqA|New York Times|GEO
+B|UUSRRURbKlPf1HwPUhjmufTg|The Free Press|GEO
 A|UUICRehoZjq3ZtAWgRJX118A|MacroVoices|MKT
 A|UUjqe6xtZYTfvA4pHs0HgJsQ|Thoughtful Money (Taggart)|MKT
+F|UUUMZ7gohGI9HcU9VNsr2FJQ|Bloomberg Originals|BUS
 A|UUiMPkzrVSCEDm3TatvdVylw|International Energy Agency|ENERGY
 A|UUWrBgaGjj6k5ZrTxbZzd0Og|Chatham House|GEO
 A|UUw0y9zO1RXI6uEzoKbbnxTQ|Atlantic Council|GEO
@@ -85,5 +361,40 @@ A|UUP7jMXSY2xbc3KCAE0MHQ-A|Google DeepMind|AI
 A|UUaqcvH8EvUtePORpN03jLMg|Intelligence Squared|PHIL
 A|UUbzQ_YWf9RsBP9ATbmv5kxQ|Capital Allocators (Seides)|MKT
 A|UUFk1qCySNf2FIzIidVVW81A|The Macro Compass (Peccatiello)|MKT
+F|UU9ijza42jVR3T6b8bColgvg|Kitco News|MKT
+B|UU6X0ttmzTAJt_2ebcqcIbYw|Palisades Gold Radio|MKT
+B|UUE9mrcoX-oE-2f1BL-iPPoQ|World Bank|MKT
+B|UU3xpIrci6GZoInyYZbWlEKg|San Francisco Fed|MKT
+B|UUaLmgAMEglL-yGvuGzTx6ig|Reserve Bank of Australia|MKT
+B|UUY4EvEbIox0M4JuEsu5OKnQ|Bank of Canada|MKT
 A|UUY70MMJ8Rj4wtwt7bVN6hIA|Bank of England|MKT
+B|UUyl7zwI6giPG6zC3uC8GGVg|Cato Institute|GEO
+B|UUt8lRYpzb-sSrKFb4DT2ECw|American Enterprise Institute|GEO
 A|UUHhC2FEUxv0OSDrxUybKhcg|Geopolitical Futures (Friedman)|GEO
+F|UU83jt4dlz1Gjl58fzQrrKZg|CNA (Channel NewsAsia)|APAC
+B|UUckWkzE1dVhYCtAVrs3sC0g|Wilson Center|GEO
+B|UUw-kH-Od73XDAt7qtH9uBYA|World Economic Forum|BUS
+B|UU3ScyryU9Oy9Wse3a8OAmYQ|FRONTLINE PBS|GEO
+B|UUTsiZiMomJo6FOyiBaFeaIw|Institute of Art and Ideas|PHIL
+B|UUvxm0qTrGN_1LMYgUaftWyQ|Moonshots (Diamandis)|AI
+B|UUafjal1QYJ3rb0Y9xZk1Ezg|80,000 Hours|AI
+B|UUvKRFNawVcuz4b9ihUTApCg|David Shapiro|AI
+B|UUqMBA83S0TnfTlTeE5j1mgQ|Layne Norton|HLTH
+B|UUj3p_1jOCJXB_L_we-DjLbA|Physionic|HLTH
+B|UUpHvNclapYpq8b0ZnGRoMeg|Perimeter Institute|SCI
+B|UUqO3GxVYutcugyknCWdAcUA|NEJM|HLTH
+B|UUjnpuIGovFFUBLG5BeHzTag|Philosophize This|PHIL
+B|UUote8RH_wwSLza2Qb0GAQJw|Doom Debates (Liron Shapira)|AI
+B|UUvhsiQGy_zcNCiSbeXEjhLg|RSA|PHIL
+B|UU9xkc8dWgBsFfC7DOJfJLFg|92NY|PHIL
+B|UU78euTMh9KcVbql3UeWOqBw|Commonwealth Club|PHIL
+B|UUBhPkAuGks2UkizNMbtW6uw|DBS Bank|APAC
+B|UUBLRu_evuoZwKSKQ4aI45kw|The Rest Is Money|BUS
+B|UUsufaClk5if2RGqABb-09Uw|The Rest Is Politics|GEO
+B|UU_AnpBvnhXTcipgGEHLWoOg|Conversations with Tyler|PHIL
+B|UUXjf7anLJA4NqUv8kPFIJWA|Freakonomics Radio|BUS
+B|UUnxuOd8obvLLtf5_-YKFbiQ|Ezra Klein Show|PHIL
+B|UU8Zy7crsNBL8NJCc_ueF-CA|CFA Institute|MKT
+B|UU7VrRTLQhc79Zie7Oehl0Vg|US EIA|ENERGY
+B|UUhub1tZZuWn9YYHJZZYTbMg|Morningstar|MKT
+F|UUzznO4xSV8BKnUBPyswtCUw|Arirang News|APAC
