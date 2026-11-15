@@ -213,9 +213,10 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    Drive `podcast_transcripts_latest` daily at 04:20 SGT. Waiting on the owner: (a) yes/no to a Supadata account
    (about US$17 a month) for YouTube, since cloud addresses cannot fetch YouTube audio or captions: he said yes at
    17:34 SGT and put `SUPADATA_API_KEY` into the Full access environment at 17:56 (his one phone visit); tested at
-   17:57 on three videos (captions in seconds, speaker turns marked), so from 16 Nov the 04:20 run also covers up to
-   90 A-tier YouTube videos a day (89 channels through YouTube's public Atom feeds, markets first; the owner asked
-   that no input be cut, and 90 a day is what the 3,000 monthly credits allow; a Saturday had 44); (b) his yes before any digest prompt reads the transcripts instead of
+   17:57 on three videos (captions in seconds, speaker turns marked), so from 16 Nov the 04:20 run also covers YouTube:
+   all 400 channels of the YouTube digest's universe through YouTube's public Atom feeds, up to 600 videos a day,
+   A-tier first (the owner's Supadata plan turned out to be Mega, 30,000 credits a month, paid since Sep 2026; he
+   asked that no input be cut; a Saturday had 336 new videos); (b) his yes before any digest prompt reads the transcripts instead of
    Podwise (the 29 Oct study found numbers on par, names a draw, no speaker labels). Until then both run in
    parallel; compare a week of bundles against Podwise before switching the Podcast Digest's SOURCING step.
 1a. **Scheduled-task prompt audit (13 Nov).** All 27 recurring tasks and 2 one-shots read; `dash.rules` matches the

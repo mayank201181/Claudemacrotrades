@@ -18,7 +18,8 @@ starts with its [h:mm:ss] offset.
 
 YouTube: cloud addresses cannot fetch YouTube audio or captions (yt-dlp and caption fetches both get YouTube's
 bot check from this container, 15 Nov 2026), so YouTube goes through a transcript provider. New uploads of the
-A-tier channels in youtube_channels.tsv (tier|uploads_playlist|name|category) come from YouTube's public Atom feeds
+400 channels in youtube_channels.tsv (tier|uploads_playlist|name|category, the YouTube digest's universe) come from
+YouTube's public Atom feeds
 (no key); with env SUPADATA_API_KEY each one is transcribed through Supadata (one credit a video). Without the key
 the YouTube step prints what it skipped.
 
@@ -345,7 +346,7 @@ def bundle(date, items, problems, skipped_note):
         lines.append(f"{i}. {ep['show']} — {ep['title']} · {ep['published'].astimezone(SGT).strftime('%d %b %H:%M SGT')} "
                      f"· {it['minutes']:.0f} min · {it['words']} words")
     if skipped_note:
-        lines += ["", f"Skipped: {skipped_note}"]
+        lines += ["", f"Notes: {skipped_note[:1500]}"]
     if problems:
         lines += ["", "Feeds with problems: " + "; ".join(problems)]
     lines += ["", "---", ""]
@@ -411,8 +412,10 @@ def discover_youtube(hours, state):
                           "show": ch["name"], "url": f"https://www.youtube.com/watch?v={vid}", "source": "youtube",
                           "link": f"https://www.youtube.com/watch?v={vid}"})
     rank = {"MKT": 0, "VOL": 0, "ENERGY": 0, "GEO": 1, "APAC": 1, "IND": 1, "BUS": 2, "AI": 2}
-    cats = {ch["name"]: ch["cat"] for ch in chans}
-    found.sort(key=lambda e: (rank.get(cats.get(e["show"], ""), 3), -e["published"].timestamp()))
+    tier = {"A": 0, "B": 1, "F": 2}
+    meta = {ch["name"]: ch for ch in chans}
+    found.sort(key=lambda e: (tier.get(meta[e["show"]]["tier"], 3), rank.get(meta[e["show"]]["cat"], 3),
+                              -e["published"].timestamp()))
     return found, problems
 
 
@@ -514,32 +517,47 @@ def cmd_run(a):
     sd_key = key("SUPADATA_API_KEY")
     vids, yproblems = discover_youtube(a.hours, state)
     problems += yproblems
-    log(f"youtube: {len(vids)} new A-tier videos" + (f"; {len(yproblems)} feed problems" if yproblems else ""))
+    log(f"youtube: {len(vids)} new videos across {len(read_channels())} channels" + (f"; {len(yproblems)} feed problems" if yproblems else ""))
     if a.dry:
         for v in vids:
             print(f"  youtube: {v['show']} — {v['title']} ({v['published'].astimezone(SGT).strftime('%d %b %H:%M SGT')})")
     if not sd_key:
-        notes.append(f"YouTube skipped: {len(vids)} new A-tier videos, no SUPADATA_API_KEY in the environment")
+        notes.append(f"YouTube skipped: {len(vids)} new videos, no SUPADATA_API_KEY in the environment")
     elif not a.dry:
         if len(vids) > a.max_youtube:
             notes.append(f"{len(vids) - a.max_youtube} YouTube videos over the cap of {a.max_youtube}, left for the next run")
-        for v in vids[:a.max_youtube]:
-            tag = f"{v['show']} — {v['title'][:70]}"
-            try:
-                text, lang = supadata_transcript(v["video_id"], sd_key)
-                if not text:
-                    raise RuntimeError("empty transcript")
-                v["apple_id"] = None
-                path, words = write_episode(v, text, 0, 0, 1, date)
+        def do_video(v):
+            text, lang = supadata_transcript(v["video_id"], sd_key)
+            if not text:
+                raise RuntimeError("empty transcript")
+            v["apple_id"] = None
+            path, words = write_episode(v, text, 0, 0, 1, date)
+            return path, words
+
+        done_yt = 0
+        with cf.ThreadPoolExecutor(max_workers=8) as ex:
+            futs = {}
+            for v in vids[:a.max_youtube]:
+                if time.time() - t0 > a.cap_minutes * 60:
+                    notes.append("time cap reached, remaining videos left for the next run")
+                    break
+                futs[ex.submit(do_video, v)] = v
+            for fut in cf.as_completed(futs):
+                v = futs[fut]
+                tag = f"{v['show']} — {v['title'][:70]}"
+                try:
+                    path, words = fut.result()
+                except Exception as e:  # noqa: BLE001
+                    notes.append(f"{tag}: {str(e)[:120]}")
+                    log(f"{tag}: FAILED {e}")
+                    continue
                 items.append({"ep": v, "path": path, "minutes": 0, "words": words, "usd": 0})
                 state["done"][v["guid"]] = {"file": os.path.relpath(path, ROOT), "date": date, "title": v["title"],
                                             "show": v["show"], "minutes": 0, "words": words,
                                             "published": v["published"].isoformat()}
                 save_json(rpath("state.json"), state)
-                log(f"{tag}: done, {words} words")
-            except Exception as e:  # noqa: BLE001
-                notes.append(f"{tag}: {str(e)[:120]}")
-                log(f"{tag}: FAILED {e}")
+                done_yt += 1
+        log(f"youtube: {done_yt} transcripts written")
 
     if a.dry:
         for n in notes + problems:
@@ -603,7 +621,7 @@ def main(argv):
     r = sub.add_parser("run")
     r.add_argument("--hours", type=float, default=26)
     r.add_argument("--max-podcasts", type=int, default=12)
-    r.add_argument("--max-youtube", type=int, default=90, help="a day; markets, vol and energy channels first, then geo and APAC (Supadata Pro is 3,000 credits a month, about 97 a day)")
+    r.add_argument("--max-youtube", type=int, default=600, help="a day; A-tier first, then B, then firehose, markets first within a tier (the owner's Supadata Mega plan is 30,000 credits a month; 600 a day leaves headroom for his other uses)")
     r.add_argument("--cap-minutes", type=float, default=50, help="stop starting new episodes after this long")
     r.add_argument("--upload-dir", default=None, help="stage the bundle here for a Drive upload")
     r.add_argument("--upload", action="store_true", help="stage it in this session's scratchpad upload folder")

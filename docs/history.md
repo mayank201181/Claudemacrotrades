@@ -21,7 +21,8 @@ and caption fetches both got YouTube's bot check from the container, so that hal
 provider (Supadata, one credit a video) with the 89 A-tier channels found through YouTube's public Atom feeds (no
 key needed, reachable from the cloud); the owner said yes to Supadata at 17:34 SGT, added `SUPADATA_API_KEY` to the Full access environment at 17:56
 (his one visit of the day, from the phone), and a three-video test at 17:57 returned captions in seconds; the
-YouTube half runs from the 16 Nov morning. Podwise, both digests and their prompts are untouched; a digest reads the new
+YouTube half runs from the 16 Nov morning. His plan turned out to be Mega (30,000 credits a month, paid since
+September), so at his ask the run takes every new video of all 400 channels, A-tier first, up to 600 a day. Podwise, both digests and their prompts are untouched; a digest reads the new
 transcripts only on his yes. Mac visits: 0.
 
 ### 13 Nov 2026: rule reads before cards (spec v19); the Sonnet side by side ends with no switch
