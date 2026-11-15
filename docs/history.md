@@ -18,8 +18,9 @@ environment). One file per episode with `[h:mm:ss]` offsets, a day bundle upload
 scheduled task "Feeder: podcast transcripts" (`trig_011ybXd1mZjsDPYWFyu7VtX6`, 04:20 SGT daily) wakes the Haiku
 feeder thread with `scripts/feeders/prompts/transcripts.txt`. **YouTube cannot be fetched from the cloud:** yt-dlp
 and caption fetches both got YouTube's bot check from the container, so that half is built around a transcript
-provider (Supadata, one credit a video) plus the YouTube Data API for the 89 A-tier channels, and waits on the
-owner's yes and two environment keys. Podwise, both digests and their prompts are untouched; a digest reads the new
+provider (Supadata, one credit a video) with the 89 A-tier channels found through YouTube's public Atom feeds (no
+key needed, reachable from the cloud); the owner said yes to Supadata at 17:34 SGT, and the half starts once
+`SUPADATA_API_KEY` is in the Full access environment (his phone visit). Podwise, both digests and their prompts are untouched; a digest reads the new
 transcripts only on his yes. Mac visits: 0.
 
 ### 13 Nov 2026: rule reads before cards (spec v19); the Sonnet side by side ends with no switch
