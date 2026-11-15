@@ -6,10 +6,8 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-13 (the Takeaways of 13 Nov landed at 07:34 SGT; its cards were written without the option
-pricer and three rule reads, and the pricer had not run on a card since at least 4 Nov: spec v19 now makes whoever
-writes the cards run them first; the Sonnet side by side ended with no switch, its Email test run ignored the test
-note and mailed a real digest, and the three test tasks are back as they were, paused. See docs/history.md).
+_Last updated: 2026-11-15 (a Podwise-independent transcription service runs beside Podwise: podcasts live,
+YouTube waiting on a Supadata yes/no, no digest reads it yet, Open items 1b. See docs/history.md).
 Scheduled tasks and rules were read from the live systems on 10 Nov._
 
 ## Where things are
@@ -56,6 +54,7 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
 | Feeder: prediction-market odds | `trig_019jXUYgtu3beS5Zt6yxb8tH` | 06:20 daily | writes Drive `predmkt_latest` (R12); moved from 06:38 so that it lands before the 06:33 start |
 | Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup. Since 11 Nov section D and the implied vol table carry the UTC day that is ending, read from DTCC's intraday files (`docs/marketpack.md`) |
+| Feeder: podcast transcripts | `trig_011ybXd1mZjsDPYWFyu7VtX6` | 04:20 daily | since 15 Nov: transcribes the new episodes of the 30 Podcast Digest shows from their RSS feeds on DeepInfra's Nemotron (about US$1 a day) and uploads Drive `podcast_transcripts_latest`; wakes the Haiku feeder thread (`scripts/transcribe/README.md`). Runs beside Podwise; no digest reads it yet (Open items 1b) |
 | Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | 06:33 on 12 to 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`): mails nothing, writes Drive `evidence_<date>`. It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`). Switch it off after 16 Nov |
 | Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | 09:05 on 12 to 16 Nov | wakes the thread "Audit the split Takeaways shadow test" (Opus 5.5), which compares the evidence file with the live digest; results in project files `shadow_test/` |
 | Weekly fundamentals pack | `trig_019siN4tMsZfsPNPCiLUqvYr` | Sun 18:41 | market pack section G. Stays in its own Opus thread (owner, 6 Nov) |
@@ -84,8 +83,8 @@ limit. Check the output file's date, not the task status.
 
 ### Scripts in this repo that the tasks run from project files
 
-`scripts/marketpack/`, `scripts/fundpack/`, `scripts/predmkt/`, `scripts/gdelt/` and `scripts/feeders/` are copies of
-the running files in `/mnt/project-files/<name>/`. Edit both and keep them byte-identical (all five matched on
+`scripts/marketpack/`, `scripts/fundpack/`, `scripts/predmkt/`, `scripts/gdelt/`, `scripts/feeders/` and
+`scripts/transcribe/` are copies of the running files in `/mnt/project-files/<name>/`. Edit both and keep them byte-identical (all five matched on
 11 Nov; `predmkt.py` changed on 13 Nov for Polymarket's gzip-only pages, both copies updated). `/mnt/project-files/feeders/status.csv` has one line per build and upload: read it, not a thread, to see
 whether a morning ran. The weekly review's prompt is built by `scripts/weekly_review/build_prompt.py`.
 
@@ -208,6 +207,15 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      09:45 SGT); then switch the evidence task off.
    - *Standing decisions the weekly review carries every week until made:* thin edge at 30 closed cards, the option
      twin trial (ten finished pairs or 13 Dec), the expression table (15 cards or six weeks).
+1b. **Transcription service beside Podwise (15 Nov, owner's ask: make Podwise redundant in time).** Podcasts run:
+   `scripts/transcribe/transcribe.py` transcribes the Podcast Digest's 30 shows from RSS on DeepInfra's Nemotron
+   (first run 15 Nov: 5 episodes, 225 minutes, US$0.45, 4 minutes; Podwise is about S$360 a month) and uploads
+   Drive `podcast_transcripts_latest` daily at 04:20 SGT. Waiting on the owner: (a) yes/no to a Supadata account
+   (about US$17 a month) for YouTube, since cloud addresses cannot fetch YouTube audio or captions; with a yes, one
+   phone visit puts `SUPADATA_API_KEY` and `YOUTUBE_API_KEY` into the Full access environment and the YouTube half
+   (built, 89 A-tier channels) starts; (b) his yes before any digest prompt reads the transcripts instead of
+   Podwise (the 29 Oct study found numbers on par, names a draw, no speaker labels). Until then both run in
+   parallel; compare a week of bundles against Podwise before switching the Podcast Digest's SOURCING step.
 1a. **Scheduled-task prompt audit (13 Nov).** All 27 recurring tasks and 2 one-shots read; `dash.rules` matches the
    table above. Owner said yes to fixes 2 to 5 and 7 the same day. Done 13 Nov: the Opus Podcast digest gets the
    Podwise key with `get_trigger trig_0194QEVwffX6ozu7t2WvhJmz`, no longer by a name search of the full task list

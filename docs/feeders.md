@@ -15,6 +15,7 @@ takes the newest copy by title.
 | odds | 06:20 daily | predmkt/predmkt.py | predmkt_latest | rule R12 |
 | marketpack | 06:52 daily | marketpack/marketpack.py | market_pack_latest | Takeaways STEP 2, last item |
 | fundpack | Sun 18:41 | fundpack/fundpack.py | fund_pack_latest | market pack section G (stays in its own Opus thread, the owner's wish of 6 Nov) |
+| transcripts | 04:20 daily | transcribe/transcribe.py (its own runner: `run --upload`, see scripts/transcribe/README.md) | podcast_transcripts_latest | nothing yet: the digests read Podwise until the owner says otherwise (15 Nov) |
 
 `feeder.py` in this folder is the one runner (repo copy: scripts/feeders/feeder.py; keep the two identical):
 
@@ -41,6 +42,7 @@ work is one shell command, one Drive call and one confirm, so it needs no judgme
 | Feeder: media attention table | trig_01LpdVu1akXy9sHddyah3j6n | 05:45 daily |
 | Feeder: prediction-market odds | trig_019jXUYgtu3beS5Zt6yxb8tH | 06:20 daily |
 | Feeder: market pack | trig_01TLpx3Z2fHb3vxvebpFFASG | 06:52 daily |
+| Feeder: podcast transcripts | trig_011ybXd1mZjsDPYWFyu7VtX6 | 04:20 daily (prompt `prompts/transcripts.txt`; runs transcribe.py directly, not feeder.py) |
 
 A task bound to a thread keeps that thread's model, and its prompt can be changed only from that thread: to change
 one, message the thread with the exact new text, or delete the task and create it again bound to the same session.

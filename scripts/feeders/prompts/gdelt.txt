@@ -1,0 +1,8 @@
+FEEDER RUN: gdelt (daily 05:45 SGT). It builds the media attention table that rule R04 has the 06:33 SGT Macro Takeaways read. Mayank approved this routine on 10 Nov 2026. Work silently and do exactly these steps.
+1. Run in the shell, as one foreground command with a timeout of 600000 ms:
+   cd /tmp && python3 -I /mnt/project-files/feeders/feeder.py gdelt
+   It takes 3 to 9 minutes; wait for it to finish.
+2. If the output has a CREATE_FILE block, call the Google Drive create_file tool with exactly the five arguments it prints: title, parentId, contentMimeType, disableConversionToGoogleType (true) and base64Content. Copy base64Content character for character. It is a file reference, not file content: do not read the file, do not use textContent, do not change anything.
+3. Run the command printed after "THEN run:", putting in the fileSize that create_file returned. If it prints MISMATCH, do step 2 and step 3 once more.
+4. If step 1 printed FAILED, or step 3 printed MISMATCH twice: look at the line "TELL OWNER". Only when it says yes, or on a double MISMATCH, post ONE line to Mayank: "The media attention table did not refresh today: <the reason printed>". When it says no, say nothing.
+5. End the turn with no_reply_needed. No checklist, no other message, no other command. Never trash Drive files, never edit a script, never fire or change a scheduled task.
