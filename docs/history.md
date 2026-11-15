@@ -6,6 +6,22 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 15 Nov 2026: a transcription service beside Podwise
+
+**The owner asked** for a transcription service that can make Podwise (about S$360 a month, mostly add-on quota
+packs) redundant in time. Built the same afternoon from the 29 Oct study, not redone: `scripts/transcribe/transcribe.py`
+(running copy `/mnt/project-files/transcribe/`) resolves the Podcast Digest's 30 shows to RSS through the iTunes
+lookup API, downloads each new enclosure, cuts it into 10-minute parts and transcribes them on DeepInfra's hosted
+NVIDIA Nemotron 3.5 Transcribe (three episodes at once, six parts each; the key was already in the Full access
+environment). One file per episode with `[h:mm:ss]` offsets, a day bundle uploaded to the digests' Drive folder as
+`podcast_transcripts_latest`. First run at 17:18 SGT: 5 episodes, 225 audio minutes, US$0.45, 4.3 minutes. A new
+scheduled task "Feeder: podcast transcripts" (`trig_011ybXd1mZjsDPYWFyu7VtX6`, 04:20 SGT daily) wakes the Haiku
+feeder thread with `scripts/feeders/prompts/transcripts.txt`. **YouTube cannot be fetched from the cloud:** yt-dlp
+and caption fetches both got YouTube's bot check from the container, so that half is built around a transcript
+provider (Supadata, one credit a video) plus the YouTube Data API for the 89 A-tier channels, and waits on the
+owner's yes and two environment keys. Podwise, both digests and their prompts are untouched; a digest reads the new
+transcripts only on his yes. Mac visits: 0.
+
 ### 13 Nov 2026: rule reads before cards (spec v19); the Sonnet side by side ends with no switch
 
 **The Takeaways of 13 Nov** landed at 07:34 SGT (62 minutes, US$60.72), the first under spec v18: the trade book
