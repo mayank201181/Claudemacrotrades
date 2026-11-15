@@ -4,8 +4,8 @@ Set up 15 Nov 2026 by the thread "Build podcast and YouTube transcription servic
 `/mnt/project-files/transcribe/` (keep `transcribe.py`, `shows.tsv` and `youtube_channels.tsv` byte-identical with
 this folder). It runs beside Podwise; Podwise and the digest prompts are unchanged until the owner says otherwise.
 
-- **Podcasts (live):** `shows.tsv` holds the 30 Apple show ids of the Podcast Digest's SHOW MAP (plus The Macro
-  Trading Floor). The iTunes lookup API gives each RSS feed; episodes published inside the window (26 h) and not in
+- **Podcasts (live):** `shows.tsv` holds the 30 Apple show ids of the Podcast Digest's SHOW MAP, The Macro
+  Trading Floor, and since 15 Nov nine shows the digests cited that the list lacked (39 in all; the backtest found them). The iTunes lookup API gives each RSS feed; episodes published inside the window (26 h) and not in
   `state.json` are downloaded from the enclosure, cut into 10-minute parts and transcribed on DeepInfra's hosted
   NVIDIA Nemotron 3.5 Transcribe (US$0.002 an audio minute; env `deepinfra_api_key`, already in the Full access
   environment). Three episodes at once, six parts each. No speaker labels; numbers as spoken.
@@ -29,3 +29,10 @@ this folder). It runs beside Podwise; Podwise and the digest prompts are unchang
     cd /tmp && python3 -I /mnt/project-files/transcribe/transcribe.py run --upload   # the daily run
     python3 -I /mnt/project-files/transcribe/transcribe.py one <audio url>           # one file, ad hoc
     python3 -I /mnt/project-files/transcribe/transcribe.py status
+
+## Backtest (15 Nov 2026)
+
+`backtest.py prepare | transcribe | score` transcribes every episode of the listed shows over a window and every
+YouTube video the digests cited, then checks each digest's cited items against our transcripts (coverage, names,
+numbers, against a wrong-transcript baseline). Its data stays in `/mnt/project-files/transcribe/backtest/`, never
+here (digest text is private).

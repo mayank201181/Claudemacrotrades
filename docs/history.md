@@ -6,6 +6,8 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+**15 Nov 2026: the transcriber backtest.** The owner asked for a backtest instead of two weeks of side-by-side runs. `scripts/transcribe/backtest.py` took the 79 YouTube and Podcast digest copies of 1-15 Nov (Opus, Fable, ChatGPT, Gemini, claude), transcribed every episode of the listed shows from RSS over 30 Oct to 15 Nov (181 episodes, 8,214 minutes, US$17.09, 51 minutes on four workers) and every cited YouTube video through Supadata (1,338), and matched each cited item. Coverage was 96-100% per copy. Gaps: nine shows the digests cite were missing from `shows.tsv` (Maggie Lake Talking Markets, Grant Williams, Prof G Markets, Howard Marks' Memo, Knowledge Project, Compound and Friends, 20VC, Conversations with Tyler, No Priors; added), two episodes failed because a 10-minute split left a sub-second tail that DeepInfra rejects (fixed), two Wealthion episodes are no longer in its feed, a Dwarkesh short exists only on YouTube. Sixteen YouTube ids cited (15 by the "claude" copy, one Gemini) do not exist on YouTube. The automatic names and numbers check found 43-61% of names and 31-51% of numbers against a chance rate near 20%; a hand check of about 45 misses showed digest-side text (market tape, ledger history, Podwise job ids, timestamps) or spoken forms ("four and a half"), not missing episode content. Data stays in `/mnt/project-files/transcribe/backtest/`.
+
 ### 15 Nov 2026: a transcription service beside Podwise
 
 **The owner asked** for a transcription service that can make Podwise (about S$360 a month, mostly add-on quota

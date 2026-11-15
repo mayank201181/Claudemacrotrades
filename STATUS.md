@@ -6,8 +6,8 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-15 (a Podwise-independent transcription service runs beside Podwise: podcasts live,
-YouTube waiting on a Supadata yes/no, no digest reads it yet, Open items 1b. See docs/history.md).
+_Last updated: 2026-11-15 (a Podwise-independent transcription service runs beside Podwise, podcasts and YouTube;
+a 14-day backtest found it covers 98-100% of what the digests cited; no digest reads it yet, Open items 1b).
 Scheduled tasks and rules were read from the live systems on 10 Nov._
 
 ## Where things are
@@ -54,7 +54,7 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
 | Feeder: prediction-market odds | `trig_019jXUYgtu3beS5Zt6yxb8tH` | 06:20 daily | writes Drive `predmkt_latest` (R12); moved from 06:38 so that it lands before the 06:33 start |
 | Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup. Since 11 Nov section D and the implied vol table carry the UTC day that is ending, read from DTCC's intraday files (`docs/marketpack.md`) |
-| Feeder: podcast transcripts | `trig_011ybXd1mZjsDPYWFyu7VtX6` | 04:20 daily | since 15 Nov: transcribes the new episodes of the 30 Podcast Digest shows from their RSS feeds on DeepInfra's Nemotron (about US$1 a day) and uploads Drive `podcast_transcripts_latest`; wakes the Haiku feeder thread (`scripts/transcribe/README.md`). Runs beside Podwise; no digest reads it yet (Open items 1b) |
+| Feeder: podcast transcripts | `trig_011ybXd1mZjsDPYWFyu7VtX6` | 04:20 daily | since 15 Nov: transcribes the new episodes of 39 shows (the Podcast Digest's 30, plus 9 the digests cited) from their RSS feeds, and new videos of the 400 YouTube channels through Supadata, on DeepInfra's Nemotron (about US$1 a day) and uploads Drive `podcast_transcripts_latest`; wakes the Haiku feeder thread (`scripts/transcribe/README.md`). Runs beside Podwise; no digest reads it yet (Open items 1b) |
 | Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | 06:33 on 12 to 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`): mails nothing, writes Drive `evidence_<date>`. It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`). Switch it off after 16 Nov |
 | Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | 09:05 on 12 to 16 Nov | wakes the thread "Audit the split Takeaways shadow test" (Opus 5.5), which compares the evidence file with the live digest; results in project files `shadow_test/` |
 | Weekly fundamentals pack | `trig_019siN4tMsZfsPNPCiLUqvYr` | Sun 18:41 | market pack section G. Stays in its own Opus thread (owner, 6 Nov) |
@@ -218,7 +218,14 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    A-tier first (the owner's Supadata plan turned out to be Mega, 30,000 credits a month, paid since Sep 2026; he
    asked that no input be cut; a Saturday had 336 new videos); (b) his yes before any digest prompt reads the transcripts instead of
    Podwise (the 29 Oct study found numbers on par, names a draw, no speaker labels). Until then both run in
-   parallel; compare a week of bundles against Podwise before switching the Podcast Digest's SOURCING step.
+   parallel. BACKTEST 15 Nov (owner's ask, in place of waiting two weeks): every episode of the shows over 30 Oct to
+   15 Nov (181, 137 audio hours, US$17) and every YouTube id the 79 digest copies cited (1,354) transcribed and checked
+   against what each digest cited: 98-100% covered for every copy; the gaps were 9 shows the list lacked (added, 39
+   now), two episodes that failed on a sub-second audio tail (fixed in `transcribe.py`), two Wealthion episodes no
+   longer in its feed and one YouTube-only Dwarkesh short. 16 cited YouTube ids do not exist (15 in the "claude"
+   YouTube copy). A hand check of about 45 cited numbers the matcher missed found them to be the digests' own tape,
+   ledger and timestamps, or spoken forms; none was an episode fact absent from our transcript. Report and data:
+   `/mnt/project-files/transcribe/backtest/report.md` (not in the repo).
 1a. **Scheduled-task prompt audit (13 Nov).** All 27 recurring tasks and 2 one-shots read; `dash.rules` matches the
    table above. Owner said yes to fixes 2 to 5 and 7 the same day. Done 13 Nov: the Opus Podcast digest gets the
    Podwise key with `get_trigger trig_0194QEVwffX6ozu7t2WvhJmz`, no longer by a name search of the full task list
