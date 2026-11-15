@@ -2,7 +2,8 @@
 
 Set up 15 Nov 2026 by the thread "Build podcast and YouTube transcription service". The running copy is
 `/mnt/project-files/transcribe/` (keep `transcribe.py`, `shows.tsv` and `youtube_channels.tsv` byte-identical with
-this folder). It runs beside Podwise; Podwise and the digest prompts are unchanged until the owner says otherwise.
+this folder). It runs beside Podwise. Since 15 Nov (the owner's yes) the Opus Podcast and YouTube digests read these transcripts
+first and send only what they lack to Podwise, which stays as the backup.
 
 - **Podcasts (live):** `shows.tsv` holds the 30 Apple show ids of the Podcast Digest's SHOW MAP, The Macro
   Trading Floor, and since 15 Nov nine shows the digests cited that the list lacked (39 in all; the backtest found them). The iTunes lookup API gives each RSS feed; episodes published inside the window (26 h) and not in
@@ -16,10 +17,15 @@ this folder). It runs beside Podwise; Podwise and the digest prompts are unchang
   firehose) are found through YouTube's public Atom feeds, no key; up to 600 a day are transcribed, A-tier first,
   then B, then firehose, markets channels first within a tier (a Saturday had 336 new videos). Eight at a time; the
   `--cap-minutes` clock applies, and a rerun continues. A transcript under 150 words is marked SHORT CLIP.
-- **Output:** `transcripts/<SGT date>/<show>__<slug>.md` per episode (header, then text with `[h:mm:ss]` offsets),
-  the day's bundle `podcast_transcripts_<date>.md` and `podcast_transcripts_latest.md` (every transcript of the SGT
-  day). `--upload` stages the bundle and prints a CREATE_FILE block for an exact Drive upload under the fixed
-  title `podcast_transcripts_latest` in folder 1LLeuELL8CLpWmtcywt2DiCpJVopNgyqm (readers take the newest copy).
+- **Output:** `transcripts/<SGT date>/<show>__<slug>.md` per item (header, then text; podcasts carry `[h:mm:ss]`
+  offsets). Each run rebuilds the SGT day's files from `state.json`: `podcast_transcripts_<date>.md` (Drive title
+  `podcast_transcripts_latest`), `youtube_transcripts_<date>_pNN.md` (about 2.4 MB each, A-tier first; Drive title
+  `youtube_transcripts_latest_pNN`) and `transcripts_index_<date>.md` (Drive title `transcripts_index_latest`: the
+  date on line 1, reading notes, then one TSV row per item: kind, id, file, show or channel, tier, published SGT,
+  minutes, words, title). Every item starts with `=== ITEM <id> ===` (the video id, or `pod-` and ten hex of the
+  guid's sha1). `--upload` stages them and prints one CREATE_FILE block per file, the index last, for exact Drive
+  uploads into folder 1LLeuELL8CLpWmtcywt2DiCpJVopNgyqm (readers take the newest copy of each title).
+  `bundle [--upload]` rebuilds and restages the day's files without transcribing.
   `status.csv` has one line per run; `state.json` is the done list.
 - **Schedule:** the scheduled task "Feeder: podcast transcripts" (`trig_011ybXd1mZjsDPYWFyu7VtX6`, daily 04:20
   SGT) wakes the Haiku feeder thread with `scripts/feeders/prompts/transcripts.txt`.

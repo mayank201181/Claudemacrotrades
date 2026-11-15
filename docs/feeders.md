@@ -15,7 +15,7 @@ takes the newest copy by title.
 | odds | 06:20 daily | predmkt/predmkt.py | predmkt_latest | rule R12 |
 | marketpack | 06:52 daily | marketpack/marketpack.py | market_pack_latest | Takeaways STEP 2, last item |
 | fundpack | Sun 18:41 | fundpack/fundpack.py | fund_pack_latest | market pack section G (stays in its own Opus thread, the owner's wish of 6 Nov) |
-| transcripts | 04:20 daily | transcribe/transcribe.py (its own runner: `run --upload`, see scripts/transcribe/README.md) | podcast_transcripts_latest | nothing yet: the digests read Podwise until the owner says otherwise (15 Nov) |
+| transcripts | 04:20 daily | transcribe/transcribe.py (its own runner: `run --upload`, see scripts/transcribe/README.md) | podcast_transcripts_latest, youtube_transcripts_latest_pNN, transcripts_index_latest | the Opus Podcast and YouTube digests, first, with Podwise as the backup (owner's yes 15 Nov) |
 
 `feeder.py` in this folder is the one runner (repo copy: scripts/feeders/feeder.py; keep the two identical):
 
