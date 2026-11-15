@@ -247,7 +247,10 @@ def split_audio(src, workdir):
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", src, "-vn", "-ac", "1", "-ar", "16000", "-b:a", "48k",
                     "-f", "segment", "-segment_time", str(PART_SECONDS), "-reset_timestamps", "1", pattern], check=True)
     parts = sorted(p for p in os.listdir(workdir) if p.startswith("part_") and p.endswith(".mp3"))
-    return [(i * PART_SECONDS, os.path.join(workdir, p)) for i, p in enumerate(parts)]
+    out = [(i * PART_SECONDS, os.path.join(workdir, p)) for i, p in enumerate(parts)]
+    # an episode a hair over a multiple of 10 minutes leaves a tail of a fraction of a second, which DeepInfra rejects
+    # ("no audio decoded") and which failed the whole episode (backtest 15 Nov 2026): drop tails under 2 seconds
+    return [(t, p) for n, (t, p) in enumerate(out) if n == 0 or audio_seconds(p) >= 2.0]
 
 
 def deepinfra(path, api_key, tries=3):
