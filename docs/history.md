@@ -19,8 +19,9 @@ scheduled task "Feeder: podcast transcripts" (`trig_011ybXd1mZjsDPYWFyu7VtX6`, 0
 feeder thread with `scripts/feeders/prompts/transcripts.txt`. **YouTube cannot be fetched from the cloud:** yt-dlp
 and caption fetches both got YouTube's bot check from the container, so that half is built around a transcript
 provider (Supadata, one credit a video) with the 89 A-tier channels found through YouTube's public Atom feeds (no
-key needed, reachable from the cloud); the owner said yes to Supadata at 17:34 SGT, and the half starts once
-`SUPADATA_API_KEY` is in the Full access environment (his phone visit). Podwise, both digests and their prompts are untouched; a digest reads the new
+key needed, reachable from the cloud); the owner said yes to Supadata at 17:34 SGT, added `SUPADATA_API_KEY` to the Full access environment at 17:56
+(his one visit of the day, from the phone), and a three-video test at 17:57 returned captions in seconds; the
+YouTube half runs from the 16 Nov morning. Podwise, both digests and their prompts are untouched; a digest reads the new
 transcripts only on his yes. Mac visits: 0.
 
 ### 13 Nov 2026: rule reads before cards (spec v19); the Sonnet side by side ends with no switch

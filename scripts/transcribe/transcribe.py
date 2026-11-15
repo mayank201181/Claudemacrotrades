@@ -308,6 +308,9 @@ def write_episode(ep, text, minutes, usd, parts, date):
         f"- Source: {ep.get('source', 'rss')} · {ep['url']}",
         f"- Show page: https://podcasts.apple.com/podcast/id{ep['apple_id']}" if ep.get("apple_id") else
         f"- Link: {ep.get('link', '')}",
+        ("- Transcript: YouTube captions through Supadata; a speaker change is marked \">>\"; no offsets." +
+         (" SHORT CLIP (under 150 words)." if words < 150 else ""))
+        if ep.get("source") == "youtube" else
         f"- Transcriber: NVIDIA Nemotron 3.5 Transcribe (DeepInfra), no speaker labels; numbers are spelled out as "
         f"spoken; each block starts with its offset in the audio.",
         "",
