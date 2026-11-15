@@ -17,10 +17,10 @@ DEEPINFRA_API_KEY). The top-level text of each part is kept (segment text is unr
 starts with its [h:mm:ss] offset.
 
 YouTube: cloud addresses cannot fetch YouTube audio or captions (yt-dlp and caption fetches both get YouTube's
-bot check from this container, 15 Nov 2026), so YouTube goes through a transcript provider. With env
-YOUTUBE_API_KEY the A-tier channels in youtube_channels.tsv (tier|uploads_playlist|name|category) are scanned for
-new uploads; with env SUPADATA_API_KEY each one is transcribed through Supadata (one credit a video). Without the
-keys the YouTube step prints what it skipped and why.
+bot check from this container, 15 Nov 2026), so YouTube goes through a transcript provider. New uploads of the
+A-tier channels in youtube_channels.tsv (tier|uploads_playlist|name|category) come from YouTube's public Atom feeds
+(no key); with env SUPADATA_API_KEY each one is transcribed through Supadata (one credit a video). Without the key
+the YouTube step prints what it skipped.
 
 Output, under the data root (default /mnt/project-files/transcribe/):
   transcripts/<SGT date>/<show>__<slug>.md     one file per episode (header, then the text with offsets)
@@ -376,30 +376,48 @@ def read_channels():
     return rows
 
 
-def discover_youtube(hours, state, yt_key):
+def channel_feed(ch):
+    """New videos of one channel from YouTube's public Atom feed (no key; reachable from the cloud, 15 Nov 2026).
+    The uploads playlist UU<id> is the channel UC<id>."""
+    cid = "UC" + ch["playlist"][2:]
+    ns = {"a": "http://www.w3.org/2005/Atom", "yt": "http://www.youtube.com/xml/schemas/2015"}
+    root = ET.fromstring(http_get(f"https://www.youtube.com/feeds/videos.xml?channel_id={cid}", timeout=30))
+    out = []
+    for e in root.findall("a:entry", ns):
+        vid = e.findtext("yt:videoId", namespaces=ns)
+        pub = e.findtext("a:published", namespaces=ns)
+        if vid and pub:
+            out.append((vid, e.findtext("a:title", namespaces=ns) or "", dt.datetime.fromisoformat(pub)))
+    return out
+
+
+def discover_youtube(hours, state):
     since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
     found, problems = [], []
-    for ch in read_channels():
-        q = urllib.parse.urlencode({"part": "snippet,contentDetails", "playlistId": ch["playlist"], "maxResults": 20,
-                                    "key": yt_key})
-        try:
-            j = json.loads(http_get("https://www.googleapis.com/youtube/v3/playlistItems?" + q, timeout=30))
-        except Exception as e:  # noqa: BLE001
-            problems.append(f"{ch['name']}: {str(e)[:60]}")
+    chans = read_channels()
+    with cf.ThreadPoolExecutor(max_workers=8) as ex:
+        results = list(ex.map(lambda ch: (ch, _safe(channel_feed, ch)), chans))
+    for ch, res in results:
+        if isinstance(res, Exception):
+            problems.append(f"{ch['name']}: {str(res)[:60]}")
             continue
-        for it in j.get("items", []):
-            vid = it["contentDetails"].get("videoId")
-            pub = it["contentDetails"].get("videoPublishedAt") or it["snippet"].get("publishedAt")
-            if not vid or not pub:
-                continue
-            when = dt.datetime.fromisoformat(pub.replace("Z", "+00:00"))
+        for vid, title, when in res:
             if when < since or f"yt:{vid}" in state["done"]:
                 continue
-            found.append({"guid": f"yt:{vid}", "video_id": vid, "title": it["snippet"].get("title", ""),
-                          "published": when, "show": ch["name"], "url": f"https://www.youtube.com/watch?v={vid}",
-                          "source": "youtube", "link": f"https://www.youtube.com/watch?v={vid}"})
-    found.sort(key=lambda e: e["published"], reverse=True)
+            found.append({"guid": f"yt:{vid}", "video_id": vid, "title": html.unescape(title), "published": when,
+                          "show": ch["name"], "url": f"https://www.youtube.com/watch?v={vid}", "source": "youtube",
+                          "link": f"https://www.youtube.com/watch?v={vid}"})
+    rank = {"MKT": 0, "VOL": 0, "ENERGY": 0, "GEO": 1, "APAC": 1, "IND": 1, "BUS": 2, "AI": 2}
+    cats = {ch["name"]: ch["cat"] for ch in chans}
+    found.sort(key=lambda e: (rank.get(cats.get(e["show"], ""), 3), -e["published"].timestamp()))
     return found, problems
+
+
+def _safe(fn, *args):
+    try:
+        return fn(*args)
+    except Exception as e:  # noqa: BLE001
+        return e
 
 
 def supadata_transcript(video_id, api_key):
@@ -451,9 +469,6 @@ def cmd_run(a):
     if a.dry:
         for ep in todo:
             print(f"  would do: {ep['show']} — {ep['title']} ({(ep['duration_s'] or 0) // 60} min)")
-        for n in notes + problems:
-            print("  note: " + n)
-        return 0
     def do_episode(ep):
         tag = f"{ep['show']} — {ep['title'][:70]}"
         wd = os.path.join(work, hashlib.sha1(ep["guid"].encode()).hexdigest()[:12])
@@ -470,7 +485,7 @@ def cmd_run(a):
 
     with cf.ThreadPoolExecutor(max_workers=EPISODES_AT_ONCE) as ex:
         futs = {}
-        for ep in todo:
+        for ep in ([] if a.dry else todo):
             if time.time() - t0 > a.cap_minutes * 60:
                 notes.append("time cap reached, remaining episodes left for the next run")
                 break
@@ -493,15 +508,18 @@ def cmd_run(a):
             save_json(rpath("state.json"), state)
 
     # YouTube
-    yt_key = key("YOUTUBE_API_KEY")
     sd_key = key("SUPADATA_API_KEY")
-    if not yt_key or not sd_key:
-        missing = [n for n, v in (("YOUTUBE_API_KEY", yt_key), ("SUPADATA_API_KEY", sd_key)) if not v]
-        notes.append("YouTube skipped: no " + " and ".join(missing) + " in the environment")
-    else:
-        vids, yproblems = discover_youtube(a.hours, state, yt_key)
-        problems += yproblems
-        log(f"youtube: {len(vids)} new A-tier videos")
+    vids, yproblems = discover_youtube(a.hours, state)
+    problems += yproblems
+    log(f"youtube: {len(vids)} new A-tier videos" + (f"; {len(yproblems)} feed problems" if yproblems else ""))
+    if a.dry:
+        for v in vids:
+            print(f"  youtube: {v['show']} — {v['title']} ({v['published'].astimezone(SGT).strftime('%d %b %H:%M SGT')})")
+    if not sd_key:
+        notes.append(f"YouTube skipped: {len(vids)} new A-tier videos, no SUPADATA_API_KEY in the environment")
+    elif not a.dry:
+        if len(vids) > a.max_youtube:
+            notes.append(f"{len(vids) - a.max_youtube} YouTube videos over the cap of {a.max_youtube}, left for the next run")
         for v in vids[:a.max_youtube]:
             tag = f"{v['show']} — {v['title'][:70]}"
             try:
@@ -520,6 +538,10 @@ def cmd_run(a):
                 notes.append(f"{tag}: {str(e)[:120]}")
                 log(f"{tag}: FAILED {e}")
 
+    if a.dry:
+        for n in notes + problems:
+            print("  note: " + n)
+        return 0
     out, latest = bundle(date, day_items(state, date), problems, "; ".join(notes))
     record(date, len(items), total_min, total_usd, "; ".join(notes) or "ok")
     secs = time.time() - t0
@@ -578,7 +600,7 @@ def main(argv):
     r = sub.add_parser("run")
     r.add_argument("--hours", type=float, default=26)
     r.add_argument("--max-podcasts", type=int, default=12)
-    r.add_argument("--max-youtube", type=int, default=20)
+    r.add_argument("--max-youtube", type=int, default=30, help="markets, vol and energy channels first, then geo and APAC")
     r.add_argument("--cap-minutes", type=float, default=50, help="stop starting new episodes after this long")
     r.add_argument("--upload-dir", default=None, help="stage the bundle here for a Drive upload")
     r.add_argument("--upload", action="store_true", help="stage it in this session's scratchpad upload folder")
