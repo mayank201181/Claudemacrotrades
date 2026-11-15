@@ -603,7 +603,7 @@ def main(argv):
     r = sub.add_parser("run")
     r.add_argument("--hours", type=float, default=26)
     r.add_argument("--max-podcasts", type=int, default=12)
-    r.add_argument("--max-youtube", type=int, default=30, help="markets, vol and energy channels first, then geo and APAC")
+    r.add_argument("--max-youtube", type=int, default=90, help="a day; markets, vol and energy channels first, then geo and APAC (Supadata Pro is 3,000 credits a month, about 97 a day)")
     r.add_argument("--cap-minutes", type=float, default=50, help="stop starting new episodes after this long")
     r.add_argument("--upload-dir", default=None, help="stage the bundle here for a Drive upload")
     r.add_argument("--upload", action="store_true", help="stage it in this session's scratchpad upload folder")
