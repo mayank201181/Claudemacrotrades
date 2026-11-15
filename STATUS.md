@@ -6,8 +6,9 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-15 (a Podwise-independent transcription service runs beside Podwise, podcasts and YouTube;
-a 14-day backtest found it covers 98-100% of what the digests cited; no digest reads it yet, Open items 1b).
+_Last updated: 2026-11-15 (the Podcast and YouTube digests read our own transcripts first from 16 Nov, Podwise as the
+backup; both take their keys from the paused Fable YouTube task; the YouTube digest reads the `fable` stance ledger;
+Open items 1b).
 Scheduled tasks and rules were read from the live systems on 10 Nov._
 
 ## Where things are
@@ -50,11 +51,11 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 |---|---|---|---|
 | Daily Macro Takeaways [Fable 5.2] | `trig_01QdRhfbBYeBiyYzmgCguhSE` | 06:33 daily | model and "[Fable 5.2]" label since 10 Nov (prompt, watchdog and site; the Grok crowding check and the ChatGPT red team match the old tag until the owner edits them). Email due 08:15. Prompt 64,787 of 65,536 bytes (749 spare since 13 Nov; it had been at the cap since 12 Nov): changes go through `dash.rules` or the trade_book_spec. Its workers (stance payload, trade book) are launched together in one message once the leans are on disk, and none waits for the run (11 Nov; see Working conventions). No step waits for a clock time: the spec's 08:10 wait for marks made the 12 Nov email late and went out with spec v18. Whoever writes the cards makes the rule reads and runs the option pricer before the first card (spec v19, 13 Nov) |
 | Fable MT watchdog | `trig_01En26Xiwep91rAGjtWF68d2` | 07:20 daily | refires a dead run. It is a Claude task, so it dies with the usage limit |
-| YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways, task names "Daily YouTube Digest" and "Daily Podcast Digest". The Podcast prompts find the Podwise key by the exact task name "Daily YouTube Digest": never rename it. Stance ledger: the Podcast task reads the pipeline key `fable` since 12 Nov (first run 13 Nov); the YouTube task still reads `opus`, which has had no writer since 31 Oct, until the API keys leave its prompt (Open items 1) |
+| YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways, task names "Daily YouTube Digest" and "Daily Podcast Digest". Since 15 Nov both read our transcripts first (Drive `transcripts_index_latest`, Podwise only for what ours lacks) and take their keys (YouTube API, Podwise) with `get_trigger trig_01X6SstZSnanyjyrfyhirx85`, the paused Fable YouTube task: never delete it or edit its KEYS section. Stance ledger: both read the pipeline key `fable` (Podcast since 12 Nov, YouTube since 15 Nov) |
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
 | Feeder: prediction-market odds | `trig_019jXUYgtu3beS5Zt6yxb8tH` | 06:20 daily | writes Drive `predmkt_latest` (R12); moved from 06:38 so that it lands before the 06:33 start |
 | Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup. Since 11 Nov section D and the implied vol table carry the UTC day that is ending, read from DTCC's intraday files (`docs/marketpack.md`) |
-| Feeder: podcast transcripts | `trig_011ybXd1mZjsDPYWFyu7VtX6` | 04:20 daily | since 15 Nov: transcribes the new episodes of 39 shows (the Podcast Digest's 30, plus 9 the digests cited) from their RSS feeds, and new videos of the 400 YouTube channels through Supadata, on DeepInfra's Nemotron (about US$1 a day) and uploads Drive `podcast_transcripts_latest`; wakes the Haiku feeder thread (`scripts/transcribe/README.md`). Runs beside Podwise; no digest reads it yet (Open items 1b) |
+| Feeder: podcast transcripts | `trig_011ybXd1mZjsDPYWFyu7VtX6` | 04:20 daily | since 15 Nov: transcribes the new episodes of 39 shows (the Podcast Digest's 30, plus 9 the digests cited) from their RSS feeds, and new videos of the 400 YouTube channels through Supadata, on DeepInfra's Nemotron (about US$1 a day) and uploads to Drive `podcast_transcripts_latest`, `youtube_transcripts_latest_pNN` (about 2.4 MB each) and, last, `transcripts_index_latest`; wakes the Haiku feeder thread (`scripts/transcribe/README.md`). The Podcast and YouTube digests read these first from 16 Nov (Open items 1b) |
 | Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | 06:33 on 12 to 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`): mails nothing, writes Drive `evidence_<date>`. It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`). Switch it off after 16 Nov |
 | Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | 09:05 on 12 to 16 Nov | wakes the thread "Audit the split Takeaways shadow test" (Opus 5.5), which compares the evidence file with the live digest; results in project files `shadow_test/` |
 | Weekly fundamentals pack | `trig_019siN4tMsZfsPNPCiLUqvYr` | Sun 18:41 | market pack section G. Stays in its own Opus thread (owner, 6 Nov) |
@@ -139,11 +140,9 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    - *Waiting on the owner, one visit* (click-by-click directions are in that thread; the morning alert was installed
      on 11 Nov): in the Grok crowding check change the subject match "MACRO TAKEAWAYS [Fable 5.1]" to "MACRO
      TAKEAWAYS [Fable" (not yet checked whether it needs it; the ChatGPT red team does not, its 12 Nov run read the
-     "[Fable 5.2]" edition of 11 Nov); the two API keys in the YouTube digest prompts and the seven "Fable 5.1"
-     labels in the Fable YouTube prompt (a thread cannot retype a prompt that holds a key; once the keys are out, a
-     thread moves the Opus YouTube prompt's stance-ledger key from `opus` to `fable`, five places, and the Podcast
-     prompts stop finding the Podwise key through the task list, which came back paginated and too large for one run
-     on 12 Nov); connectors per digest task cut to the four it uses, and the evidence-pass task cut to Gmail and
+     "[Fable 5.2]" edition of 11 Nov); the seven "Fable 5.1" labels in the paused Fable YouTube prompt (it holds
+     the keys, so a thread cannot retype it; since 15 Nov it is the key holder for the Opus YouTube and Podcast
+     digests, whose prompts no longer hold keys, and the Opus YouTube prompt reads the `fable` ledger); connectors per digest task cut to the four it uses, and the evidence-pass task cut to Gmail and
      Google Drive. Optional, one paste in the SQL editor: the line that puts R17 to R19 in force before Sunday, and
      `019_gemini_source.sql` (relabels the 86 Gemini rows stored as `claude`).
    - *Same-day re-run of 11 Nov (owner's yes):* the first try (08:40 SGT) died at 09:00 when the extra-usage cap
@@ -207,25 +206,21 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      09:45 SGT); then switch the evidence task off.
    - *Standing decisions the weekly review carries every week until made:* thin edge at 30 closed cards, the option
      twin trial (ten finished pairs or 13 Dec), the expression table (15 cards or six weeks).
-1b. **Transcription service beside Podwise (15 Nov, owner's ask: make Podwise redundant in time).** Podcasts run:
-   `scripts/transcribe/transcribe.py` transcribes the Podcast Digest's 30 shows from RSS on DeepInfra's Nemotron
-   (first run 15 Nov: 5 episodes, 225 minutes, US$0.45, 4 minutes; Podwise is about S$360 a month) and uploads
-   Drive `podcast_transcripts_latest` daily at 04:20 SGT. Waiting on the owner: (a) yes/no to a Supadata account
-   (about US$17 a month) for YouTube, since cloud addresses cannot fetch YouTube audio or captions: he said yes at
-   17:34 SGT and put `SUPADATA_API_KEY` into the Full access environment at 17:56 (his one phone visit); tested at
-   17:57 on three videos (captions in seconds, speaker turns marked), so from 16 Nov the 04:20 run also covers YouTube:
-   all 400 channels of the YouTube digest's universe through YouTube's public Atom feeds, up to 600 videos a day,
-   A-tier first (the owner's Supadata plan turned out to be Mega, 30,000 credits a month, paid since Sep 2026; he
-   asked that no input be cut; a Saturday had 336 new videos); (b) his yes before any digest prompt reads the transcripts instead of
-   Podwise (the 29 Oct study found numbers on par, names a draw, no speaker labels). Until then both run in
-   parallel. BACKTEST 15 Nov (owner's ask, in place of waiting two weeks): every episode of the shows over 30 Oct to
-   15 Nov (181, 137 audio hours, US$17) and every YouTube id the 79 digest copies cited (1,354) transcribed and checked
-   against what each digest cited: 98-100% covered for every copy; the gaps were 9 shows the list lacked (added, 39
-   now), two episodes that failed on a sub-second audio tail (fixed in `transcribe.py`), two Wealthion episodes no
-   longer in its feed and one YouTube-only Dwarkesh short. 16 cited YouTube ids do not exist (15 in the "claude"
-   YouTube copy). A hand check of about 45 cited numbers the matcher missed found them to be the digests' own tape,
-   ledger and timestamps, or spoken forms; none was an episode fact absent from our transcript. Report and data:
-   `/mnt/project-files/transcribe/backtest/report.md` (not in the repo).
+1b. **Transcription service, read first by the digests from 16 Nov (owner's ask 15 Nov: make Podwise redundant in
+   time).** `scripts/transcribe/transcribe.py` runs at 04:20 SGT: new episodes of 39 shows from RSS on DeepInfra's
+   Nemotron (about US$1 a day) and new videos of the YouTube digest's 400 channels through Supadata (the owner's Mega
+   plan, 30,000 credits a month; up to 600 a day, A-tier first). It uploads to Drive folder
+   1LLeuELL8CLpWmtcywt2DiCpJVopNgyqm `podcast_transcripts_latest`, `youtube_transcripts_latest_p01`... (about 2.4 MB
+   each) and, last, `transcripts_index_latest` (one TSV row per item: kind, id, file, show, tier, published, words,
+   title); items are cut at `=== ITEM <id> ===`. BACKTEST 15 Nov over 1-15 Nov: 98-100% of the items each of the 79
+   digest copies cited had a transcript (report `/mnt/project-files/transcribe/backtest/report.md`, not in the
+   repo). The owner said yes the same evening: the Opus Podcast digest (06:00) and Opus YouTube digest (05:00) now read
+   ours first and send only what ours lacks to Podwise (YouTube: up to 20); a stale index (not today's date) sends
+   them back to Podwise and says so in the footer. Podwise stays paid and running as the backup. To check on the
+   16 Nov runs: the transcriber's `status.csv` line and Drive files, and each digest's footer (how many read from
+   ours, how many from Podwise). Not decided: when to drop Podwise (after a clean week, his call). Drive gains about
+   18 files (about 45 MB) a day under fixed titles; threads cannot trash files, so old copies pile up until a
+   clean-up he approves.
 1a. **Scheduled-task prompt audit (13 Nov).** All 27 recurring tasks and 2 one-shots read; `dash.rules` matches the
    table above. Owner said yes to fixes 2 to 5 and 7 the same day. Done 13 Nov: the Opus Podcast digest gets the
    Podwise key with `get_trigger trig_0194QEVwffX6ozu7t2WvhJmz`, no longer by a name search of the full task list

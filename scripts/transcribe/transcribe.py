@@ -25,11 +25,16 @@ the YouTube step prints what it skipped.
 
 Output, under the data root (default /mnt/project-files/transcribe/):
   transcripts/<SGT date>/<show>__<slug>.md     one file per episode (header, then the text with offsets)
-  transcripts/podcast_transcripts_<SGT date>.md the day's bundle, and podcast_transcripts_latest.md (same bytes)
+  transcripts/podcast_transcripts_<SGT date>.md     the day's podcast transcripts (Drive: podcast_transcripts_latest)
+  transcripts/youtube_transcripts_<date>_pNN.md     the day's YouTube transcripts in parts of at most 2.5 MB
+                                                    (Drive: youtube_transcripts_latest_pNN), A-tier channels first
+  transcripts/transcripts_index_<date>.md           one line per item: kind, id, file, show, tier, time, title
+                                                    (Drive: transcripts_index_latest); the digests read it first
   state.json                                   episodes done (guid -> file), so a rerun does nothing twice
   status.csv                                   one line per run: utc, date, episodes, minutes, usd, note
-With --upload (or --upload-dir) the run prints a CREATE_FILE block for an exact Google Drive upload of the bundle
-under the fixed title podcast_transcripts_latest (file reference, see feeders/README.md): the model that runs it never reads or retypes a transcript.
+With --upload (or --upload-dir) the run prints one CREATE_FILE block per file for an exact Google Drive upload
+(file references, see feeders/README.md): the model that runs it never reads or retypes a transcript.
+`bundle [--upload]` rebuilds and restages the day's files from state.json without transcribing.
 """
 import argparse
 import concurrent.futures as cf
@@ -333,36 +338,95 @@ def day_items(state, date):
         pub = ent.get("published")
         when = dt.datetime.fromisoformat(pub) if pub else dt.datetime.now(dt.timezone.utc)
         items.append({"ep": {"show": ent.get("show", ""), "title": ent.get("title", ""), "published": when},
-                      "path": rpath(ent["file"]), "minutes": ent.get("minutes", 0), "words": ent.get("words", 0)})
+                      "path": rpath(ent["file"]), "minutes": ent.get("minutes", 0), "words": ent.get("words", 0),
+                      "guid": guid, "kind": "youtube" if guid.startswith("yt:") else "podcast"})
     items.sort(key=lambda it: it["ep"]["published"], reverse=True)
     return items
 
 
+PART_BYTES = 2_500_000   # a YouTube part file; Drive download_file_content saves it whole to a file (tested 15 Nov)
+TIER_RANK = {"A": 0, "B": 1, "F": 2}
+CAT_RANK = {"MKT": 0, "VOL": 0, "ENERGY": 0, "GEO": 1, "APAC": 1, "IND": 1, "BUS": 2, "AI": 2}
+
+
+def item_id(it):
+    g = it["guid"]
+    return g[3:] if g.startswith("yt:") else "pod-" + hashlib.sha1(g.encode()).hexdigest()[:10]
+
+
 def bundle(date, items, problems, skipped_note):
-    out = rpath("transcripts", f"podcast_transcripts_{date}.md")
-    lines = [f"# Transcripts for {date} (SGT) · {len(items)} episodes", "",
-             "Written by the Macro Desk transcriber (scripts/transcribe/transcribe.py), independent of Podwise. Each "
-             "episode's full transcript follows the contents; no speaker labels, offsets in [h:mm:ss].", "",
-             "## Contents", ""]
-    for i, it in enumerate(items, 1):
-        ep = it["ep"]
-        lines.append(f"{i}. {ep['show']} — {ep['title']} · {ep['published'].astimezone(SGT).strftime('%d %b %H:%M SGT')} "
-                     f"· {it['minutes']:.0f} min · {it['words']} words")
-    if skipped_note:
-        lines += ["", f"Notes: {skipped_note[:1500]}"]
-    if problems:
-        lines += ["", "Feeds with problems: " + "; ".join(problems)]
-    lines += ["", "---", ""]
-    for it in items:
+    """The day's Drive files: podcast transcripts in one file, YouTube transcripts in parts of at most PART_BYTES,
+    and a small index the digests read first. Returns [(drive title, local path)], index last."""
+    day = rpath("transcripts")
+    built = dt.datetime.now(SGT).strftime("%Y-%m-%d %H:%M SGT")
+    meta = {ch["name"]: ch for ch in read_channels()}
+    pods = [it for it in items if it["kind"] == "podcast"]
+    vids = [it for it in items if it["kind"] == "youtube"]
+    vids.sort(key=lambda it: (TIER_RANK.get(meta.get(it["ep"]["show"], {}).get("tier"), 3),
+                              CAT_RANK.get(meta.get(it["ep"]["show"], {}).get("cat"), 3),
+                              -it["ep"]["published"].timestamp()))
+
+    def block(it):
         with open(it["path"], encoding="utf-8") as f:
-            lines.append(f.read().strip())
-        lines += ["", "---", ""]
-    data = "\n".join(lines) + "\n"
+            return f"=== ITEM {item_id(it)} ===\n" + f.read().strip() + "\n\n"
+
+    files, where = [], {}
+    head = (f"# {{}} · {date} (SGT), built {built}\n\nWritten by the Macro Desk transcriber, independent of Podwise. "
+            f"Each item starts with a line \"=== ITEM <id> ===\"; the ids are in transcripts_index_latest.\n\n")
+    out = os.path.join(day, f"podcast_transcripts_{date}.md")
     with open(out, "w", encoding="utf-8") as f:
-        f.write(data)
-    latest = rpath("transcripts", "podcast_transcripts_latest.md")
-    shutil.copyfile(out, latest)
-    return out, latest
+        f.write(head.format(f"Podcast transcripts · {len(pods)} episodes"))
+        for it in pods:
+            f.write(block(it))
+            where[it["guid"]] = "podcast_transcripts_latest"
+    files.append(("podcast_transcripts_latest", out))
+    parts, cur, size = [], [], 0
+    for it in vids:
+        bl = block(it)
+        n = len(bl.encode())
+        if cur and size + n > PART_BYTES:
+            parts.append(cur)
+            cur, size = [], 0
+        cur.append((it, bl))
+        size += n
+    if cur:
+        parts.append(cur)
+    for k, part in enumerate(parts, 1):
+        title = f"youtube_transcripts_latest_p{k:02d}"
+        out = os.path.join(day, f"youtube_transcripts_{date}_p{k:02d}.md")
+        with open(out, "w", encoding="utf-8") as f:
+            f.write(head.format(f"YouTube transcripts part {k} of {len(parts)} · {len(part)} videos"))
+            for it, bl in part:
+                f.write(bl)
+                where[it["guid"]] = title
+        files.append((title, out))
+
+    lines = [f"# Transcripts index · {date} (SGT), built {built}", "",
+             f"{len(pods)} podcast episodes in podcast_transcripts_latest; {len(vids)} YouTube videos in "
+             f"{len(parts)} parts, youtube_transcripts_latest_p01 to p{len(parts):02d} (A-tier channels first). Older "
+             f"parts with higher numbers may remain on Drive from earlier days: read only the parts named here, and "
+             f"check that a part's first line carries this date.",
+             "Podcasts: NVIDIA Nemotron on DeepInfra from the RSS audio, no speaker labels, numbers spelled out, offsets "
+             "[h:mm:ss]. YouTube: the video's captions through Supadata, '>>' marks a speaker change, no offsets.",
+             "To read one item: download the named file with Google Drive download_file_content (it lands in a local "
+             "file), then cut from its '=== ITEM <id> ===' line to the next such line with a script.", ""]
+    if skipped_note:
+        lines.append(f"Notes: {skipped_note[:1500]}")
+    if problems:
+        lines.append("Feeds with problems: " + "; ".join(problems)[:1500])
+    lines += ["", "kind\tid\tfile\tshow_or_channel\ttier\tpublished_sgt\tminutes\twords\ttitle"]
+    for it in pods + vids:
+        ep = it["ep"]
+        tier = meta.get(ep["show"], {}).get("tier", "") if it["kind"] == "youtube" else ""
+        title = re.sub(r"\s+", " ", ep["title"])
+        lines.append(f"{it['kind']}\t{item_id(it)}\t{where[it['guid']]}\t{ep['show']}\t{tier}\t"
+                     f"{ep['published'].astimezone(SGT).strftime('%Y-%m-%d %H:%M')}\t{it['minutes']:.0f}\t"
+                     f"{it['words']}\t{title}")
+    out = os.path.join(day, f"transcripts_index_{date}.md")
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    files.append(("transcripts_index_latest", out))
+    return files
 
 
 # ------------------------------------------------------------------------------------------------------ youtube
@@ -566,29 +630,49 @@ def cmd_run(a):
         for n in notes + problems:
             print("  note: " + n)
         return 0
-    out, latest = bundle(date, day_items(state, date), problems, "; ".join(notes))
+    files = bundle(date, day_items(state, date), problems, "; ".join(notes))
     record(date, len(items), total_min, total_usd, "; ".join(notes) or "ok")
     secs = time.time() - t0
     print()
     print(f"ok: {len(items)} transcripts, {total_min:.0f} audio minutes, US${total_usd:.2f}, {secs / 60:.1f} min wall; "
-          f"bundle {os.path.getsize(out)} bytes at {out}")
+          f"{len(files)} files, {sum(os.path.getsize(p) for _, p in files)} bytes")
     for n in notes:
         print("  note: " + n)
     upload_dir = a.upload_dir or (find_upload_dir() if a.upload else None)
     if upload_dir and items:
-        os.makedirs(upload_dir, exist_ok=True)
-        staged = os.path.join(os.path.abspath(upload_dir), "podcast_transcripts_latest.md")
-        shutil.copyfile(out, staged)
+        print_uploads(files, upload_dir)
+    return 0
+
+
+def print_uploads(files, upload_dir):
+    """One CREATE_FILE block per file, the index last (file references: the model never reads a transcript)."""
+    os.makedirs(upload_dir, exist_ok=True)
+    print(f"\nUPLOADS: {len(files)} CREATE_FILE blocks follow; call create_file once for each, in order.")
+    for title, path in files:
+        staged = os.path.join(os.path.abspath(upload_dir), title + ".md")
+        shutil.copyfile(path, staged)
         with open(staged, "rb") as f:
             digest = hashlib.sha256(f.read()).hexdigest()
         print()
         print("CREATE_FILE (call Google Drive create_file with exactly these five arguments, nothing else):")
-        print("title = podcast_transcripts_latest")
+        print(f"title = {title}")
         print(f"parentId = {DRIVE_FOLDER}")
         print("contentMimeType = text/plain")
         print("disableConversionToGoogleType = true")
         print(f"base64Content = sha256:{digest}:{staged}")
         print(f"EXPECT fileSize = {os.path.getsize(staged)}")
+
+
+def cmd_bundle(a):
+    """Rebuild and (with --upload) restage today's files from state.json without transcribing anything."""
+    date = a.date or sgt_date()
+    state = load_json(rpath("state.json"), {"done": {}})
+    files = bundle(date, day_items(state, date), [], a.note or "")
+    for t, p in files:
+        print(f"{t}: {os.path.getsize(p)} bytes")
+    upload_dir = a.upload_dir or (find_upload_dir() if a.upload else None)
+    if upload_dir:
+        print_uploads(files, upload_dir)
     return 0
 
 
@@ -634,6 +718,12 @@ def main(argv):
     o.add_argument("source")
     o.add_argument("--title", default=None)
     o.set_defaults(fn=cmd_one)
+    bu = sub.add_parser("bundle")
+    bu.add_argument("--date", default=None)
+    bu.add_argument("--note", default=None)
+    bu.add_argument("--upload-dir", default=None)
+    bu.add_argument("--upload", action="store_true")
+    bu.set_defaults(fn=cmd_bundle)
     s = sub.add_parser("status")
     s.set_defaults(fn=cmd_status)
     a = ap.parse_args(argv)
