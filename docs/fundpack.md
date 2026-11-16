@@ -14,6 +14,7 @@ files `fundpack/` and Drive `fund_pack_latest`. The daily market pack copies it 
 | Trade | IMF IMTS (goods, USD, world) | exports 3-month sum y/y, 3-month balance vs a year earlier (EA uses Germany) |
 | Reserves | IMF IL | FX reserves in USD, 3m and 6m % change (valuation included) |
 | Credit | BIS WS_TC, WS_CREDIT_GAP | private non-financial credit % GDP, 4q and 8q change, credit gap |
+| Regime scorecard (section 1b, 16 Nov 2026) | the blocks above | per economy growth, inflation, policy, external and credit from -2 to +2, and lean = inflation + growth - policy; the base of the weekly MACRO sleeve (`docs/macro_sleeve.md`), never a daily trigger |
 | US block | FRED | claims, NFCI, unemployment, payrolls, core CPI 3m saar, core PCE, 5y5y, HY OAS |
 
 Usage: `python3 -I fundpack.py --out DIR`. Prints `ok: <path> <bytes> · <n> cells · errors <n>`; each source fails soft.
