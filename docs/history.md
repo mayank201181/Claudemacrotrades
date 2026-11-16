@@ -7,6 +7,39 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
 **16 Nov 2026: the macro book against our rules.** The owner put two files on Drive, an HTML "practitioner takeaways" summary of Willer and Saunders' *Trading Global Macro Markets* (Wiley 2026) and a 16-page photo PDF of his own summary collection (454 MB, over the Drive connector's 10 MB download cap; a thread read it from the Mac's Downloads folder through the device sandbox, rendering pages with `pdftoppm` and reading them as images; page 16 was unreadable). He asked for a comparison with the Takeaways process and whether rules should be added or removed. The thread read spec v19, R01 to R20 and the trade gates, and tested the one book claim our own record can speak to: it joined every closed card to `dash.trend_state` at the latest run on or before its open (the R10 proxy map, bond futures sign-flipped) and cut realised R by whether the card was with or against the trend monitor's ensemble. Thematic cards with the trend did better than those against on targets, stops and average R; tactical cards, against the trend by construction, did fine; six weeks and one regime, so no haircut yet. Outcome: R21 proposed with `dash.propose_rule` (trend tag as a META key, printed after the CARVER line; an against-trend thematic card must name what turns the trend; a weekly cut by trend bucket and class; a decision at 20 closed thematic cards or 20 Jan 2027), no rule removed, three rules watched (R11 against the book's FOMC follow-through, the tactical washout outside equities, R09 against trend), six book ideas parked as future tag-and-cut candidates (credit filter, Fed-cycle stage, VRP beside the washout screen, oil spec ratio and OPEC-day drift, breadth, dollar scorecard). The write-up is a Claude Doc linked from the thread; counts only in the public repo, realised R by bucket in the rule's evidence field in the database. The `trend` key was added to `parse.ts` and `scripts/weekly_review/trend_cut.sql` computes the bucket until `dash-ingest` is re-pinned. No Mac visit was needed.
+### 16 Nov 2026: the split-run shadow test ends
+
+Five scheduled mornings (12 to 16 Nov) of a Sonnet 5.5 reader writing one evidence file from every input beside
+the live Takeaways, each checked by the audit thread the same morning. Pass rule, as approved on 10 Nov: no trade
+card, odds call or headline view rests on a claim that was in an input the reader had and is not in its file.
+
+| morning | verdict | judged items | claims | carried | degraded | lost | input not read | pass finished | digest sent |
+|---|---|---|---|---|---|---|---|---|---|
+| 12 Nov | PASS | 33 | 33 | 29 | 0 | 0 | 0 | 08:15 | 08:21 |
+| 13 Nov | PASS | 40 | 40 | 36 | 0 | 0 | 0 | 08:12 | 07:34 |
+| 14 Nov | PASS | 33 | 33 | 28 | 0 | 0 | 0 | 08:14 | 07:28 |
+| 15 Nov | FAIL | 25 | 50 | 36 | 5 | 0 | 2 | 08:25 | 07:06 |
+| 16 Nov | PASS | 25 | 52 | 44 | 0 | 0 | 0 | 08:14 | 07:16 |
+
+The 15 Nov fail is one of scope: the digest also used a day-old flows brief that landed after the previous pass and
+was never among the reader's inputs (the pass has an older-day fallback for the crowding check, not for desk
+inputs). Its five degraded claims kept the content but drifted on attribution. Nothing the reader had was lost on
+any morning. The weak points: the file landed 40 to 80 minutes after the digest from 13 Nov on, the item links of
+the Gemini peer Takeaways were never covered, and a copy that lands after the digest is built (the Gemini peer
+Takeaways at 07:33 to 07:54) gives the two halves different inputs. A pass took 98 to 112 minutes; the 16 Nov run
+cost US$8.03 (earlier mornings' session ids were not kept; the dry runs were about US$7).
+
+What each extra copy adds: of 395 claims the digest used over the five mornings, 310 sat in only one copy. Second
+and third copies of the same feed each carried claims no other copy had (YouTube: Opus 44 used, 22 alone; Gemini
+33 and 25; ChatGPT 30 and 9. Podcast: Opus 18 and 11; Gemini 14 and 12; ChatGPT 10 and 5. Email: Gemini 23 and 13;
+ChatGPT 17 and 7). That backs the owner's rule of keeping every input.
+
+Done: the evidence task switched off (read back: enabled false); the audit wake disabled by the audit thread
+rather than deleted, because deleting it would delete that thread's session. The owner got the result and one
+yes/no card: build a staged split (the reader starts about 05:30 SGT and Fable decides from its file), recommended
+no, because the file lands after the digest today and an earlier schedule would put the 08:15 deadline at risk for
+a saving nobody has measured. Also checked that morning: spec v19 held on 14 to 16 Nov (every option card prints a
+PRICER line on DTCC vols through the Drive loader; no "not run"), and the three emails landed by 07:28 SGT.
 
 **16 Nov 2026: digest keys move to a Drive file.** The first runs on our transcripts (05:00 YouTube, 06:00 Podcast) read our index but could not call `get_trigger`: scheduled runs that start a fresh session cannot reach it, even with the connector attached. YouTube ran with no search sweep and the Podcast digest, which had used `get_trigger` since 13 Nov, had had no Podwise for three days. On the owner's written yes, a thread copied the two keys by script into the private Drive file `macro_desk_digest_keys` (My Drive root, KEY=value lines) and both prompts now read that file at run start, with fallbacks if it is missing; both prompts were read back against the built text. Reruns at 08:20 SGT: the Podcast footer reads "Keys: file read OK, Podwise key set OK, Podwise submissions 3" and the YouTube footer "Keys: file read OK, YouTube API OK, searches run 54, Podwise key set OK" (59 transcripts read, 56 ours, 3 Podwise). Both reruns mailed real digests marked "(rerun)".
 
