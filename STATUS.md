@@ -6,7 +6,7 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-16 (R17 to R20 in force; R21 trend tag proposed for Sun 22 Nov from the book comparison, Open
+_Last updated: 2026-11-16 (R17 to R20 in force; R21 trend tag in force since 16 Nov from the book comparison, Open
 items 13; the `trend` META key is in `parse.ts` on `main` but reaches the database only when `dash-ingest` is re-pinned,
 Open items 2. Same day: the split-run shadow test ended: the reader lost nothing it was given, but its file lands
 after the digest; the evidence task is off and the owner has a yes/no on a staged split; spec v19 held on 14 to
@@ -117,7 +117,7 @@ email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/
 | R18 | FX option twin beside every cash FX card; the pack's DTCC implied vol is the vol source; model-implied odds on FX level questions (`twin.ts` run by `dash-mark`) | 15 Nov | 13 Dec or ten finished pairs |
 | R19 | expression table: up to four expressions of a live view, the best one carded, alternates shadowed by theme | 15 Nov | 22 Dec (15 cards or six weeks) |
 | R20 | questions never leave the print unresolved: an open question is carried or closed with a reason (from the weekly review of 14 Nov) | 15 Nov | 26 Dec |
-| R21 | trend tag on every new card (direction x `dash.trend_state` ensemble, bond futures sign-flipped, `trend` META key) printed after the CARVER line; an against-trend thematic card names what turns the trend; weekly cut by trend bucket x class (`scripts/weekly_review/trend_cut.sql`); decision at 20 closed thematic cards or 20 Jan 2027 on an R09-style haircut; no gate, fill, exit or size changes (`supabase/rules/R21_trend_tag.sql`) | proposed 16 Nov, in force Sun 22 Nov 20:00 SGT unless "oppose R21" | 20 Jan 2027 |
+| R21 | trend tag on every new card (direction x `dash.trend_state` ensemble, bond futures sign-flipped, `trend` META key) printed after the CARVER line; an against-trend thematic card names what turns the trend; weekly cut by trend bucket x class (`scripts/weekly_review/trend_cut.sql`); decision at 20 closed thematic cards or 20 Jan 2027 on an R09-style haircut; no gate, fill, exit or size changes (`supabase/rules/R21_trend_tag.sql`) | 16 Nov (put in force early on the owner's word, 10:02 SGT) | 20 Jan 2027 |
 
 R03 (drivers engine) reverted 1 Nov. R15 (market pack as a rule) withdrawn 1 Nov; the pack went in as a prompt edit.
 R13 (question hunt evidence, scope opus) reverted 10 Nov; its only reader, the Opus Macro Takeaways, stopped on 31 Oct.
@@ -310,7 +310,7 @@ a compliance view). Details in `docs/history.md`.
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
 - 16 Nov: book comparison (Willer and Saunders) ends in one proposed rule, R21 trend tag and cut, and no removals;
-  six further book ideas parked as tag-and-cut candidates (Open items 13). The owner has the doc and has not replied.
+  six further book ideas parked as tag-and-cut candidates (Open items 13). The owner said to apply it at once; R21 in force 16 Nov, first cards on 17 Nov.
 - 16 Nov: the split-run shadow test passed on loss (nothing the reader was given went missing) and failed on
   timing; no split is built unless the owner says yes on the card of 16 Nov.
 - 13 Nov: the Sonnet 5.5 side by side ended with no switch, by the pass rule approved on 10 Nov: the YouTube and
