@@ -6,7 +6,9 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-15 (the Podcast and YouTube digests read our own transcripts first from 16 Nov, Podwise as the
+_Last updated: 2026-11-16 (the split-run shadow test ended: the reader lost nothing it was given, but its file lands
+after the digest; the evidence task is off and the owner has a yes/no on a staged split; spec v19 held on 14 to
+16 Nov. Before that, 15 Nov: the Podcast and YouTube digests read our own transcripts first from 16 Nov, Podwise as the
 backup; both take their keys from the paused Fable YouTube task; the YouTube digest reads the `fable` stance ledger;
 Open items 1b).
 Scheduled tasks and rules were read from the live systems on 10 Nov._
@@ -56,8 +58,8 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | Feeder: prediction-market odds | `trig_019jXUYgtu3beS5Zt6yxb8tH` | 06:20 daily | writes Drive `predmkt_latest` (R12); moved from 06:38 so that it lands before the 06:33 start |
 | Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup. Since 11 Nov section D and the implied vol table carry the UTC day that is ending, read from DTCC's intraday files (`docs/marketpack.md`) |
 | Feeder: podcast transcripts | `trig_011ybXd1mZjsDPYWFyu7VtX6` | 04:20 daily | since 15 Nov: transcribes the new episodes of 39 shows (the Podcast Digest's 30, plus 9 the digests cited) from their RSS feeds, and new videos of the 400 YouTube channels through Supadata, on DeepInfra's Nemotron (about US$1 a day) and uploads to Drive `podcast_transcripts_latest`, `youtube_transcripts_latest_pNN` (about 2.4 MB each) and, last, `transcripts_index_latest`; wakes the Haiku feeder thread (`scripts/transcribe/README.md`). The Podcast and YouTube digests read these first from 16 Nov (Open items 1b) |
-| Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | 06:33 on 12 to 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`): mails nothing, writes Drive `evidence_<date>`. It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`). Switch it off after 16 Nov |
-| Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | 09:05 on 12 to 16 Nov | wakes the thread "Audit the split Takeaways shadow test" (Opus 5.5), which compares the evidence file with the live digest; results in project files `shadow_test/` |
+| Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | OFF since 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`), switched off after its fifth morning (its cron would fire again in Nov 2027). It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`) |
+| Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | OFF since 16 Nov | disabled by the audit thread, not deleted: it is bound to that thread's session, and deleting a scheduled task deletes its session. Results in project files `shadow_test/` |
 | Weekly fundamentals pack | `trig_019siN4tMsZfsPNPCiLUqvYr` | Sun 18:41 | market pack section G. Stays in its own Opus thread (owner, 6 Nov) |
 | Macro Desk scorer | `trig_01BbvwRoPCZtxzMeZfuqmUFX` | 09:57 daily | stance calls and `dash.refresh_scores()` |
 | Macro Desk weekly review | `trig_013JmK7MsEHmNzi84F33zbBx` | Sat 09:53 | review email; since 10 Nov it runs fixed cuts and must end with up to two rule proposals or "none, because" (`docs/weekly_review.md`; first such run 14 Nov) |
@@ -168,13 +170,13 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      implied vols). And the Sonnet Email test run ignored its test note and behaved as the paused production task:
      a real email at 08:39 SGT, a phone alert, a hand-off file and a `dash.feeds` row (file renamed, owner told;
      what is left over is listed in the side-by-side bullet below).
-   - *First runs to check:* the Takeaways of 14, 15 and 16 Nov, the first under spec v19 (a PRICER line, or
-     "PRICER: n/a" with its reason, for every option card; no "not run" or "not read" anywhere; email before 08:15
-     SGT; it is also the first use of the Drive loader inside a scheduled run, and R18 leans on it from 16 Nov);
-     the footer of the 14 Nov edition, which must not count the stray test email of 13 Nov as a Claude Email
-     digest; the weekly review of 14 Nov under the new prompt; the Takeaways of 16 Nov under R17 to R19 (the `risk`
-     key, TWIN lines and the expression table in the digest, `twins` above zero in the `dash-mark` reply). Checked
-     on 13 Nov: the Takeaways landed at 07:34 SGT (62 minutes, about US$61) and its trade book worker did not sleep
+   - *First runs to check:* the first Takeaways with a new cash FX card under R18 (a TWIN line priced on the
+     smile, `twins` above zero in the `dash-mark` reply; the 16 Nov edition printed none, and whether it opened a
+     cash FX card was not checked); the weekly review of 14 Nov under the new prompt. Checked on 16 Nov: spec v19
+     held on 14, 15 and 16 Nov (the option cards print a PRICER line through the Drive loader, on DTCC vols, and no
+     "not run" anywhere, where 13 Nov had three); the emails went at 07:28, 07:06 and 07:16 SGT; the 14 Nov footer
+     names the stray Sonnet email of 13 Nov as excluded; R17 to R19 went in force on 15 Nov at 20:11 SGT and the
+     16 Nov edition prints the R19 expression line. Checked on 13 Nov: the Takeaways landed at 07:34 SGT (62 minutes, about US$61) and its trade book worker did not sleep
      on a clock time; the Opus YouTube (05:56) and Podcast (06:16) digests were on time; the Podcast footer dates
      the stance ledger 12 Nov under the key `fable`. Checked on 12 Nov: the corrected launch sentence worked
      (five workers left within two minutes of each other once the leans were on disk, none earlier); the market pack
@@ -196,14 +198,16 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      wants them gone: the stray "Email Digest [Sonnet 5.5]" mail of 08:39 SGT, the Drive file
      `zz_stray_sonnet_test_output_email_digest_2026-11-13_not_a_feed`, and the `dash.feeds` row substack / claude
      of 13 Nov.
-   - *Split-run shadow test* (decision 7), mornings of 12 to 16 Nov: a cheaper reader writes one evidence file from
-     every input, and an audit thread checks each morning whether the live digest rested on anything the file lost
-     (`docs/shadow_test.md`; hand-over in project files `shadow_test/README.md`). Two dry runs on the evening of
-     10 Nov passed their audits with no claim lost or degraded (62 and 69 claims behind 29 and 33 judged items;
-     about US$7 and 15 to 20 minutes each), and the second proved the wait between sweeps and the full-content
-     read in the task's own environment. The first scheduled morning is the first with waits as long as a real
-     morning's. Verdict to the owner on Mon 16 Nov, one yes/no from the workflow thread (a wake is set for
-     09:45 SGT); then switch the evidence task off.
+   - *Split-run shadow test* (decision 7): ENDED 16 Nov. A Sonnet 5.5 reader wrote one evidence file from every
+     input on five mornings and an audit thread checked the live digest against it (`docs/shadow_test.md`; results
+     in project files `shadow_test/`). The reader lost nothing it was given: 12, 13, 14 and 16 Nov pass; 15 Nov
+     fails on scope only (the digest also used a day-old flows brief that was never among the reader's inputs, and
+     five claims kept their story but drifted on who said it). Timing is the problem: the file landed 08:12 to
+     08:25 SGT, after the digest on four mornings (07:06 to 08:21). A run is about 100 minutes and about US$8 (16 Nov
+     session record; the dry runs were about US$7). Of 395 claims the digest used over the five mornings, 310 sat in
+     only one copy of a feed, and every second or third copy carried some alone, which backs keeping every input.
+     The evidence task is off. The owner has one yes/no (card of 16 Nov): build a staged split (reader from about
+     05:30, Fable decides from its file), recommended no.
    - *Standing decisions the weekly review carries every week until made:* thin edge at 30 closed cards, the option
      twin trial (ten finished pairs or 13 Dec), the expression table (15 cards or six weeks).
 1b. **Transcription service, read first by the digests from 16 Nov (owner's ask 15 Nov: make Podwise redundant in
@@ -281,6 +285,8 @@ a compliance view). Details in `docs/history.md`.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
+- 16 Nov: the split-run shadow test passed on loss (nothing the reader was given went missing) and failed on
+  timing; no split is built unless the owner says yes on the card of 16 Nov.
 - 13 Nov: the Sonnet 5.5 side by side ended with no switch, by the pass rule approved on 10 Nov: the YouTube and
   Podcast digests stay on Opus 5.5 and the Claude Email digest stays off, so the "Models by stage" line of 10 Nov
   below now reads Opus 5.5 for the digests. The owner was told and has not replied; his word would change it.
