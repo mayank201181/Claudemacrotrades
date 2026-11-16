@@ -386,7 +386,9 @@ const META_KEYS = new Set(['opened', 'filled', 'closed', 'class', 'boundary', 'p
   'risk',
   // R21: direction x trend-monitor ensemble at open (two decimals, or "-" when the proxy has no monitor asset); stored once
   // dash-ingest is re-pinned past this commit
-  'trend']);
+  'trend',
+  // R22: the market pack's credit state and Fed-cycle stage when the card was written
+  'credit', 'cycle']);
 
 function dateOnly(s: string | undefined): string | null {
   const m = (s ?? '').match(/\d{4}-\d{2}-\d{2}/);

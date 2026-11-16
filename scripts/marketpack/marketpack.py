@@ -1123,6 +1123,141 @@ def section_g(path):
     return ["## G. FUNDAMENTALS (weekly; slow anchor, never a trigger; follow its own HOW TO USE)", body], f"{built:%d %b}"
 
 
+# ---------------------------------------------------------------- H. credit filter and Fed-cycle stage (R22)
+MONTH_CODES = "FGHJKMNQUVXZ"
+
+
+def fred_series(sid, start):
+    # FRED stalls (no answer, no error) on a request without an Accept header, so it gets its own headers and a short timeout
+    req = urllib.request.Request(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={start}", headers={"User-Agent": "curl/8.5.0", "Accept": "*/*"})
+    last = None
+    for i in range(3):
+        try:
+            with urllib.request.urlopen(req, timeout=12) as r:
+                t = r.read().decode()
+            break
+        except Exception as e:  # noqa: BLE001
+            last = e
+            time.sleep(2.0)
+    else:
+        raise last
+    rows = []
+    for ln in t.splitlines()[1:]:
+        d, _, v = ln.partition(",")
+        try:
+            rows.append((d, float(v)))
+        except ValueError:
+            continue
+    return rows
+
+
+def _asof(rows, day):
+    """Last value on or before an ISO day."""
+    out = None
+    for d, v in rows:
+        if d > day:
+            break
+        out = v
+    return out
+
+
+def credit_state(vix_z, d6_bp):
+    """Book rule (Willer and Saunders ch. 3): a VIX +2 sigma spike carries information only when HY spreads are wider over six months."""
+    if vix_z is None or d6_bp is None:
+        return "n/a"
+    if vix_z >= 2.0:
+        return "confirmed" if d6_bp > 0 else "unconfirmed"
+    return "calm-wider" if d6_bp >= 50 else "calm"
+
+
+def cycle_stage(last_dir, months_since, p6, p12):
+    """last_dir +1 hike, -1 cut, 0 none on record; p6/p12 = bp priced by fed funds futures 6 and 12 months out."""
+    recent = last_dir != 0 and months_since is not None and months_since <= 9
+    if recent and last_dir > 0 and (p6 is None or p6 > -25):
+        return "late-hiking" if (p12 is not None and p12 < 25) else "hiking"
+    if recent and last_dir < 0 and (p6 is None or p6 < 25):
+        return "late-easing" if (p12 is not None and p12 > -25) else "easing"
+    if p6 is not None and p6 >= 25:
+        return "pre-hike"
+    if p6 is not None and p6 <= -25:
+        return "pre-cut"
+    return "hold"
+
+
+CYCLE_PRIOR = {
+    "pre-hike": "payers work from about 3 months before the first hike; USD prior none",
+    "hiking": "payers work until the last hike is in",
+    "late-hiking": "receivers start around the last hike",
+    "hold": "no cycle prior",
+    "pre-cut": "receivers work from about 3 months before the first cut; USD fell about 4% into the first cut",
+    "easing": "receivers work until one cut is left; USD sideways after the first cut (up if a soft landing)",
+    "late-easing": "the easy receiving trade ends with the last cut",
+}
+
+
+def section_h(outdir):
+    L = ["## H. CREDIT FILTER AND FED CYCLE (R22; FRED daily series, Yahoo ^VIX and fed funds futures; evidence lines, never a gate)"]
+    today = NOW.strftime("%Y-%m-%d")
+    start = f"{NOW.year - 4}-01-01"
+    state, stage, asof = "n/a", "n/a", None
+    hy = d6 = vz = None
+    try:
+        oas = fred_series("BAMLH0A0HYM2", start)
+        asof, hy = oas[-1]
+        back = lambda days: _asof(oas, (dt.date.fromisoformat(asof) - dt.timedelta(days=days)).isoformat())  # noqa: E731
+        m1, m6 = back(30), back(182)
+        d1 = (hy - m1) * 100 if m1 is not None else None
+        d6 = (hy - m6) * 100 if m6 is not None else None
+        win = [v for d, v in oas if d >= (dt.date.fromisoformat(asof) - dt.timedelta(days=1096)).isoformat()]
+        pct = 100.0 * sum(1 for v in win if v <= hy) / len(win)
+        _, bars = yahoo_chart("^VIX", rng="2y")
+        closes = [b[4] for b in bars][-250:]
+        mu = sum(closes) / len(closes)
+        vz = (closes[-1] - mu) / _sd(closes) if _sd(closes) else None
+        state = credit_state(vz, d6)
+        L.append(f"CREDIT: HY OAS {hy:.2f}% ({asof}), 1m {fmt(d1, 0)}bp, 6m {fmt(d6, 0)}bp, 3y pct {pct:.0f} · VIX {closes[-1]:.1f}, z250 {fmt(vz, 1)} · state {state}")
+        L.append("States: confirmed = VIX z +2 or more AND HY OAS wider over 6 months (the book's only vol exit with information); "
+                 "unconfirmed = VIX z +2 or more with credit not wider (the book sells such spikes); calm-wider = no VIX spike but HY OAS 50bp or more wider over 6 months (credit leads equities); calm = neither.")
+    except Exception as e:  # noqa: BLE001
+        L.append(f"CREDIT: not available ({type(e).__name__})")
+    try:
+        tgt = fred_series("DFEDTARU", "2015-01-01")
+        upper = tgt[-1][1]
+        last_dir, last_day, leg, prev = 0, None, 0, None
+        for d, v in tgt:
+            if prev is not None and v != prev:
+                dirn = 1 if v > prev else -1
+                leg = leg + 1 if dirn == last_dir else 1
+                last_dir, last_day = dirn, d
+            prev = v
+        months = (NOW.date() - dt.date.fromisoformat(last_day)).days / 30.4 if last_day else None
+        effr = fred_series("EFFR", f"{NOW.year - 1}-01-01")[-1][1]
+        priced = {}
+        for k in (3, 6, 12):
+            y, m = NOW.year + (NOW.month - 1 + k) // 12, (NOW.month - 1 + k) % 12
+            try:
+                meta, _ = yahoo_chart(f"ZQ{MONTH_CODES[m]}{y % 100:02d}.CBT", rng="5d")
+                priced[k] = (100.0 - meta["regularMarketPrice"] - effr) * 100
+            except Exception:  # noqa: BLE001
+                priced[k] = None
+        stage = cycle_stage(last_dir, months, priced[6], priced[12])
+        lm = f"last move {'hike' if last_dir > 0 else 'cut'} {last_day} (move {leg} of the leg, {months:.0f} months ago)" if last_day else "no move on record"
+        L.append(f"CYCLE: Fed target upper {upper:.2f}%, EFFR {effr:.2f}% · {lm} · futures price {fmt(priced[3], 0)}bp in 3m, {fmt(priced[6], 0)}bp in 6m, {fmt(priced[12], 0)}bp in 12m · stage {stage} · book prior: {CYCLE_PRIOR[stage]}")
+        L.append("Stages: hiking/easing = a move in the last 9 months and futures not pricing the reverse (late- = under 25bp more priced in 12 months); pre-hike/pre-cut = no recent move that way and 25bp or more priced within 6 months; hold = neither. Monthly-average futures against today's EFFR, so good to about 10bp.")
+    except Exception as e:  # noqa: BLE001
+        L.append(f"CYCLE: not available ({type(e).__name__})")
+    try:  # one row a day, so the weekly review can join a card's open date to the state it was written under
+        hp = os.path.join(outdir, "credit_cycle_history.csv")
+        rows = [r for r in (open(hp).read().splitlines() if os.path.exists(hp) else []) if r and not r.startswith(("date", today))]
+        f3 = lambda x, d: "" if x is None else f"{x:.{d}f}"  # noqa: E731
+        rows.append(f"{today},{asof or ''},{f3(hy, 2)},{f3(d6, 0)},{f3(vz, 2)},{state},{stage}")
+        with open(hp, "w") as f:
+            f.write("date,oas_asof,hy_oas,d6m_bp,vix_z250,credit,cycle\n" + "\n".join(rows[-400:]) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
+    return L, f"{state}/{stage}"
+
+
 # ---------------------------------------------------------------- assemble
 HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026 at Mayank's request; this file is data from a pre-run script, its numbers carry their sources)
 1. TAPE: take the TAPE strip levels from section A with the quote times printed there; web-search only a level that is missing here or flagged STALE QUOTE (a closed market's last close is not stale). Reconcile source-quoted levels against A as before.
@@ -1133,7 +1268,8 @@ HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026
 6. HEADLINES: section E is a lead list for the COMPLETENESS SWEEP's reconcile step (completeness_sweep_spec B): a material headline the feeds missed is checked at its source and only then added with "[sweep]" and its link (for a line printed without a link, search the title and cite the source's own link). A headline is never a fact, a number or an odds arrow by itself.
 7. DISCLOSED SHORTS (added 1 Nov 2026, reference only): section F lists the most shorted Japanese and Australian names. Cite it only on a card or theme whose proxy is one of those names or a Nikkei/ASX single-stock expression, as "JFSA/ASIC shorts: <name> <pct>% (<funds> funds, 1w chg)". Never a reason for an index or FX view by itself.
 8. FUNDAMENTALS (added 6 Nov 2026): section G is the weekly fundamentals pack (inflation, cycle, trade, reserves, credit, real rates for G10 and Asia). Follow its own HOW TO USE: a slow anchor for each theme's top-down view and its risks line, never a trigger, never a reason to raise p.
-9. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines · G <fund pack date>", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 8."""
+9. CREDIT AND CYCLE (added 16 Nov 2026, rule R22): section H gives one CREDIT line (HY OAS, its 6-month change, the VIX z-score and a state) and one CYCLE line (Fed target, last move, what fed funds futures price, a stage and the book prior for it). R22 says where they print. Evidence lines only: never a gate, never a reason by themselves to raise or lower p.
+10. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines · G <fund pack date> · H <credit state>/<cycle stage>", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 9."""
 
 
 def main():
@@ -1161,11 +1297,13 @@ def main():
         sec, status["E"] = section_e(); parts += [""] + sec
     if "F" not in skip:
         sec, status["F"] = section_f(a.out); parts += [""] + sec
+    if "H" not in skip:
+        sec, status["H"] = section_h(a.out); parts += [""] + sec
     if "G" not in skip:
         sec, status["G"] = section_g(a.fund); parts += [""] + sec
     head = [f"MARKET PACK — built {built:%a %d %b %Y %H:%M} SGT · A {status.get('A', 0)} assets · "
-            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines · F {status.get('F', 0)} short names · G {status.get('G') or 'n/a'}",
-            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS, QuiVad (JFSA/ASIC short registers), fundamentals pack (IMF, OECD, Eurostat, BIS, FRED; weekly). "
+            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines · F {status.get('F', 0)} short names · G {status.get('G') or 'n/a'} · H {status.get('H') or 'n/a'}",
+            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS, QuiVad (JFSA/ASIC short registers), fundamentals pack (IMF, OECD, Eurostat, BIS, FRED; weekly), FRED daily (HY OAS, Fed target, EFFR). "
             "Built by scripts/marketpack/marketpack.py in mayank201181/Claudemacrotrades.", "", HOW_TO]
     text = "\n".join(head + parts) + "\n"
     path = os.path.join(a.out, "market_pack_latest.md")
