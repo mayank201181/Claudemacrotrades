@@ -6,7 +6,7 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-16 (R17 to R20 in force; R21 trend tag in force since 16 Nov from the book comparison, Open
+_Last updated: 2026-11-16 (R17 to R20 in force; R21 trend tag and R22 credit and cycle lines in force since 16 Nov from the book comparison; the market pack has a section H, Open
 items 13; the `trend` META key is in `parse.ts` on `main` but reaches the database only when `dash-ingest` is re-pinned,
 Open items 2. Same day: the split-run shadow test ended: the reader lost nothing it was given, but its file lands
 after the digest; the evidence task is off and the owner has a yes/no on a staged split; spec v19 held on 14 to
@@ -58,7 +58,7 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | YouTube Digest, Podcast Digest (Opus) | `trig_0194QEVwffX6ozu7t2WvhJmz`, `trig_01MQsXTVyYmvcGZV2PQPNRkp` | 05:00, 06:00 daily | feeds for the Takeaways, task names "Daily YouTube Digest" and "Daily Podcast Digest". Since 15 Nov both read our transcripts first (Drive `transcripts_index_latest`, Podwise only for what ours lacks) and since 16 Nov take their keys (YouTube API, Podwise) from the private Drive file `macro_desk_digest_keys` (My Drive root, lines KEY=value; never commit or print it): scheduled runs cannot call `get_trigger`, so the 15 Nov design that read them from the paused Fable YouTube task failed on the 16 Nov 05:00 and 06:00 runs. To change a key, replace that file. Stance ledger: both read the pipeline key `fable` (Podcast since 12 Nov, YouTube since 15 Nov) |
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
 | Feeder: prediction-market odds | `trig_019jXUYgtu3beS5Zt6yxb8tH` | 06:20 daily | writes Drive `predmkt_latest` (R12); moved from 06:38 so that it lands before the 06:33 start |
-| Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup. Since 11 Nov section D and the implied vol table carry the UTC day that is ending, read from DTCC's intraday files (`docs/marketpack.md`) |
+| Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup. Since 11 Nov section H (16 Nov) carries the credit filter and Fed-cycle lines for R22, and section D and the implied vol table carry the UTC day that is ending, read from DTCC's intraday files (`docs/marketpack.md`) |
 | Feeder: podcast transcripts | `trig_011ybXd1mZjsDPYWFyu7VtX6` | 04:20 daily | since 15 Nov: transcribes the new episodes of 39 shows (the Podcast Digest's 30, plus 9 the digests cited) from their RSS feeds, and new videos of the 400 YouTube channels through Supadata, on DeepInfra's Nemotron (about US$1 a day) and uploads to Drive `podcast_transcripts_latest`, `youtube_transcripts_latest_pNN` (about 2.4 MB each) and, last, `transcripts_index_latest`; wakes the Haiku feeder thread (`scripts/transcribe/README.md`). The Podcast and YouTube digests read these first from 16 Nov (Open items 1b) |
 | Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | OFF since 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`), switched off after its fifth morning (its cron would fire again in Nov 2027). It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`) |
 | Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | OFF since 16 Nov | disabled by the audit thread, not deleted: it is bound to that thread's session, and deleting a scheduled task deletes its session. Results in project files `shadow_test/` |
@@ -118,6 +118,7 @@ email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/
 | R19 | expression table: up to four expressions of a live view, the best one carded, alternates shadowed by theme | 15 Nov | 22 Dec (15 cards or six weeks) |
 | R20 | questions never leave the print unresolved: an open question is carried or closed with a reason (from the weekly review of 14 Nov) | 15 Nov | 26 Dec |
 | R21 | trend tag on every new card (direction x `dash.trend_state` ensemble, bond futures sign-flipped, `trend` META key) printed after the CARVER line; an against-trend thematic card names what turns the trend; weekly cut by trend bucket x class (`scripts/weekly_review/trend_cut.sql`); decision at 20 closed thematic cards or 20 Jan 2027 on an R09-style haircut; no gate, fill, exit or size changes (`supabase/rules/R21_trend_tag.sql`) | 16 Nov (put in force early on the owner's word, 10:02 SGT) | 20 Jan 2027 |
+| R22 | CREDIT line (HY OAS, 6-month change, VIX z, state) on equity and credit cards and in the BOOK CHECK; CYCLE line (Fed target, futures pricing, stage, book prior) in the rates paragraph and on USD and UST cards; `credit` and `cycle` META keys; weekly cuts once ten cards carry a tag; decision at 20 closed tagged cards or 28 Feb 2027; no gate change. Data: section H of the market pack (`supabase/rules/R22_credit_cycle_lines.sql`) | 16 Nov (owner's yes, put in force the same day) | 28 Feb 2027 |
 
 R03 (drivers engine) reverted 1 Nov. R15 (market pack as a rule) withdrawn 1 Nov; the pack went in as a prompt edit.
 R13 (question hunt evidence, scope opus) reverted 10 Nov; its only reader, the Opus Macro Takeaways, stopped on 31 Oct.
@@ -293,8 +294,8 @@ a compliance view). Details in `docs/history.md`.
     (R21, trend tag and trend cut, decision at 20 closed thematic cards), remove none. Of the book's principles the
     spec already holds: trade close to the catalyst (test b), entry and stop discipline (REF, NO-CHASE, hourly-close
     stop), positioning as evidence (R02, R09), FOMC-day handling (R11), Carver trend and carry on the card (R10).
-    Gaps it does not hold, ranked by how much our own record can test them, all parked until a rule or a trade shows
-    the need: a credit filter beside the VIX on equity cards and in BOOK CHECK (HY OAS six-month change with a VIX
+    The first two gaps below were built the same day on the owner's yes (R22, market pack section H); the
+    rest stay parked until a rule or a trade shows the need: a credit filter beside the VIX on equity cards and in BOOK CHECK (HY OAS six-month change with a VIX
     z-score); a Fed-cycle stage line in the macro section; a VRP (implied less realised vol) read beside the R02
     washout screen; oil speculative long/short ratio and the OPEC-day drift on energy cards; a breadth line for
     equity-index cards; the book's four-indicator dollar scorecard. Where the book argues against us, watched rather
@@ -309,6 +310,8 @@ a compliance view). Details in `docs/history.md`.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
+- 16 Nov: the owner said yes to the credit and Fed-cycle lines as print-only evidence; R22 in force that day, section H
+  added to the market pack (FRED answers only a request with an Accept header from the cloud address).
 - 16 Nov: book comparison (Willer and Saunders) ends in one proposed rule, R21 trend tag and cut, and no removals;
   six further book ideas parked as tag-and-cut candidates (Open items 13). The owner said to apply it at once; R21 in force 16 Nov, first cards on 17 Nov.
 - 16 Nov: the split-run shadow test passed on loss (nothing the reader was given went missing) and failed on

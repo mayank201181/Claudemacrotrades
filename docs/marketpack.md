@@ -14,10 +14,11 @@ data for the Fable Macro Takeaways before it runs. The takeaways read the newest
 | D FX options and NDFs | DTCC public swap repository (CFTC FX files: the full-day file for finished days, the intraday files for the day that is ending) | option notional vs 20d and base-call share per pair, NDF volume, large strikes expiring within 14 days near spot, and implied vol by tenor from option premiums (10 Nov); cited as "DTCC sample" |
 | E headlines | Google News queries plus FT, Nikkei Asia, CNBC, WSJ, MarketWatch RSS, last 24h | leads for the completeness sweep only |
 | F disclosed shorts JP/AU | QuiVad (keyless republication of the JFSA and ASIC short registers), added 1 Nov 2026 | most shorted Japanese and ASX names and 1-week build-ups; cited only on single-name JP/AU cards or themes |
+| H credit and cycle | FRED daily (`BAMLH0A0HYM2`, `DFEDTARU`, `EFFR`), Yahoo `^VIX` and fed funds futures, added 16 Nov 2026 | one CREDIT line and one CYCLE line that R22 prints on equity, USD and UST cards; evidence only |
 
 Usage: `python3 -I marketpack.py --out DIR [--sql posbuild.sql] [--skip D,E]`. Prints
 `ok: <path> <bytes> · A n · B n · D <date> · E n`. Every section fails soft. History files in DIR:
-`oi_history.csv` (120 days), `dtcc_daily.csv`, `dtcc_strikes.csv`, `shorts_history.csv` (top 60 names per market, 120 days).
+`oi_history.csv` (120 days), `dtcc_daily.csv`, `dtcc_strikes.csv`, `shorts_history.csv` (top 60 names per market, 120 days), `credit_cycle_history.csv` (one row a day: HY OAS, 6-month change, VIX z, credit state, cycle stage).
 
 `verify_drive.py` compares a Drive read-back with the local file after undoing Drive's markdown escapes.
 
