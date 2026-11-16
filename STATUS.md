@@ -6,7 +6,7 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-16, late night (spec v20 and v21 are the owner's own edits, kept, reconciled with the rules, Open items 16 closed and 17 opened; three-month macro sleeve proposed, Open items 15; spec on Drive found at v21, Open items 16. Earlier: open-source comparison: one gap found, the stated p was never scored; the weekly
+_Last updated: 2026-11-16, late night (three-month MACRO sleeve built on the owner's "go for all eight": regime scorecard in the fundamentals pack, the Sunday task, rule R24 proposed for Sun 22 Nov, first run checked, Open items 15; spec v20 and v21 are the owner's own edits, kept, reconciled with the rules, Open items 16 closed and 17 opened; three-month macro sleeve proposed, Open items 15; spec on Drive found at v21, Open items 16. Earlier: open-source comparison: one gap found, the stated p was never scored; the weekly
 review now carries a calibration block and R23 is proposed for Sun 22 Nov, Open items 14. Earlier the same day: R17 to R20 in force; R21 trend tag and R22 credit and cycle lines in force since 16 Nov from the book comparison; the market pack has a section H, Open
 items 13; the `trend` META key is in `parse.ts` on `main` but reaches the database only when `dash-ingest` is re-pinned,
 Open items 2. Same day: the split-run shadow test ended: the reader lost nothing it was given, but its file lands
@@ -63,7 +63,8 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | Feeder: podcast transcripts | `trig_011ybXd1mZjsDPYWFyu7VtX6` | 04:20 daily | since 15 Nov: transcribes the new episodes of 39 shows (the Podcast Digest's 30, plus 9 the digests cited) from their RSS feeds, and new videos of the 400 YouTube channels through Supadata, on DeepInfra's Nemotron (about US$1 a day) and uploads to Drive `podcast_transcripts_latest`, `youtube_transcripts_latest_pNN` (about 2.4 MB each) and, last, `transcripts_index_latest`; wakes the Haiku feeder thread (`scripts/transcribe/README.md`). The Podcast and YouTube digests read these first from 16 Nov (Open items 1b) |
 | Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | OFF since 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`), switched off after its fifth morning (its cron would fire again in Nov 2027). It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`) |
 | Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | OFF since 16 Nov | disabled by the audit thread, not deleted: it is bound to that thread's session, and deleting a scheduled task deletes its session. Results in project files `shadow_test/` |
-| Weekly fundamentals pack | `trig_019siN4tMsZfsPNPCiLUqvYr` | Sun 18:41 | market pack section G. Stays in its own Opus thread (owner, 6 Nov) |
+| Weekly fundamentals pack | `trig_019siN4tMsZfsPNPCiLUqvYr` | Sun 18:41 | market pack section G; since 16 Nov section 1b of the pack is the regime scorecard that the MACRO sleeve reads. Stays in its own Opus thread (owner, 6 Nov) |
+| Macro sleeve weekly | `trig_01KqhJzihoFqnGDo7tWb2qi4` | Sun 19:31 | three-month paper book, a fresh session each week (`docs/macro_sleeve.md`, prompt in `scripts/macro_sleeve/task_prompt.txt`); writes Drive `macro_sleeve_current`; the Takeaways reads it under R24; first run fired by hand 16 Nov 20:56 SGT |
 | Macro Desk scorer | `trig_01BbvwRoPCZtxzMeZfuqmUFX` | 09:57 daily | stance calls and `dash.refresh_scores()` |
 | Macro Desk weekly review | `trig_013JmK7MsEHmNzi84F33zbBx` | Sat 09:53 | review email; since 10 Nov it runs fixed cuts and must end with up to two rule proposals or "none, because" (`docs/weekly_review.md`; first such run 14 Nov) |
 | Macro Desk apply rules | `trig_01VB1CtVFkpuJDeq1Ym8qMfx` | Sun 20:10 | puts unopposed proposals in force |
@@ -121,6 +122,7 @@ email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/
 | R21 | trend tag on every new card (direction x `dash.trend_state` ensemble, bond futures sign-flipped, `trend` META key) printed after the CARVER line; an against-trend thematic card names what turns the trend; weekly cut by trend bucket x class (`scripts/weekly_review/trend_cut.sql`); decision at 20 closed thematic cards or 20 Jan 2027 on an R09-style haircut; no gate, fill, exit or size changes (`supabase/rules/R21_trend_tag.sql`) | 16 Nov (put in force early on the owner's word, 10:02 SGT) | 20 Jan 2027 |
 | R22 | CREDIT line (HY OAS, 6-month change, VIX z, state) on equity and credit cards and in the BOOK CHECK; CYCLE line (Fed target, futures pricing, stage, book prior) in the rates paragraph and on USD and UST cards; `credit` and `cycle` META keys; weekly cuts once ten cards carry a tag; decision at 20 closed tagged cards or 28 Feb 2027; no gate change. Data: section H of the market pack (`supabase/rules/R22_credit_cycle_lines.sql`) | 16 Nov (owner's yes, put in force the same day) | 28 Feb 2027 |
 
+| R24 | PROPOSED 16 Nov, applies Sun 22 Nov 20:00 SGT unless opposed: the daily run reads Drive `macro_sleeve_current` at the evidence step and prints a MACRO SLEEVE block after the trade book (one line per card: mark, CONFIRMED / UNCHANGED / WEAKENED / SIGNPOST FIRED); it never originates, closes or scores a sleeve card, and the sleeve never enters cum R, the SCORECARD or TESTED; R14 applies inside each book; decision at 20 closed MACRO cards or 31 Aug 2027 (`supabase/rules/R24_macro_sleeve.sql`) | pending | 28 Feb 2027 |
 | R23 | PROPOSED 16 Nov, applies Sun 22 Nov 20:00 SGT unless opposed: the stated p of every card scored as a forecast in the weekly review (calibration block in `scripts/weekly_review/cuts.sql`: p bands, Brier against target and win outcomes beside the base-rate Brier, gap in points); decision at 40 closed cards or 30 Jan 2027 on keep, a per-band p haircut in the form of R09, or nothing; no gate change (`supabase/rules/R23_p_calibration.sql`) | pending | 30 Jan 2027 |
 
 R03 (drivers engine) reverted 1 Nov. R15 (market pack as a rule) withdrawn 1 Nov; the pack went in as a prompt edit.
@@ -350,16 +352,18 @@ a compliance view). Details in `docs/history.md`.
     surface regime tools (no live surface). The one careful reproduction of TradingAgents (trading-agents-lab) finds
     the agent desk does not beat buy-and-hold once names and dates are masked.
 
-15. **Three-month macro sleeve (16 Nov, owner's question, no build yet).** Thread "Add three-month thematic macro
-    trades"; note in project files `notes/macro_sleeve_proposal_16nov2026.md`. Finding: the THEMATIC class is a
-    catalyst class, not a horizon class; realised holds on the Fable book run 6 to 16 days (22 closed cards, nine of
-    them ended by the 10-session review). Proposal, waiting on the owner's yes or no: a separate weekly MACRO paper
-    sleeve (own scorecard line, outside cum R) originated on Sunday evening from the fundamentals pack plus a
-    per-country regime scorecard, the daily Takeaways allowed to confirm or invalidate only; wired inputs first, the
-    38 trend-monitor assets as the universe, stops at 2.5 to 3 ATR(20), monthly reviews, cap six open; no
-    point-in-time fundamentals backtest (no vintages, out of phase), one cheap replay of the themes printed since
-    5 Oct as three-month trades instead. On a yes: replay first, then the scorecard in `fundpack.py`, a Sunday task
-    and one rule for the Saturday review.
+15. **Three-month MACRO sleeve (16 Nov; the owner said "go for all eight" at 20:46 SGT; built the same evening,
+    `docs/macro_sleeve.md`).** Thread "Add three-month thematic macro trades"; proposal and the private replay result
+    in project files `notes/macro_sleeve_proposal_16nov2026.md` and `notes/macro_sleeve_replay_16nov2026.md`.
+    Finding: the THEMATIC class is a catalyst class, not a horizon class; realised holds on the Fable book run 6 to
+    16 days (22 closed cards, nine ended by the 10-session review); the replay of every view tested since 5 Oct as a
+    three-month trade (`scripts/macro_sleeve/replay.sql`) is a small loss so far, so the sleeve originates from the
+    fundamentals base, not from the daily views. Built: section 1b regime scorecard in `fundpack.py` (both copies,
+    the Drive pack rebuilt with it on 16 Nov); the Sunday task above (first run fired by hand 16 Nov 20:56 SGT: four minutes,
+    three pending cards filling at the Mon 17 Nov close, eleven candidates tested, file in the pipeline folder); R24 proposed. Open: the first scheduled run on
+    Sun 22 Nov 19:31 SGT; the first Takeaways with a MACRO SLEEVE block on Mon 23 Nov (R24 in force Sun 22 Nov 20:00
+    SGT unless opposed); the sleeve is not in `dash.trades`, so the dashboard and `dash-mark` do not see it until the
+    20-card decision; re-run the replay in early January 2027 when the October arrivals reach 63 bars.
 16. **Spec version on Drive: closed.** v20 and v21 (16 Nov) are the owner's own edits, kept ("Mine, keep v21",
     20:45 SGT); what they change is under Trade book spec. Not restored, not edited.
 17. **Reading spec v21 beside the rules (16 Nov, thread "Reconcile spec v21 with rules"; check on the 17 Nov
@@ -386,6 +390,9 @@ a compliance view). Details in `docs/history.md`.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
+- 16 Nov: the owner said "go for all eight" to the three-month MACRO sleeve: a separate weekly paper book off the
+  fundamentals pack's regime scorecard, the daily run confirming or weakening only (R24 proposed), no fundamentals
+  backtest (Open items 15).
 - 16 Nov: the owner keeps his own spec edits v20 and v21 (p shrink, size tiers, EM factor cap, signpost lock,
   playbooks, decision ledger); rules in force still win where they overlap (Open items 17).
 - 16 Nov: open-source comparison ends in one build (calibration block in the weekly review) and one proposal (R23);

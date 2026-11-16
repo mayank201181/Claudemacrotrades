@@ -177,19 +177,31 @@ FRED = [  # id, label, transform, unit
 ]
 
 
+_KEYF = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".fred_key")
+FRED_KEY = os.environ.get("FRED_API_KEY") or (open(_KEYF).read().strip() if os.path.exists(_KEYF) else "")
+
+
 def fred():
     out = {}
     for sid, _, _, _ in FRED:
         try:
-            t = get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={NOW.year - 6}-01-01", timeout=60)
             rows = []
-            for r in _rows(t):
-                v = r.get(sid)
-                if v and v != ".":
-                    rows.append((r["observation_date"], float(v)))
+            if FRED_KEY:  # keyed API (api.stlouisfed.org); the public CSV refuses this script since 8 Nov 2026
+                j = json.loads(get(f"https://api.stlouisfed.org/fred/series/observations?series_id={sid}&api_key={FRED_KEY}"
+                                   f"&file_type=json&observation_start={NOW.year - 6}-01-01", timeout=30, tries=2))
+                rows = [(o["date"], float(o["value"])) for o in j["observations"] if o["value"] not in (".", "")]
+            else:
+                t = get(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={sid}&cosd={NOW.year - 6}-01-01", timeout=20, tries=1)
+                for r in _rows(t):
+                    v = r.get(sid)
+                    if v and v != ".":
+                        rows.append((r["observation_date"], float(v)))
             out[("US", "fred_" + sid)] = rows
         except Exception as e:  # noqa: BLE001
-            ERR.append(f"FRED {sid}: {type(e).__name__}")
+            ERR.append(f"FRED {sid}: {type(e).__name__}".replace(FRED_KEY, "***") if FRED_KEY else f"FRED {sid}: {type(e).__name__}")
+            if not out:  # first series failed: FRED is refusing this run, skip the rest
+                ERR.append("FRED: skipped remaining series")
+                break
         time.sleep(0.5)
     return out
 
@@ -329,6 +341,42 @@ def regime(r):
     return ", ".join(out)
 
 
+def _sgn(x, thr):
+    if x is None:
+        return 0
+    return 1 if x > thr else (-1 if x < -thr else 0)
+
+
+def scorecard(r):
+    """Five scores from -2 to +2 per economy for the MACRO sleeve (added 16 Nov 2026). Descriptive, untested.
+    growth: OECD CLI level vs 100 plus its 3m momentum (BCI if no CLI; exports momentum as the last fallback, +-1).
+    inflation: headline CPI 3m and 6m momentum (positive = rising).
+    policy: real policy rate level (+2 at 1.5 or above = restrictive, -2 below -1.5 = loose).
+    external: goods-export momentum plus reserves momentum.
+    credit: BIS credit-to-GDP gap, scored as room (+2 when the gap is below -5, -2 above +5).
+    lean = inflation + growth - policy: the pressure on the central bank's next move, -6 (cuts) to +6 (hikes)."""
+    s = {}
+    if r["cli"]:
+        s["growth"] = _sgn(r["cli"]["v"] - 100, 0) + _sgn(r["cli"]["d3"], 0)
+    elif r["bci"]:
+        s["growth"] = _sgn(r["bci"]["v"] - 100, 0) + _sgn(r["bci"]["d3"], 0)
+    elif r["x"]:
+        s["growth"] = _sgn(r["x"]["d3"], 2)
+    if r["cpi"]:
+        s["inflation"] = _sgn(r["cpi"]["d3"], 0.2) + _sgn(r["cpi"]["d6"], 0.2)
+    if r.get("real"):
+        v = r["real"]["v"]
+        s["policy"] = 2 if v >= 1.5 else 1 if v >= 0.5 else 0 if v > -0.5 else -1 if v > -1.5 else -2
+    if r["x"] or r["res"]:
+        s["external"] = (_sgn(r["x"]["d3"], 2) if r["x"] else 0) + (_sgn(r["res"]["d3"], 1) if r["res"] else 0)
+    if r["gap"]:
+        g = r["gap"]["v"]
+        s["credit"] = 2 if g <= -5 else 1 if g <= -2 else 0 if g < 2 else -1 if g < 5 else -2
+    if all(k in s for k in ("growth", "inflation", "policy")):
+        s["lean"] = s["inflation"] + s["growth"] - s["policy"]
+    return s
+
+
 def cell(s, d=1, thr=0.2, show_pct=True, unit="", spans=("3m", "6m")):
     if not s:
         return "n/a"
@@ -342,7 +390,8 @@ HOW_TO = """HOW TO USE (Macro Takeaways; weekly anchor added 6 Nov 2026 at Mayan
 2. Never a trade trigger and never a reason to raise p by itself: levels carry no consensus, so no surprise; markets price the surprise. Dated catalysts still come from the event library and the calendar.
 3. Data lag: every cell prints its period. Monthly data 2-4 months old and BIS credit about two quarters old is normal; a cell marked STALE is context only. Do not quote a number here as the latest print if a feed or the web has a newer one.
 4. Where a theme's thesis contradicts the anchor (e.g. "inflation re-accelerating" while CPI and core are ↓ on 3m and 6m), say so in the theme's risks line. That is the main use.
-5. Footer: the market pack footer's G field carries this pack's build date; "stale" there means skip it."""
+5. Footer: the market pack footer's G field carries this pack's build date; "stale" there means skip it.
+6. Section 1b (regime scorecard, 16 Nov 2026) is the base of the weekly MACRO sleeve (Sunday task), not of the daily cards: the Takeaways may quote a score in a theme's macro view but never card on it."""
 
 
 def render(rows):
@@ -361,6 +410,20 @@ def render(rows):
     L.append("## 1. Regime by country (momentum only, descriptive, untested)")
     for c in C:
         L.append(f"{c[0]}{'' if c[1] == c[0] else ' ' + c[1]}: {regime(rows[c[0]]) or 'n/a'}")
+
+    L += ["", "## 1b. Regime scorecard (for the MACRO sleeve, 16 Nov 2026; each score -2 to +2, descriptive, untested)",
+          "growth = CLI level vs 100 + 3m momentum; inflation = CPI 3m + 6m momentum; policy = real policy rate (+2 restrictive, -2 loose); "
+          "external = exports + reserves momentum; credit = BIS credit-gap room; lean = inflation + growth - policy (pressure on the next "
+          "central-bank move, -6 cuts to +6 hikes). Cross-country differences in lean, growth and external are the sleeve's base; "
+          "the daily Takeaways never trade this table."]
+    sc = {c[0]: scorecard(rows[c[0]]) for c in C}
+    for c in C:
+        s = sc[c[0]]
+        L.append(f"{c[0]}: " + " | ".join(f"{k} {s[k]:+d}" for k in ("growth", "inflation", "policy", "external", "credit", "lean") if k in s)
+                 if s else f"{c[0]}: n/a")
+    ranked = sorted((s["lean"], cc) for cc, s in sc.items() if "lean" in s)
+    if ranked:
+        L.append("lean ranked: " + ", ".join(f"{cc} {v:+d}" for v, cc in reversed(ranked)))
 
     L += ["", "## 2. Inflation"]
     for c in C:
@@ -476,7 +539,8 @@ def main():
     with open(path, "w") as fh:
         fh.write(text)
     with open(os.path.join(a.out, "fund_pack_latest.json"), "w") as fh:
-        json.dump({"built": NOW.isoformat(), "rows": rows, "us": data_us, "errors": ERR}, fh, default=str)
+        json.dump({"built": NOW.isoformat(), "rows": rows, "scorecard": {cc: scorecard(r) for cc, r in rows.items()},
+                   "us": data_us, "errors": ERR}, fh, default=str)
     n = sum(1 for r in rows.values() for k, v in r.items() if isinstance(v, dict))
     print(f"ok: {path} {len(text.encode())} bytes · {n} cells · errors {len(ERR)}")
 
