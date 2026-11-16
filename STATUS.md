@@ -64,7 +64,7 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | OFF since 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`), switched off after its fifth morning (its cron would fire again in Nov 2027). It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`) |
 | Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | OFF since 16 Nov | disabled by the audit thread, not deleted: it is bound to that thread's session, and deleting a scheduled task deletes its session. Results in project files `shadow_test/` |
 | Weekly fundamentals pack | `trig_019siN4tMsZfsPNPCiLUqvYr` | Sun 18:41 | market pack section G; since 16 Nov section 1b of the pack is the regime scorecard that the MACRO sleeve reads. Stays in its own Opus thread (owner, 6 Nov) |
-| Macro sleeve weekly | `trig_01KqhJzihoFqnGDo7tWb2qi4` | Sun 19:31 | three-month paper book, a fresh session each week (`docs/macro_sleeve.md`, prompt in `scripts/macro_sleeve/task_prompt.txt`); writes Drive `macro_sleeve_current`; the Takeaways reads it under R24; first run fired by hand 16 Nov 20:56 SGT |
+| Macro sleeve weekly | `trig_01KqhJzihoFqnGDo7tWb2qi4` | Sun 19:31 | three-month paper book, a fresh session each week (`docs/macro_sleeve.md`, prompt in `scripts/macro_sleeve/task_prompt.txt`); writes Drive `macro_sleeve_current`; the Takeaways reads it under R24; first run fired by hand 16 Nov 20:56 SGT on the project default model (Fable 5.1, medium); model set to Fable 5.2 the same night on the owner's word ("fine to keep it on fable 5.2 high effort", 21:40 SGT); the effort level follows the project setting and is not set from a thread |
 | Macro Desk scorer | `trig_01BbvwRoPCZtxzMeZfuqmUFX` | 09:57 daily | stance calls and `dash.refresh_scores()` |
 | Macro Desk weekly review | `trig_013JmK7MsEHmNzi84F33zbBx` | Sat 09:53 | review email; since 10 Nov it runs fixed cuts and must end with up to two rule proposals or "none, because" (`docs/weekly_review.md`; first such run 14 Nov) |
 | Macro Desk apply rules | `trig_01VB1CtVFkpuJDeq1Ym8qMfx` | Sun 20:10 | puts unopposed proposals in force |
@@ -390,6 +390,7 @@ a compliance view). Details in `docs/history.md`.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
+- 16 Nov: the Macro sleeve weekly task runs on Fable 5.2 (owner, 21:40 SGT).
 - 16 Nov: the owner said "go for all eight" to the three-month MACRO sleeve: a separate weekly paper book off the
   fundamentals pack's regime scorecard, the daily run confirming or weakening only (R24 proposed), no fundamentals
   backtest (Open items 15).
