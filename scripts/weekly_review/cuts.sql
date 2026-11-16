@@ -62,6 +62,19 @@ select jsonb_build_object(
       'twin_beat_card', count(*) filter (where status like 'closed%' and ts in ('touch', 'expiry', 'view') and twin_r > result_r),
       'rows', coalesce(jsonb_agg(jsonb_build_object('pid', pid, 'card', status, 'card_r', round(coalesce(result_r, live_r), 2), 'twin', meta->>'twin_terms',
               'twin_state', ts, 'twin_r', twin_r, 'premium_pct', meta->>'twin_p0') order by pid), '[]')) from tw),
+  'calibration', (select jsonb_build_object(
+      'closed_with_p', count(*),
+      'bands', (select coalesce(jsonb_agg(jsonb_build_object('p_band', band, 'n', n, 'avg_p_stated', ap, 'targets', tg, 'target_rate', tr, 'wins', w, 'win_rate', wr, 'avg_r', av) order by band), '[]')
+                from (select case when p < 30 then '1 under 30' when p < 40 then '2 30-39' when p < 50 then '3 40-49' when p < 60 then '4 50-59' else '5 60 and over' end band,
+                             count(*) n, round(avg(p)) ap, count(*) filter (where status = 'closed-target') tg, round(100.0 * count(*) filter (where status = 'closed-target') / count(*)) tr,
+                             count(*) filter (where result_r >= 0.1) w, round(100.0 * count(*) filter (where result_r >= 0.1) / count(*)) wr, round(avg(result_r), 2) av
+                      from c where p is not null group by 1) g),
+      'brier_target', round(avg((p / 100.0 - (status = 'closed-target')::int) ^ 2), 3),
+      'brier_target_base_rate', round(avg(((select avg((status = 'closed-target')::int) from c where p is not null) - (status = 'closed-target')::int) ^ 2), 3),
+      'brier_win', round(avg((p / 100.0 - (result_r >= 0.1)::int) ^ 2), 3),
+      'brier_win_base_rate', round(avg(((select avg((result_r >= 0.1)::int) from c where p is not null) - (result_r >= 0.1)::int) ^ 2), 3),
+      'p_stated_minus_target_rate_pts', round(avg(p) - 100 * avg((status = 'closed-target')::int)),
+      'p_stated_minus_win_rate_pts', round(avg(p) - 100 * avg((result_r >= 0.1)::int))) from c where p is not null),
   'landings', (select jsonb_agg(jsonb_build_object('d', g.d::date, 'built_sgt', x.built, 'sent_sgt', to_char(x.sent_at at time zone 'Asia/Singapore', 'HH24:MI'),
       'late', x.sent_at is null or (x.sent_at at time zone 'Asia/Singapore')::time > time '08:15') order by g.d)
     from generate_series(current_date - 7, current_date, interval '1 day') g(d) left join dash.digests x on x.model = 'fable' and x.d = g.d::date)

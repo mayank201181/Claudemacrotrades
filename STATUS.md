@@ -6,7 +6,8 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-16 (R17 to R20 in force; R21 trend tag and R22 credit and cycle lines in force since 16 Nov from the book comparison; the market pack has a section H, Open
+_Last updated: 2026-11-16, evening (open-source comparison: one gap found, the stated p was never scored; the weekly
+review now carries a calibration block and R23 is proposed for Sun 22 Nov, Open items 14. Earlier the same day: R17 to R20 in force; R21 trend tag and R22 credit and cycle lines in force since 16 Nov from the book comparison; the market pack has a section H, Open
 items 13; the `trend` META key is in `parse.ts` on `main` but reaches the database only when `dash-ingest` is re-pinned,
 Open items 2. Same day: the split-run shadow test ended: the reader lost nothing it was given, but its file lands
 after the digest; the evidence task is off and the owner has a yes/no on a staged split; spec v19 held on 14 to
@@ -119,6 +120,8 @@ email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/
 | R20 | questions never leave the print unresolved: an open question is carried or closed with a reason (from the weekly review of 14 Nov) | 15 Nov | 26 Dec |
 | R21 | trend tag on every new card (direction x `dash.trend_state` ensemble, bond futures sign-flipped, `trend` META key) printed after the CARVER line; an against-trend thematic card names what turns the trend; weekly cut by trend bucket x class (`scripts/weekly_review/trend_cut.sql`); decision at 20 closed thematic cards or 20 Jan 2027 on an R09-style haircut; no gate, fill, exit or size changes (`supabase/rules/R21_trend_tag.sql`) | 16 Nov (put in force early on the owner's word, 10:02 SGT) | 20 Jan 2027 |
 | R22 | CREDIT line (HY OAS, 6-month change, VIX z, state) on equity and credit cards and in the BOOK CHECK; CYCLE line (Fed target, futures pricing, stage, book prior) in the rates paragraph and on USD and UST cards; `credit` and `cycle` META keys; weekly cuts once ten cards carry a tag; decision at 20 closed tagged cards or 28 Feb 2027; no gate change. Data: section H of the market pack (`supabase/rules/R22_credit_cycle_lines.sql`) | 16 Nov (owner's yes, put in force the same day) | 28 Feb 2027 |
+
+| R23 | PROPOSED 16 Nov, applies Sun 22 Nov 20:00 SGT unless opposed: the stated p of every card scored as a forecast in the weekly review (calibration block in `scripts/weekly_review/cuts.sql`: p bands, Brier against target and win outcomes beside the base-rate Brier, gap in points); decision at 40 closed cards or 30 Jan 2027 on keep, a per-band p haircut in the form of R09, or nothing; no gate change (`supabase/rules/R23_p_calibration.sql`) | pending | 30 Jan 2027 |
 
 R03 (drivers engine) reverted 1 Nov. R15 (market pack as a rule) withdrawn 1 Nov; the pack went in as a prompt edit.
 R13 (question hunt evidence, scope opus) reverted 10 Nov; its only reader, the Opus Macro Takeaways, stopped on 31 Oct.
@@ -308,8 +311,25 @@ a compliance view). Details in `docs/history.md`.
     read in full. Left in the owner's Mac Downloads folder (threads cannot delete): a duplicate of the PDF ending
     "(1).pdf" and the `_book_ocr_tmp` folder of page images.
 
+14. **Open-source comparison (16 Nov): GitHub and web search of LLM trading and research frameworks, news-to-signal
+    pipelines, forecast scoring tools, regime tools and evaluation harnesses, against this workflow** (project files
+    `notes/opensource_comparison_16nov2026.md`; the 25 Oct shortlist, the 26 Oct library review and the 1 Nov
+    public-apis screen were not repeated). One approach beats ours: open forecasting tools (Metaculus
+    forecasting-tools, Edgebook, forecasting-tracker) score every stated probability with a Brier score and a
+    calibration table, and we never scored the p the EV gate rests on. Built the same day: the `calibration` block in
+    the weekly review's cuts and its standing line (task prompt replaced, read back byte-identical), rule R23
+    proposed (above). First read: the review of Sat 21 Nov. Waiting on its read, not built: a median of several
+    independent p draws per card (forecasting-tools), a mirrored-direction placebo book (glassbench method), a
+    per-card rule-adherence flag (trade-journal playbooks). Judged not better: memory-log reflection fed back into
+    the run (TradingAgents; ATLAS finds no systematic gain, and our rules loop is the stricter version), evidence
+    desks and sources panels (ALTA, LangAlpha; we have the red team, R19 and numbers.tsv), agent arenas, FX vol
+    surface regime tools (no live surface). The one careful reproduction of TradingAgents (trading-agents-lab) finds
+    the agent desk does not beat buy-and-hold once names and dates are masked.
+
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
+- 16 Nov: open-source comparison ends in one build (calibration block in the weekly review) and one proposal (R23);
+  nothing else found that beats the workflow (Open items 14).
 - 16 Nov: the owner said yes to the credit and Fed-cycle lines as print-only evidence; R22 in force that day, section H
   added to the market pack (FRED answers only a request with an Accept header from the cloud address).
 - 16 Nov: book comparison (Willer and Saunders) ends in one proposed rule, R21 trend tag and cut, and no removals;

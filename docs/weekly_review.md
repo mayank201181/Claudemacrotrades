@@ -55,6 +55,13 @@ six weeks).
   it counts against a rule's revert condition only when no such failure explains it and the delay is under an hour.
 - **What a proposal may change.** It may tighten the gate, a fill, an exit or the scoring, add a check, or add a line
   the digest must write or carry. It may never loosen the gate or weaken the accuracy, verification or privacy rules.
+- **Calibration (R23, 16 Nov 2026).** The stated p of every closed card is scored as a forecast: by p band (n, average
+  stated p, target rate, win rate, average R), the Brier score of p against the target outcome and against the win
+  outcome, each beside the Brier of a constant forecast at the sample's own rate, and the gap in points between
+  average stated p and the realised rates. p is the odds of the target before the stop, so the target rate is its
+  test. One standing line each week; decision at 40 closed cards or 30 Jan 2027 (keep, a per-band p haircut in the
+  form of R09, or nothing). From the open-source comparison of 16 Nov (project files
+  `notes/opensource_comparison_16nov2026.md`).
 - **Data problems** (scorecard against database, daily against hourly bars, a mark against its log line, a malformed
   row, a feed with a missing day) get their own heading in the email and a `data_problems` key in the lessons row.
   They are not lessons and not proposals; they exist so the code gets fixed.
