@@ -383,7 +383,10 @@ const META_KEYS = new Set(['opened', 'filled', 'closed', 'class', 'boundary', 'p
   // R01 convexity cards, appended after exit
   'struct', 'strike', 'cut', 'pay', 'vol', 'carry', 'p0fill',
   // R17: the card's planned risk, |REF - stop| when it was written; one R for the life of the card
-  'risk']);
+  'risk',
+  // R21: direction x trend-monitor ensemble at open (two decimals, or "-" when the proxy has no monitor asset); stored once
+  // dash-ingest is re-pinned past this commit
+  'trend']);
 
 function dateOnly(s: string | undefined): string | null {
   const m = (s ?? '').match(/\d{4}-\d{2}-\d{2}/);
