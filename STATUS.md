@@ -6,7 +6,7 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-16, evening (open-source comparison: one gap found, the stated p was never scored; the weekly
+_Last updated: 2026-11-16, night (three-month macro sleeve proposed, Open items 15; spec on Drive found at v21, Open items 16. Earlier: open-source comparison: one gap found, the stated p was never scored; the weekly
 review now carries a calibration block and R23 is proposed for Sun 22 Nov, Open items 14. Earlier the same day: R17 to R20 in force; R21 trend tag and R22 credit and cycle lines in force since 16 Nov from the book comparison; the market pack has a section H, Open
 items 13; the `trend` META key is in `parse.ts` on `main` but reaches the database only when `dash-ingest` is re-pinned,
 Open items 2. Same day: the split-run shadow test ended: the reader lost nothing it was given, but its file lands
@@ -325,6 +325,22 @@ a compliance view). Details in `docs/history.md`.
     desks and sources panels (ALTA, LangAlpha; we have the red team, R19 and numbers.tsv), agent arenas, FX vol
     surface regime tools (no live surface). The one careful reproduction of TradingAgents (trading-agents-lab) finds
     the agent desk does not beat buy-and-hold once names and dates are masked.
+
+15. **Three-month macro sleeve (16 Nov, owner's question, no build yet).** Thread "Add three-month thematic macro
+    trades"; note in project files `notes/macro_sleeve_proposal_16nov2026.md`. Finding: the THEMATIC class is a
+    catalyst class, not a horizon class; realised holds on the Fable book run 6 to 16 days (22 closed cards, nine of
+    them ended by the 10-session review). Proposal, waiting on the owner's yes or no: a separate weekly MACRO paper
+    sleeve (own scorecard line, outside cum R) originated on Sunday evening from the fundamentals pack plus a
+    per-country regime scorecard, the daily Takeaways allowed to confirm or invalidate only; wired inputs first, the
+    38 trend-monitor assets as the universe, stops at 2.5 to 3 ATR(20), monthly reviews, cap six open; no
+    point-in-time fundamentals backtest (no vintages, out of phase), one cheap replay of the themes printed since
+    5 Oct as three-month trades instead. On a yes: replay first, then the scorecard in `fundpack.py`, a Sunday task
+    and one rule for the Saturday review.
+16. **Spec version on Drive.** On 16 Nov the Drive `trade_book_spec` reads version 21 (v20 and v21 both dated
+    16 Nov, headed "Willer & Saunders empirical calibration" and "open-source infrastructure upgrades", with gate,
+    sizing and risk-cap changes and references to a Gemini decision ledger) while this file records v19 as the
+    current version and no Claude thread wrote them. The owner is asked whether they are intended; until then the
+    17 Nov Takeaways reads v21.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
