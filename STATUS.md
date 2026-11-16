@@ -6,7 +6,7 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-16, night (three-month MACRO sleeve built on the owner's "go for all eight": regime scorecard in the fundamentals pack, a Sunday task, rule R24 proposed for Sun 22 Nov, Open items 15; the spec on Drive is at v21 by the owner's own choice, Open items 16. Earlier: open-source comparison: one gap found, the stated p was never scored; the weekly
+_Last updated: 2026-11-16, late night (three-month MACRO sleeve built on the owner's "go for all eight": regime scorecard in the fundamentals pack, the Sunday task, rule R24 proposed for Sun 22 Nov, first run checked, Open items 15; spec v20 and v21 are the owner's own edits, kept, reconciled with the rules, Open items 16 closed and 17 opened; three-month macro sleeve proposed, Open items 15; spec on Drive found at v21, Open items 16. Earlier: open-source comparison: one gap found, the stated p was never scored; the weekly
 review now carries a calibration block and R23 is proposed for Sun 22 Nov, Open items 14. Earlier the same day: R17 to R20 in force; R21 trend tag and R22 credit and cycle lines in force since 16 Nov from the book comparison; the market pack has a section H, Open
 items 13; the `trend` META key is in `parse.ts` on `main` but reaches the database only when `dash-ingest` is re-pinned,
 Open items 2. Same day: the split-run shadow test ended: the reader lost nothing it was given, but its file lands
@@ -133,6 +133,30 @@ it in force early.
 
 ## Trade book spec (`trade_book_spec` on Drive, both books read it)
 
+Version 21 (16 Nov, the owner's own edits, made outside the Claude threads and kept on his word, "Mine, keep v21",
+20:45 SGT; not through the Saturday review). v20, about 10:47 SGT, "Willer & Saunders empirical calibration": (i) at
+test (c) p is shrunk 5 points first, p_cal = max(p - 5%, 5%), and EV_cal = p_cal x r/r - (1 - p_cal) must be above 0
+(at or above 0 for a hedge), thin edge 0 to +0.30R unchanged; (ii) two size tiers, 0.5R (thin edge, a 3-1 USD
+scorecard split, a +2 sigma equity bubble long) and 1.0R (EV_cal at or above +0.30R with 4-0 alignment or a
+confirmed washout), META key `size`, applied as a multiplier on realised and running R, plus a 2.0R cap on combined
+open risk per shared EM or Asia FX factor; (iii) a positioning matrix by asset class (never fade CTAs; fade CFTC
+extremes in equities and vol-shocked FX flows only; in rates and commodities an extreme is trend confirmation, crude
+spec long/short under 2.0 excepted) and R09's haircut kept "strictly" for price-extended chases; (iv) fiscal-supply
+theses fail test (b) as curve steepeners and go through swap spreads, and a list of "zero-IR myths" fails test (d);
+(v) five playbooks (USD scorecard on 5Y spreads, central-bank clock, equity breadth and bubble gates, APAC and
+commodity rules, BTC on ETF flows) and a six-variable nearest-neighbour regime tag on the BOOK CHECK as the
+tie-breaker; (vi) SIGNPOSTS line on every thematic or hedge card after INVALIDATION, and VIEW CHANGED only when a
+signpost fires, the linked Qnn resolves against the card or a 10-session review finds no live catalyst; and an "R07
+outright forward parity" line (1W/2W forwards, roll two sessions before value date, both pipelines). v21, about
+20:27 SGT, "open-source infrastructure upgrades": an append-only hash-chained decision ledger
+(`gemini_decision_ledger_current.jsonl` on Drive, 9.7 KB on 16 Nov, SQLite `MacroDecisionLedger`) with losses-first
+recall by regime before candidates are scored and REFUSAL codes for filtered leans; when a stated p has a liquid
+market prior (OIS, Kalshi, Polymarket, one-touch) p_cal = p_prior + 0.70 x max(p - p_prior, 0), else the v20 shrink;
+a logical-coherence and fee-drag check across Qnn questions, four-model odds pooled in log-odds space, an
+edge-versus-consensus Brier skill score; and a Shapiro news-reaction-failure gate (crowded non-CTA position that
+stalls or reverses at the 17:00 ET close on a 1.5 sigma supportive surprise). The v18 no-wait and v19 rule-reads
+lines are intact, no clock wait was added, and the CALIBRATION SHRINKAGE paragraph appears twice (harmless). How the
+Fable run should read v21 against the rules: Open items 17.
 Version 19 (13 Nov, RULE READS BEFORE CARDS: whoever runs the trade test and writes the cards, the run itself or
 the worker it hands the step to, first makes the reads that rules in force ask for before a trade card (event
 library R05, attention table R04, prediction-market file R12, positioning extremes R02, Carver block R10) and runs
@@ -335,22 +359,42 @@ a compliance view). Details in `docs/history.md`.
     16 days (22 closed cards, nine ended by the 10-session review); the replay of every view tested since 5 Oct as a
     three-month trade (`scripts/macro_sleeve/replay.sql`) is a small loss so far, so the sleeve originates from the
     fundamentals base, not from the daily views. Built: section 1b regime scorecard in `fundpack.py` (both copies,
-    the Drive pack rebuilt with it on 16 Nov); the Sunday task above (first run fired by hand 16 Nov 20:56 SGT: check
-    that a `macro_sleeve_current` landed in the pipeline folder); R24 proposed. Open: the first scheduled run on
+    the Drive pack rebuilt with it on 16 Nov); the Sunday task above (first run fired by hand 16 Nov 20:56 SGT: four minutes,
+    three pending cards filling at the Mon 17 Nov close, eleven candidates tested, file in the pipeline folder); R24 proposed. Open: the first scheduled run on
     Sun 22 Nov 19:31 SGT; the first Takeaways with a MACRO SLEEVE block on Mon 23 Nov (R24 in force Sun 22 Nov 20:00
     SGT unless opposed); the sleeve is not in `dash.trades`, so the dashboard and `dash-mark` do not see it until the
     20-card decision; re-run the replay in early January 2027 when the October arrivals reach 63 bars.
-16. **Spec version on Drive.** On 16 Nov the Drive `trade_book_spec` reads version 21 (v20 and v21 both dated
-    16 Nov, headed "Willer & Saunders empirical calibration" and "open-source infrastructure upgrades", with gate,
-    sizing and risk-cap changes and references to a Gemini decision ledger) while this file recorded v19. The owner
-    answered at 20:45 SGT "Mine, keep v21": they are his own edits and stay. A separate thread records them here and
-    checks them against the rules in force.
+16. **Spec version on Drive: closed.** v20 and v21 (16 Nov) are the owner's own edits, kept ("Mine, keep v21",
+    20:45 SGT); what they change is under Trade book spec. Not restored, not edited.
+17. **Reading spec v21 beside the rules (16 Nov, thread "Reconcile spec v21 with rules"; check on the 17 Nov
+    Takeaways).** A rule in force wins over the spec on the point it covers, so: (a) R23's calibration cut reads the
+    META `p` key, which stays the STATED p (spec STATED p, v8, unchanged); p_cal is gate arithmetic printed beside
+    EV_cal on the card, and META `ev` carries EV_cal (as R09 has it carry the adjusted figure). If a run writes p_cal
+    into `p`, R23 measures the shrink and not the model; the 17 Nov cards are the first check. R23's decision at 40
+    closes then says whether the flat 5 points is the right haircut, so no second haircut is proposed before it.
+    (b) R09 applies as written, to every crowd = WITH card by positioning evidence; v20's "strictly on price-extended
+    chases" narrows it only if a rule says so (not proposed; R09's own SCORECARD crowd line decides it at 20 WITH
+    closes). (c) R07 governs cash FX tenor and rolls (1W to 3M covering the review, usually 2W); v20's "1W/2W"
+    line agrees where it overlaps. (d) R08's review-first close of a dead or weakened card and R11's FOMC exit stand
+    beside the v20 signpost lock; v13 and v15 set when an exit executes, not when a view may change, so no clash.
+    (e) R17, R18, R19 and R21 unchanged; the v20 positioning matrix agrees with R21 (positioning is trend outside
+    equities). (f) The `size` key is not in `parse.ts`, so the database and the weekly cuts hold per-unit R while
+    the digest's SCORECARD is size-weighted; store `size` with the `trend` re-pin (Open items 2) and leave the
+    database in per-unit R until then. (g) Mechanics: no clock wait, v18 and v19 lines intact, the spec is 88,000
+    rendered characters (v19 was 73,000 and the 14 to 16 Nov runs read it), and the named code (`MacroDecisionLedger`,
+    `check_qnn_logical_coherence`, `score_news_reaction_failure`) and data (Citi surprise and POLLS, S&P generals
+    breadth, BTC ETF flows, the six regime variables beyond the fundpack) do not exist for the Fable run, so under
+    v19 it prints each as the rule's own failure text with the reason, never "not run". A note: v21's anchored
+    formula lifts a stated p that sits BELOW its market prior up to the prior (max(p - p_prior, 0)), which may or
+    may not be intended.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
 - 16 Nov: the owner said "go for all eight" to the three-month MACRO sleeve: a separate weekly paper book off the
   fundamentals pack's regime scorecard, the daily run confirming or weakening only (R24 proposed), no fundamentals
   backtest (Open items 15).
+- 16 Nov: the owner keeps his own spec edits v20 and v21 (p shrink, size tiers, EM factor cap, signpost lock,
+  playbooks, decision ledger); rules in force still win where they overlap (Open items 17).
 - 16 Nov: open-source comparison ends in one build (calibration block in the weekly review) and one proposal (R23);
   nothing else found that beats the workflow (Open items 14).
 - 16 Nov: the owner said yes to the credit and Fed-cycle lines as print-only evidence; R22 in force that day, section H
