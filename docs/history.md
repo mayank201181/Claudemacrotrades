@@ -6,6 +6,40 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+### 16 Nov 2026: the split-run shadow test ends
+
+Five scheduled mornings (12 to 16 Nov) of a Sonnet 5.5 reader writing one evidence file from every input beside
+the live Takeaways, each checked by the audit thread the same morning. Pass rule, as approved on 10 Nov: no trade
+card, odds call or headline view rests on a claim that was in an input the reader had and is not in its file.
+
+| morning | verdict | judged items | claims | carried | degraded | lost | input not read | pass finished | digest sent |
+|---|---|---|---|---|---|---|---|---|---|
+| 12 Nov | PASS | 33 | 33 | 29 | 0 | 0 | 0 | 08:15 | 08:21 |
+| 13 Nov | PASS | 40 | 40 | 36 | 0 | 0 | 0 | 08:12 | 07:34 |
+| 14 Nov | PASS | 33 | 33 | 28 | 0 | 0 | 0 | 08:14 | 07:28 |
+| 15 Nov | FAIL | 25 | 50 | 36 | 5 | 0 | 2 | 08:25 | 07:06 |
+| 16 Nov | PASS | 25 | 52 | 44 | 0 | 0 | 0 | 08:14 | 07:16 |
+
+The 15 Nov fail is one of scope: the digest also used a day-old flows brief that landed after the previous pass and
+was never among the reader's inputs (the pass has an older-day fallback for the crowding check, not for desk
+inputs). Its five degraded claims kept the content but drifted on attribution. Nothing the reader had was lost on
+any morning. The weak points: the file landed 40 to 80 minutes after the digest from 13 Nov on, the item links of
+the Gemini peer Takeaways were never covered, and a copy that lands after the digest is built (the Gemini peer
+Takeaways at 07:33 to 07:54) gives the two halves different inputs. A pass took 98 to 112 minutes; the 16 Nov run
+cost US$8.03 (earlier mornings' session ids were not kept; the dry runs were about US$7).
+
+What each extra copy adds: of 395 claims the digest used over the five mornings, 310 sat in only one copy. Second
+and third copies of the same feed each carried claims no other copy had (YouTube: Opus 44 used, 22 alone; Gemini
+33 and 25; ChatGPT 30 and 9. Podcast: Opus 18 and 11; Gemini 14 and 12; ChatGPT 10 and 5. Email: Gemini 23 and 13;
+ChatGPT 17 and 7). That backs the owner's rule of keeping every input.
+
+Done: the evidence task switched off (read back: enabled false); the audit wake disabled by the audit thread
+rather than deleted, because deleting it would delete that thread's session. The owner got the result and one
+yes/no card: build a staged split (the reader starts about 05:30 SGT and Fable decides from its file), recommended
+no, because the file lands after the digest today and an earlier schedule would put the 08:15 deadline at risk for
+a saving nobody has measured. Also checked that morning: spec v19 held on 14 to 16 Nov (every option card prints a
+PRICER line on DTCC vols through the Drive loader; no "not run"), and the three emails landed by 07:28 SGT.
+
 **16 Nov 2026: digest keys move to a Drive file.** The first runs on our transcripts (05:00 YouTube, 06:00 Podcast) read our index but could not call `get_trigger`: scheduled runs that start a fresh session cannot reach it, even with the connector attached. YouTube ran with no search sweep and the Podcast digest, which had used `get_trigger` since 13 Nov, had had no Podwise for three days. On the owner's written yes, a thread copied the two keys by script into the private Drive file `macro_desk_digest_keys` (My Drive root, KEY=value lines) and both prompts now read that file at run start, with fallbacks if it is missing; both prompts were read back against the built text. Reruns at 08:20 SGT: the Podcast footer reads "Keys: file read OK, Podwise key set OK, Podwise submissions 3" and the YouTube footer "Keys: file read OK, YouTube API OK, searches run 54, Podwise key set OK" (59 transcripts read, 56 ours, 3 Podwise). Both reruns mailed real digests marked "(rerun)".
 
 **15 Nov 2026: the digests switch to our transcripts.** On the backtest the owner said yes to the Podcast and YouTube digests reading our transcripts, Podwise kept as the backup. `transcribe.py` now writes three kinds of file each day (podcast bundle, YouTube parts of about 2.4 MB, and an index the digests read first), because one bundle with a day's YouTube captions would be about 18 MB; the 04:20 feeder uploads each by file reference, the index last. The Opus Podcast digest (06:00) reads ours first and asks Podwise only for episodes ours lacks; the Opus YouTube digest (05:00) does the same, Podwise capped at 20 misses. Neither prompt holds a key now: both take the YouTube API and Podwise keys with `get_trigger` from the paused Fable YouTube task (the owner's choice on a card), and the YouTube digest moved its stance-ledger reads from the frozen `opus` key to `fable`, five places. The Fable task's YouTube key could not be tested from a thread, so the YouTube prompt falls back to our index for candidates if Google rejects it. Both prompts were read back after the change and match the built text. First runs on 16 Nov.
