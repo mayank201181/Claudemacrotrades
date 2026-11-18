@@ -274,8 +274,11 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    `feeder.py fundpack` timed out in a test on 13 Nov (the build outlasts the feeder's time budget), so the Sunday
    task keeps its direct build and textContent upload. Waiting on the owner's visit: the Opus YouTube prompt's two
    API keys and `opus` ledger key (last entry 30 Oct), and 21 to 26 connectors on the digest, evidence-pass, MSD
-   brief, Research Radar and Longevity tasks. A reminder on 17 Nov 10:30 SGT deletes the three old feeder tasks and
-   the paused Question Hunt if the feeders ran cleanly all week. The shadow tasks' crons recur in Nov 2027; the
+   brief, Research Radar and Longevity tasks. Old feeder tasks and the paused Question Hunt NOT deleted (checked
+   18 Nov): the week was not clean. 13 Nov the odds build came out short (Polymarket HTTP 406) and was never uploaded,
+   and on 17 and 18 Nov no feed built at all because the feeder thread hit the account's spend limit (last line in
+   `feeders/status.csv` is 16 Nov). A re-check on Wed 25 Nov 10:30 SGT deletes them if 19 to 25 Nov are clean.
+   The shadow tasks' crons recur in Nov 2027; the
    16 Nov verdict task switches them off.
 2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to d334277), `dash-mark`
    (9fcaed6) and `dash-ingest` (08a5516; `main` has the colspan change since 009d343, a deploy from a thread was refused by the permission classifier on 12 Nov, so re-pin it with the next function change) are one-file stubs that import this repo at a `main` commit: merge,
