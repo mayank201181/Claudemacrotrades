@@ -9,9 +9,11 @@ CFTC Traders in Financial Futures / Disaggregated reports (public Socrata API, w
 
   1. flags today's extremes: closes outside the 20-day Bollinger band for 4+ sessions, stretch from the 20-day mean
      of 2.5 ATR or more, RSI(14) at 75/25, a 20-day move of 2 sigma or more against its own 3-year distribution,
-     and a CFTC net position at or beyond its 3-year 5th/95th percentile;
+     a cross-asset pair whose legs have diverged by 2.2 sigma while still correlated, and a CFTC net position at or
+     beyond its 3-year 5th/95th percentile;
   2. gives each flag the base rate from the SAME series' own history: how often the move reverted over the next
-     5, 10 and 20 sessions after the same kind of extreme, the median forward move, the sample size, and the
+     5, 10 and 20 sessions after the same kind of extreme, the median forward move, the sample size, what a fade
+     had to sit through on the way (adverse excursion), the dates of the last three such events, and the
      unconditional rate the same series would have shown on any day (the baseline), with a binomial test;
   3. lists the seasonal windows opening now (the next 20 sessions, each past year): hit rate, median move, years,
      the asset's unconditional rate, and the placebo rate (the share of all calendar start dates in that series
@@ -49,7 +51,9 @@ ASSETS = [
     ("DXY", "DX-Y.NYB", "px", "FX"), ("EURUSD", "EURUSD=X", "px", "FX"), ("USDJPY", "JPY=X", "px", "FX"),
     ("GBPUSD", "GBPUSD=X", "px", "FX"), ("AUDUSD", "AUDUSD=X", "px", "FX"), ("NZDUSD", "NZDUSD=X", "px", "FX"),
     ("USDCAD", "CAD=X", "px", "FX"), ("USDCHF", "CHF=X", "px", "FX"), ("EURJPY", "EURJPY=X", "px", "FX"),
-    ("AUDJPY", "AUDJPY=X", "px", "FX"), ("USDCNH", "CNH=X|CNY=X", "px", "AsiaFX"), ("USDKRW", "KRW=X", "px", "AsiaFX"),
+    ("AUDJPY", "AUDJPY=X", "px", "FX"), ("GBPJPY", "GBPJPY=X", "px", "FX"),
+    ("AUDNZD", "AUDNZD=X", "px", "FX"), ("EURGBP", "EURGBP=X", "px", "FX"), ("EURCHF", "EURCHF=X", "px", "FX"),
+    ("USDCNH", "CNH=X|CNY=X", "px", "AsiaFX"), ("USDKRW", "KRW=X", "px", "AsiaFX"),
     ("USDTWD", "TWD=X", "px", "AsiaFX"), ("USDINR", "INR=X", "px", "AsiaFX"), ("USDSGD", "SGD=X", "px", "AsiaFX"),
     ("USDIDR", "IDR=X", "px", "AsiaFX"), ("USDPHP", "PHP=X", "px", "AsiaFX"), ("USDTHB", "THB=X", "px", "AsiaFX"),
     ("USDMYR", "MYR=X", "px", "AsiaFX"),
@@ -65,6 +69,16 @@ ASSETS = [
     ("NIFTY", "^NSEI", "px", "APAC eq"), ("ASX200", "^AXJO", "px", "APAC eq"), ("STI", "^STI", "px", "APAC eq"),
     ("VIX", "^VIX", "px", "Vol"), ("MOVE", "^MOVE", "px", "Vol"),
 ]
+
+# Synthetic series built from two loaded ones: label, leg a minus leg b (yields in %), kind, group
+SYNTH = [("US 2s10s", "UST10Y", "UST2Y", "yld", "Rates"), ("US 5s30s", "UST30Y", "UST5Y", "yld", "Rates")]
+
+# Cross-asset pairs: leg a, leg b, the sign their moves normally share (+1 together, -1 opposite)
+PAIRS = [("DXY", "Gold", -1), ("UST10Y", "USDJPY", 1), ("UST10Y", "Gold", -1), ("Brent", "USDCAD", -1),
+         ("Copper", "AUDUSD", 1), ("USDCNH", "AUDUSD", -1), ("VIX", "SPX", -1), ("SOX", "KOSPI", 1),
+         ("SOX", "TAIEX", 1), ("USDJPY", "N225", 1), ("US 2s10s", "USDJPY", -1)]
+PAIR_Z = 2.2            # divergence of the two legs' 20-session moves, each in units of its own 60-session sigma
+PAIR_CORR = 0.3         # the 60-session correlation must still carry the normal sign at least this strongly
 
 # CFTC: label, dataset, contract code, group column prefix, price label whose move the position bets on,
 # sign (+1 net long means the price label rises, -1 the opposite, for USDJPY-style quotes)
@@ -213,6 +227,13 @@ def load_history(outdir, fetch=True):
             series[label] = {"kind": kind, "group": group, "rows": rows}
         else:
             note(f"{label}: only {len(rows)} bars, skipped")
+    for label, a, b, kind, group in SYNTH:
+        if a in series and b in series:
+            db = {r[0]: r[1] for r in series[b]["rows"]}
+            rows = [(r[0], r[1] - db[r[0]]) for r in series[a]["rows"] if r[0] in db]
+            rows = [(d, v, v, v) for d, v in rows]
+            if len(rows) >= 300:
+                series[label] = {"kind": kind, "group": group, "rows": rows, "signed": True}
     return series
 
 
@@ -337,7 +358,7 @@ def binom_p(hits, n, p0):
     return 2 * (1 - 0.5 * (1 + math.erf(abs(z) / math.sqrt(2))))
 
 
-def base_rate(kind, closes, atr, evs, direction, exclude_last=0):
+def base_rate(kind, closes, atr, evs, direction, exclude_last=0, dates=None):
     """Reversion base rate after past events of one direction: for each horizon, hit = forward move against the
     extreme, median forward move (signed, in % or bp), n; baseline = share of all k-day moves against that direction."""
     res = {}
@@ -352,6 +373,21 @@ def base_rate(kind, closes, atr, evs, direction, exclude_last=0):
         res[k] = {"n": len(f), "hit": hits / len(f) if f else None, "med": statistics.median(f) if f else None,
                   "base": base, "p": binom_p(hits, len(f), base) if f else 1.0,
                   "med_atr": None}
+    # path risk for whoever fades the extreme: the worst move in the extreme's own direction inside 20 sessions
+    k = HORIZONS[-1]
+    idx = [i for i, d in evs if d == direction and i < n - k - exclude_last]
+    adverse = []
+    for i in idx:
+        worst = 0.0
+        for j in range(1, k + 1):
+            m = fwd(kind, closes, i, j)
+            if m is not None:
+                worst = max(worst, m * direction)
+        adverse.append(worst)
+    adverse.sort()
+    res["mae95"] = adverse[min(len(adverse) - 1, int(math.ceil(0.95 * len(adverse))) - 1)] if adverse else None
+    res["mae50"] = statistics.median(adverse) if adverse else None
+    res["last"] = [dates[i] for i in idx[-3:]] if dates else []
     return res
 
 
@@ -379,7 +415,57 @@ def fmt_br(br, kind):
             parts.append(f"{k}d n=0")
         else:
             parts.append(f"{k}d {r['hit'] * 100:.0f}% vs {r['base'] * 100:.0f}% (n={r['n']}, med {r['med']:+.1f}{u}, p={r['p']:.2f})")
+    if br.get("mae95") is not None:
+        parts.append(f"fade path 20d: adverse median {br['mae50']:.1f}{u}, 95th pct {br['mae95']:.1f}{u}")
+    if br.get("last"):
+        parts.append("last " + ", ".join(br["last"]))
     return " · ".join(parts)
+
+
+# ---------------------------------------------------------------- cross-asset divergence
+def pair_scan(series):
+    """For each pair: the gap between the legs' 20-session moves (each over its own 60-session sigma, leg b signed by
+    the pair's normal relation). A gap of PAIR_Z or more while the 60-session correlation still has its normal sign is
+    a divergence; the base rate is leg a's own record after past divergences of the same side."""
+    out, tests = [], 0
+    for a, b, sign in PAIRS:
+        if a not in series or b not in series:
+            continue
+        sa, sb = series[a], series[b]
+        db = {r[0]: r[1] for r in sb["rows"]}
+        rows = [(r[0], r[1], db[r[0]]) for r in sa["rows"] if r[0] in db]
+        if len(rows) < 400:
+            continue
+        dates = [r[0] for r in rows]
+        ca, cb = [r[1] for r in rows], [r[2] for r in rows]
+        ra, rb = moves(sa["kind"], ca), moves(sb["kind"], cb)
+        n = len(rows)
+        flags, gaps, corrs = [0] * n, [None] * n, [None] * n
+        for i in range(80, n):
+            xa, xb = ra[i - 59:i + 1], rb[i - 59:i + 1]
+            ma, mb = sum(xa) / 60, sum(xb) / 60
+            va = sum((x - ma) ** 2 for x in xa) / 60
+            vb = sum((x - mb) ** 2 for x in xb) / 60
+            if va <= 0 or vb <= 0:
+                continue
+            corr = sum((x - ma) * (y - mb) for x, y in zip(xa, xb)) / 60 / math.sqrt(va * vb)
+            za = sum(ra[i - 19:i + 1]) / (math.sqrt(va) * math.sqrt(20))
+            zb = sum(rb[i - 19:i + 1]) / (math.sqrt(vb) * math.sqrt(20))
+            gap = za - sign * zb
+            gaps[i], corrs[i] = gap, corr
+            if abs(gap) >= PAIR_Z and corr * sign >= PAIR_CORR:
+                flags[i] = 1 if gap > 0 else -1
+        tests += 2 * len(HORIZONS)
+        last = n - 1
+        if flags[last]:
+            d = flags[last]
+            br = base_rate(sa["kind"], ca, None, events(flags), d, dates=dates)
+            out.append({"asset": f"{a} vs {b}", "group": "Pairs", "signal": "PAIR_DIV", "dir": d,
+                        "read": (f"{a} is {'rich' if d > 0 else 'cheap'} to {b}: 20d gap {gaps[last]:+.1f} sigma, 60d corr {corrs[last]:+.2f} "
+                                 f"(normal sign {'+' if sign > 0 else '-'}); base rate is {a}'s own move after past gaps"),
+                        "date": dates[last], "close": ca[last], "br": br, "kind": sa["kind"], "verdict": verdict(br),
+                        "evs": 0})
+    return out, tests
 
 
 # ---------------------------------------------------------------- seasonality
@@ -586,10 +672,13 @@ def build(outdir, fetch):
             d = sig[name][last]
             if d:
                 # the current event itself is excluded from its own base rate (no forward data anyway)
-                br = base_rate(s["kind"], closes, atr, evs, d)
+                br = base_rate(s["kind"], closes, atr, evs, d, dates=[r[0] for r in s["rows"]])
                 flags.append({"asset": label, "group": s["group"], "signal": name, "dir": d, "read": read[name][last],
                               "date": s["rows"][last][0], "close": closes[last], "br": br, "kind": s["kind"],
                               "verdict": verdict(br), "evs": sum(1 for _, x in evs if x == d)})
+    pair_flags, pair_tests = pair_scan(series)
+    flags += pair_flags
+    tests += pair_tests
     seas = []
     for label, s in series.items():
         r = seasonal(label, s, today)
@@ -629,6 +718,8 @@ def build(outdir, fetch):
         L.append("none today")
     for f in flags:
         side = "UP extreme" if f["dir"] > 0 else "DOWN extreme"
+        if f["signal"] == "PAIR_DIV":
+            side = "leg a rich" if f["dir"] > 0 else "leg a cheap"
         L.append(f"{f['asset']} | {f['signal']} {side} | {f['read']} | {fmt_level(f['close'])} ({f['date']}) | {fmt_br(f['br'], f['kind'])} | {f['verdict']}")
     L.append("")
     L.append("## B. SEASONAL WINDOWS OPENING NOW (the next 20 sessions from today's calendar date in each past year; only windows with a hit rate "
@@ -669,7 +760,7 @@ def build(outdir, fetch):
     L.append("")
     exp_fp = 0.05 * tests
     L.append("## D. METHOD AND HONESTY")
-    L.append(f"- Tests run this morning: {len(series)} series x 4 signals x 2 sides x 3 horizons = {tests} base rates, plus {len(cftc)} positioning series "
+    L.append(f"- Tests run this morning: {len(series)} series x 4 signals x 2 sides x 3 horizons, plus {len(PAIRS)} pairs x 2 sides x 3 horizons = {tests} base rates, plus {len(cftc)} positioning series "
              f"and {len(series)} seasonal windows. At p < 0.05 about {exp_fp:.0f} of the {tests} base rates pass by chance alone, so a REVERTS verdict on one flag "
              f"is weak evidence; a REVERTS verdict that repeats across horizons, across related series, and agrees with a positioning extreme is stronger.")
     L.append(f"- Events: a condition counts once when it first turns true after {COOLDOWN} sessions without it; forward moves overlap across events and "
@@ -678,9 +769,15 @@ def build(outdir, fetch):
     L.append("- Signals: BB_STREAK = 4 or more consecutive closes outside the 20-session 2-sigma band; STRETCH = close 2.5 ATR(20) or more from the "
              "20-session mean; RSI = RSI(14) at 75 or above, 25 or below; Z20 = the 20-session move at 2 sigma or more of the series' own 20-session "
              "moves over the prior 3 years. Yields are in bp, everything else in log %.")
+    L.append(f"- PAIR_DIV = the gap between two legs' 20-session moves (each over its own 60-session sigma, leg b signed by the pair's normal "
+             f"relation) at {PAIR_Z} or more while their 60-session correlation still has its normal sign by {PAIR_CORR} or more; the base rate is leg a's own "
+             "record after past gaps of the same side, so it says whether leg a came back, not which leg closes the gap. Asian index legs close "
+             "before the US leg, which a 20-session window mostly absorbs. Thresholds are fixed in the script, never set from today's reading.")
+    L.append("- Fade path: for the same past events, the worst move in the extreme's own direction inside the next 20 sessions (median and 95th "
+             "percentile). It is what a fade had to sit through, a guide to stop width, not a stop. 'last' = the three most recent past events.")
     L.append("- Seasonality uses calendar start dates, 20 sessions forward, one observation per year; it says nothing about why, and the placebo rate "
              "shows how often such a window appears by chance in the same series.")
-    L.append("- Not covered: intraday extremes, option skew, cross-asset divergences, single stocks, anything needing a paid source. Positioning here is "
+    L.append("- Not covered: intraday extremes, option skew, single stocks, anything needing a paid source. Positioning here is "
              "US futures only; the database's 83 positioning series stay under R02.")
     if NOTES:
         L.append("- Build notes: " + "; ".join(NOTES[:12]))
@@ -692,11 +789,15 @@ def build(outdir, fetch):
         f.write(text)
     # flags history
     hp = os.path.join(outdir, "flags_history.csv")
-    new = not os.path.exists(hp)
-    with open(hp, "a", newline="", encoding="utf-8") as f:
+    head = ["sgt_date", "asset", "signal", "dir", "reading", "bar_date", "close", "n20", "hit20", "base20", "med20", "p20", "verdict"]
+    kept = []
+    if os.path.exists(hp):
+        with open(hp, newline="", encoding="utf-8") as f:
+            kept = [r for r in list(csv.reader(f))[1:] if r and r[0] != today.isoformat()]     # a rebuild replaces today's rows
+    with open(hp, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        if new:
-            w.writerow(["sgt_date", "asset", "signal", "dir", "reading", "bar_date", "close", "n20", "hit20", "base20", "med20", "p20", "verdict"])
+        w.writerow(head)
+        w.writerows(kept)
         for x in flags:
             r = x["br"][20]
             w.writerow([today.isoformat(), x["asset"], x["signal"], x["dir"], x["read"], x["date"], f"{x['close']:.6g}", r["n"],

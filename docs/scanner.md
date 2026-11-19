@@ -11,7 +11,7 @@ only, no credentials). Every morning at 06:10 SGT the Haiku feeder thread runs i
 (scheduled task `trig_015XKVVpLccDvR4fVSdBGvaM`), and uploads `extremes_latest` to the digests' Drive folder by file
 reference. The Takeaways reads it under rule R25 (proposed 19 Nov, applies Sun 22 Nov 2026 20:00 SGT unless opposed).
 
-Data: Yahoo Finance daily bars for the market pack's price universe (50 series: G10 and Asian FX, UST yields and the
+Data: Yahoo Finance daily bars for the market pack's price universe plus four crosses and two curve spreads (56 series: G10 and Asian FX, UST yields and the
 10-year future, energy, metals, US, European and APAC equity indices, VIX and MOVE), 15 years, cached under
 `scanner/history/` and topped up with a 3-month pull each day; FRED `DGS2` for the 2-year yield; CFTC Traders in
 Financial Futures and Disaggregated reports from the public Socrata API (`gpe5-46if`, `72hh-3qpy`), weekly since 2006,
@@ -37,6 +37,20 @@ Financial Futures and Disaggregated reports from the public Socrata API (`gpe5-4
 - **D. Method and honesty**: the number of base rates computed (about 1,200 a morning) and how many pass p < 0.05 by
   chance (about 60), overlap and in-sample caveats, what is not covered.
 - `scanner/flags_history.csv`: one row per flag per day, so the weekly review can score the verdicts out of sample.
+
+## Upgrade, 19 Nov 2026 evening (the owner's "if you feel like upgrading yours further then do", after he shared the Gemini pipeline's scanner)
+
+Taken from that design, each with our baseline discipline: (1) **fade path** on every base rate: for the same past
+events, the worst move in the extreme's own direction inside 20 sessions, median and 95th percentile, a guide to stop
+width; (2) the dates of the **last three analogs**; (3) four FX crosses (GBPJPY, AUDNZD, EURGBP, EURCHF) and two
+synthetic curve spreads (US 2s10s, 5s30s), 56 series in all; (4) **PAIR_DIV** in section A: eleven cross-asset pairs
+(DXY/gold, UST10Y/USDJPY, UST10Y/gold, Brent/USDCAD, copper/AUDUSD, USDCNH/AUDUSD, VIX/SPX, SOX/KOSPI, SOX/TAIEX,
+USDJPY/N225, 2s10s/USDJPY), flagged when the legs' 20-session moves diverge by 2.2 sigma while the 60-session
+correlation still has its normal sign by 0.3; the base rate is leg a's own record after past gaps. Not taken: 50 to
+100 years of spliced history (regimes and fixing times differ), thresholds set from today's reading, a full-sample
+200-day percentile (looks ahead), win rates without an unconditional rate. Pair flags print in section A, so R25
+covers them unchanged. First upgraded build: 17 flags, no pair divergence (two gaps over 2 sigma failed the
+correlation gate), four seasonal windows of which AUDNZD down clears its placebo (80% vs 51%, 15 years, placebo 11%).
 
 ## First build, 19 Nov 2026
 
