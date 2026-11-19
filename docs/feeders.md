@@ -15,11 +15,12 @@ takes the newest copy by title.
 | odds | 06:20 daily | predmkt/predmkt.py | predmkt_latest | rule R12 |
 | marketpack | 06:52 daily | marketpack/marketpack.py | market_pack_latest | Takeaways STEP 2, last item |
 | fundpack | Sun 18:41 | fundpack/fundpack.py | fund_pack_latest | market pack section G (stays in its own Opus thread, the owner's wish of 6 Nov) |
+| scanner | 06:10 daily | scanner/scanner.py (extremes, seasonal windows, CFTC extremes, each with base rates; `docs/scanner.md`) | extremes_latest | rule R25 (proposed 19 Nov 2026) |
 | transcripts | 04:20 daily | transcribe/transcribe.py (its own runner: `run --upload`, see scripts/transcribe/README.md) | podcast_transcripts_latest, youtube_transcripts_latest_pNN, transcripts_index_latest | the Opus Podcast and YouTube digests, first, with Podwise as the backup (owner's yes 15 Nov) |
 
 `feeder.py` in this folder is the one runner (repo copy: scripts/feeders/feeder.py; keep the two identical):
 
-    cd /tmp && python3 -I /mnt/project-files/feeders/feeder.py <gdelt|odds|marketpack|fundpack>
+    cd /tmp && python3 -I /mnt/project-files/feeders/feeder.py <gdelt|odds|marketpack|fundpack|scanner>
     python3 -I /mnt/project-files/feeders/feeder.py confirm <feed> <fileSize that create_file returned>
     python3 -I /mnt/project-files/feeders/feeder.py status
 
@@ -42,6 +43,7 @@ work is one shell command, one Drive call and one confirm, so it needs no judgme
 | Feeder: media attention table | trig_01LpdVu1akXy9sHddyah3j6n | 05:45 daily |
 | Feeder: prediction-market odds | trig_019jXUYgtu3beS5Zt6yxb8tH | 06:20 daily |
 | Feeder: market pack | trig_01TLpx3Z2fHb3vxvebpFFASG | 06:52 daily |
+| Feeder: extremes scanner | trig_015XKVVpLccDvR4fVSdBGvaM | 06:10 daily (prompt `prompts/scanner.txt`, added 19 Nov 2026) |
 | Feeder: podcast transcripts | trig_011ybXd1mZjsDPYWFyu7VtX6 | 04:20 daily (prompt `prompts/transcripts.txt`; runs transcribe.py directly, not feeder.py) |
 
 A task bound to a thread keeps that thread's model, and its prompt can be changed only from that thread: to change

@@ -6,7 +6,7 @@ verified) goes at the top of `docs/history.md`, one paragraph per event, and her
 tables or lists below. Before a session ends, merge its STATUS change; a STATUS pull request left open is how this
 file went stale between 8 Oct and 10 Nov 2026.
 
-_Last updated: 2026-11-16, late night (three-month MACRO sleeve built on the owner's "go for all eight": regime scorecard in the fundamentals pack, the Sunday task, rule R24 proposed for Sun 22 Nov, first run checked, Open items 15; spec v20 and v21 are the owner's own edits, kept, reconciled with the rules, Open items 16 closed and 17 opened; three-month macro sleeve proposed, Open items 15; spec on Drive found at v21, Open items 16. Earlier: open-source comparison: one gap found, the stated p was never scored; the weekly
+_Last updated: 2026-11-19, afternoon (extremes and seasonality scanner built on the owner's ask: a 06:10 SGT feeder writes Drive `extremes_latest`, R25 proposed for Sun 22 Nov, Open items 18. Earlier: 2026-11-16, late night: three-month MACRO sleeve built on the owner's "go for all eight": regime scorecard in the fundamentals pack, the Sunday task, rule R24 proposed for Sun 22 Nov, first run checked, Open items 15; spec v20 and v21 are the owner's own edits, kept, reconciled with the rules, Open items 16 closed and 17 opened; three-month macro sleeve proposed, Open items 15; spec on Drive found at v21, Open items 16. Earlier: open-source comparison: one gap found, the stated p was never scored; the weekly
 review now carries a calibration block and R23 is proposed for Sun 22 Nov, Open items 14. Earlier the same day: R17 to R20 in force; R21 trend tag and R22 credit and cycle lines in force since 16 Nov from the book comparison; the market pack has a section H, Open
 items 13; the `trend` META key is in `parse.ts` on `main` but reaches the database only when `dash-ingest` is re-pinned,
 Open items 2. Same day: the split-run shadow test ended: the reader lost nothing it was given, but its file lands
@@ -60,6 +60,7 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | Feeder: media attention table | `trig_01LpdVu1akXy9sHddyah3j6n` | 05:45 daily | writes Drive `gdelt_attention_latest` (R04). All three feeders wake one small thread, "Run morning data feeders" (Haiku 5.5, low effort), which runs `feeders/feeder.py` and uploads by file reference: `docs/feeders.md` |
 | Feeder: prediction-market odds | `trig_019jXUYgtu3beS5Zt6yxb8tH` | 06:20 daily | writes Drive `predmkt_latest` (R12); moved from 06:38 so that it lands before the 06:33 start |
 | Feeder: market pack | `trig_01TLpx3Z2fHb3vxvebpFFASG` | 06:52 daily | writes Drive `market_pack_latest`. It builds after the 06:33 start; the run folds it in at its late pickup. Since 11 Nov section H (16 Nov) carries the credit filter and Fed-cycle lines for R22, and section D and the implied vol table carry the UTC day that is ending, read from DTCC's intraday files (`docs/marketpack.md`) |
+| Feeder: extremes scanner | `trig_015XKVVpLccDvR4fVSdBGvaM` | 06:10 daily | since 19 Nov: writes Drive `extremes_latest` from `scripts/scanner/scanner.py` (today's extremes over 50 series with the base rate of a reversion from each series' own history, seasonal windows against a placebo rate, CFTC extremes with their record; `docs/scanner.md`); read by the Takeaways under R25 once in force |
 | Feeder: podcast transcripts | `trig_011ybXd1mZjsDPYWFyu7VtX6` | 04:20 daily | since 15 Nov: transcribes the new episodes of 39 shows (the Podcast Digest's 30, plus 9 the digests cited) from their RSS feeds, and new videos of the 400 YouTube channels through Supadata, on DeepInfra's Nemotron (about US$1 a day) and uploads to Drive `podcast_transcripts_latest`, `youtube_transcripts_latest_pNN` (about 2.4 MB each) and, last, `transcripts_index_latest`; wakes the Haiku feeder thread (`scripts/transcribe/README.md`). The Podcast and YouTube digests read these first from 16 Nov (Open items 1b) |
 | Takeaways evidence pass [shadow test, Sonnet 5.5] | `trig_01PDjNqUabmAdt9VoCVMwUwx` | OFF since 16 Nov | the reader half of the split-run shadow test (`docs/shadow_test.md`), switched off after its fifth morning (its cron would fire again in Nov 2027). It is the old Opus Macro Takeaways task under a new prompt (the old one is in project files `shadow_test/backup/`) |
 | Shadow test audit (five mornings) | `trig_01KLyghYVbzNJZL8dqhQM5dT` | OFF since 16 Nov | disabled by the audit thread, not deleted: it is bound to that thread's session, and deleting a scheduled task deletes its session. Results in project files `shadow_test/` |
@@ -90,7 +91,7 @@ limit. Check the output file's date, not the task status.
 
 ### Scripts in this repo that the tasks run from project files
 
-`scripts/marketpack/`, `scripts/fundpack/`, `scripts/predmkt/`, `scripts/gdelt/`, `scripts/feeders/` and
+`scripts/marketpack/`, `scripts/fundpack/`, `scripts/predmkt/`, `scripts/gdelt/`, `scripts/feeders/`, `scripts/scanner/` and
 `scripts/transcribe/` are copies of the running files in `/mnt/project-files/<name>/`. Edit both and keep them byte-identical (all five matched on
 11 Nov; `predmkt.py` changed on 13 Nov for Polymarket's gzip-only pages, both copies updated). `/mnt/project-files/feeders/status.csv` has one line per build and upload: read it, not a thread, to see
 whether a morning ran. The weekly review's prompt is built by `scripts/weekly_review/build_prompt.py`.
@@ -123,6 +124,7 @@ email; "revert Rnn" removes one. Rule text for R06 onward is in `supabase/rules/
 | R22 | CREDIT line (HY OAS, 6-month change, VIX z, state) on equity and credit cards and in the BOOK CHECK; CYCLE line (Fed target, futures pricing, stage, book prior) in the rates paragraph and on USD and UST cards; `credit` and `cycle` META keys; weekly cuts once ten cards carry a tag; decision at 20 closed tagged cards or 28 Feb 2027; no gate change. Data: section H of the market pack (`supabase/rules/R22_credit_cycle_lines.sql`) | 16 Nov (owner's yes, put in force the same day) | 28 Feb 2027 |
 
 | R24 | PROPOSED 16 Nov, applies Sun 22 Nov 20:00 SGT unless opposed: the daily run reads Drive `macro_sleeve_current` at the evidence step and prints a MACRO SLEEVE block after the trade book (one line per card: mark, CONFIRMED / UNCHANGED / WEAKENED / SIGNPOST FIRED); it never originates, closes or scores a sleeve card, and the sleeve never enters cum R, the SCORECARD or TESTED; R14 applies inside each book; decision at 20 closed MACRO cards or 31 Aug 2027 (`supabase/rules/R24_macro_sleeve.sql`) | pending | 28 Feb 2027 |
+| R25 | PROPOSED 19 Nov, applies Sun 22 Nov 20:00 SGT unless opposed: the daily run reads Drive `extremes_latest` at the evidence step and prints a CONDITIONAL SETUPS block after the trade book (REVERTS and CONTINUES flags, seasonal windows that clear their placebo rate, CROWDED CFTC lines, each with the run's own catalyst clause or "no catalyst"); a flag never makes a card by itself; a card that uses one prints a SCANNER line after the TREND line, its base rate caps p (REVERTS rate plus 10 points unless the reason says what differs), NO EDGE, THIN and seasonal flags never raise p; `scanner` META key; weekly cut at ten tagged closes, verdicts scored out of sample from `scanner/flags_history.csv`; decision at 20 closed tagged cards or 28 Feb 2027; no gate change (`supabase/rules/R25_extremes_scanner.sql`) | pending | 28 Feb 2027 |
 | R23 | PROPOSED 16 Nov, applies Sun 22 Nov 20:00 SGT unless opposed: the stated p of every card scored as a forecast in the weekly review (calibration block in `scripts/weekly_review/cuts.sql`: p bands, Brier against target and win outcomes beside the base-rate Brier, gap in points); decision at 40 closed cards or 30 Jan 2027 on keep, a per-band p haircut in the form of R09, or nothing; no gate change (`supabase/rules/R23_p_calibration.sql`) | pending | 30 Jan 2027 |
 
 R03 (drivers engine) reverted 1 Nov. R15 (market pack as a rule) withdrawn 1 Nov; the pack went in as a prompt edit.
@@ -391,7 +393,21 @@ a compliance view). Details in `docs/history.md`.
     formula lifts a stated p that sits BELOW its market prior up to the prior (max(p - p_prior, 0)), which may or
     may not be intended.
 
+18. **Extremes and seasonality scanner (19 Nov; the owner's ask, thread "Build extremes and seasonality scanner"; `docs/scanner.md`).** Built and
+    running: `scripts/scanner/scanner.py` (project files `scanner/`, 15 years of Yahoo bars cached, FRED 2-year, CFTC public API since 2006), the
+    06:10 SGT feeder task above (first scheduled run Fri 20 Nov), `feeders/feeder.py scanner` and `prompts/scanner.txt` in both copies, the first
+    file on Drive (12,315 bytes, 19 Nov 16:48 SGT), R25 proposed. First read: 17 flags, one REVERTS (gold stretch down, 72% vs 52%, n=43), the
+    DXY band-streak anecdote from the owner's screenshot has no edge in 15 years (EURUSD mirror n=12, 50% vs 47%), no seasonal window clears its
+    placebo rate, all six CFTC extremes THIN. Open: the first Takeaways with a CONDITIONAL SETUPS block on Mon 23 Nov (R25 in force Sun 22 Nov
+    20:00 SGT unless opposed; the owner can put it in force early with the one line in the rule file); the `scanner` META key is not in
+    `parse.ts` (store it with the `trend` and `size` re-pin, Open items 2; until then the weekly review joins by date to `flags_history.csv`);
+    not covered and parked until a card shows the need: Bund and JGB futures (not on Yahoo), option skew, intraday extremes, cross-asset
+    divergences. Honesty line: about 60 of the 1,200 base rates pass p < 0.05 by chance each morning, printed in the file's section D.
+
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
+
+- 19 Nov: the owner asked for a standing process that catches stretched moves and seasonal windows across his markets as conditional
+  candidates; built as a feeder plus rule R25 (Open items 18), no gate change.
 
 - 16 Nov: the Macro sleeve weekly task runs on Fable 5.2 (owner's choice 21:40 SGT, set by him on the task's page 21:54 SGT).
 - 16 Nov: the owner said "go for all eight" to the three-month MACRO sleeve: a separate weekly paper book off the

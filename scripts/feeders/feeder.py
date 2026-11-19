@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run one morning data feeder and stage its file for an exact Google Drive upload.
 
-  python3 -I feeder.py <gdelt|odds|marketpack|fundpack> [upload_dir]
+  python3 -I feeder.py <gdelt|odds|marketpack|fundpack|scanner> [upload_dir]
   python3 -I feeder.py confirm <feed> <fileSize that create_file returned>
   python3 -I feeder.py status
 
@@ -14,8 +14,8 @@ whose container it runs in.
 The second form records what Drive stored, and says so when the size differs from the file that was built.
 
 Every run appends one line to feeders/status.csv under the root, so a missing or failed morning is visible later
-without reading a thread. Stdlib only, no credentials. The builds themselves live in gdelt/, predmkt/, marketpack/
-and fundpack/ under the root (default /mnt/project-files, override with FEEDER_ROOT for tests).
+without reading a thread. Stdlib only, no credentials. The builds themselves live in gdelt/, predmkt/, marketpack/,
+fundpack/ and scanner/ under the root (default /mnt/project-files, override with FEEDER_ROOT for tests).
 """
 import csv
 import datetime as dt
@@ -41,6 +41,8 @@ FEEDS = {
                    "cmd": ["marketpack/marketpack.py", "--out", "marketpack/"]},
     "fundpack": {"title": "fund_pack_latest", "out": "fundpack/fund_pack_latest.md", "min_bytes": 3000,
                  "cmd": ["fundpack/fundpack.py", "--out", "fundpack/"]},
+    "scanner": {"title": "extremes_latest", "out": "scanner/extremes_latest.md", "min_bytes": 4000,
+                "cmd": ["scanner/scanner.py", "--out", "scanner/"]},
 }
 
 
