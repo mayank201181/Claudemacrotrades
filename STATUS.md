@@ -401,8 +401,10 @@ a compliance view). Details in `docs/history.md`.
     placebo rate, all six CFTC extremes THIN. Open: the first Takeaways with a CONDITIONAL SETUPS block on Mon 23 Nov (R25 in force Sun 22 Nov
     20:00 SGT unless opposed; the owner can put it in force early with the one line in the rule file); the `scanner` META key is not in
     `parse.ts` (store it with the `trend` and `size` re-pin, Open items 2; until then the weekly review joins by date to `flags_history.csv`);
-    not covered and parked until a card shows the need: Bund and JGB futures (not on Yahoo), option skew, intraday extremes, cross-asset
-    divergences. Honesty line: about 60 of the 1,200 base rates pass p < 0.05 by chance each morning, printed in the file's section D.
+    not covered and parked until a card shows the need: Bund and JGB futures (not on Yahoo), option skew, intraday extremes. Upgraded the same
+    evening on the owner's word, after he shared the Gemini pipeline's scanner: fade-path figures (adverse excursion, median and 95th
+    percentile) and the last three analog dates on every base rate, four FX crosses, two curve spreads, eleven cross-asset divergence pairs
+    (PAIR_DIV lines in section A, so R25 is unchanged); 56 series. Honesty line: about 60 of the 1,200 base rates pass p < 0.05 by chance each morning, printed in the file's section D.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
