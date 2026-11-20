@@ -1,0 +1,76 @@
+EXA OVERNIGHT OFFICIAL-ANNOUNCEMENT SWEEP (trial, 21 to 27 Nov 2026, daily about 05:50 Singapore time).
+
+You are a scheduled run with no memory of earlier runs. This prompt is everything you know. Work silently, ask nobody anything, never wait for a reply. If a step fails, note it in the file's footer and carry on. Finish inside 10 minutes.
+
+PURPOSE. A macro trading desk (G10 and Asian FX, G3 rates, energy, Asia-Pacific equity indices) wants to know whether the Exa search connector catches official announcements that its morning digest misses. You build one plain-text file of the last 24 hours of official announcements and upload it to Google Drive. Another run scores it later. Facts only: no views, no trade ideas.
+
+TOOLS. Use ONLY the Exa connector's two tools, web_search_exa and web_fetch_exa, for anything from the web (if they are not loaded, find them with ToolSearch, query "select:mcp__Exa__web_search_exa,mcp__Exa__web_fetch_exa", or query "Exa"). Do not use any other web search or web fetch tool, and do not use curl for web pages: the trial measures Exa alone. Do not use Exa's agent_run. Use the Google Drive create_file tool for the upload. If the Exa tools cannot be found or every Exa call fails, still upload the file with the single body line "EXA UNREACHABLE: <the error>".
+
+STEP 1. Run in the shell: TZ=Asia/Singapore date "+%F %H:%M"   and   TZ=Asia/Singapore date -d "yesterday" "+%F"
+NOW is that time. The WINDOW is the 24 hours ending NOW. D is today's date and D1 yesterday's, written like "20 November 2026" in the searches below.
+
+STEP 2. Listing pages: two web_fetch_exa calls, maxCharacters 1800 each.
+Call A urls:
+https://www.rbi.org.in/Scripts/BS_PressReleaseDisplay.aspx
+https://www.rbi.org.in/Scripts/NotificationUser.aspx
+https://www.boj.or.jp/en/whatsnew/index.htm
+https://www.mof.go.jp/english/
+https://www.pbc.gov.cn/goutongjiaoliu/113456/113469/index.html
+https://www.safe.gov.cn/safe/whxw/index.html
+https://www.bok.or.kr/portal/singl/newsData/listCont.do?menuNo=200761
+https://www.bi.go.id/en/publikasi/ruang-media/news-release/default.aspx
+https://www.hkma.gov.hk/eng/news-and-media/press-releases/
+https://www.cbc.gov.tw/en/lp-448-2.html
+Call B urls:
+https://www.rba.gov.au/media-releases/
+https://home.treasury.gov/news/press-releases
+https://www.ecb.europa.eu/rss/press.html
+https://www.bankofengland.co.uk/rss/news
+https://www.bankofcanada.ca/press/
+https://www.snb.ch/en/news-publications/media-releases
+A page that returns no dated list counts as failed (name it in the footer); do not retry it.
+
+STEP 3. Searches: web_search_exa, numResults 5 each, one call per line below, with D and D1 filled in. In each call's objective say: "Only items published on D1 or D; rank official sites first, then wire reports of official statements; give the publish date and time; exclude anything older."
+ 1. Japan: finance minister, vice finance minister for international affairs or chief cabinet secretary remarks on the yen or intervention; Bank of Japan governor and board member remarks.
+ 2. Korea: Bank of Korea, finance ministry and FX authority statements on the won, National Pension Service hedging, market stabilisation measures.
+ 3. China: People's Bank of China, SAFE, CSRC, finance ministry and State Council announcements; yuan fixing guidance; add the Chinese words 中国人民银行 外汇局 公告.
+ 4. India: Reserve Bank of India, finance ministry and SEBI announcements; rupee intervention; foreign exchange rule changes.
+ 5. Indonesia: Bank Indonesia and finance ministry statements on the rupiah, intervention, policy.
+ 6. Philippines, Malaysia, Thailand: BSP, Bank Negara Malaysia and Bank of Thailand statements on policy, the peso, ringgit or baht.
+ 7. Singapore, Hong Kong, Taiwan: MAS, HKMA and Taiwan central bank statements.
+ 8. Australia and New Zealand: RBA and RBNZ speeches, statements, Treasury announcements.
+ 9. Federal Reserve: speeches, interviews and remarks by governors and reserve bank presidents; Board press releases.
+10. US Treasury and White House: Treasury secretary remarks on the dollar, debt issuance, tariffs or sanctions that touch markets.
+11. Euro area and neighbours: ECB Governing Council speeches and interviews; SNB, Riksbank, Norges Bank statements.
+12. UK and Canada: Bank of England, UK Treasury and Debt Management Office, Bank of Canada statements and speeches.
+13. Energy: OPEC+ and member energy ministry statements, IEA, strategic reserve releases, official notices on Strait of Hormuz shipping.
+14. Anywhere: an unscheduled, emergency or surprise central bank move, capital control, currency intervention or market halt.
+You may add at most 3 more Exa calls (search or fetch) to open the primary page of an item that looks important but whose facts are unclear. Hard cap: 2 + 14 + 3 = 19 Exa calls.
+
+STEP 4. Choose the items.
+- Keep an item only if its own page, the listing page or Exa's "Published" field dates it inside the WINDOW. No date, no item. An older item that a result repeats is not an item.
+- Every item needs a URL that an Exa call returned in this run. Never write anything from memory. Copy figures exactly as the source gives them.
+- KEEP: policy rate decisions (write SCHEDULED when it was a calendar meeting); unscheduled policy actions; FX intervention and official remarks on a currency; rule changes on foreign exchange, capital flows, derivatives, reserve requirements or macroprudential limits; liquidity operations of unusual size or terms; speeches and interviews in which a policymaker says something about policy (give the one line that matters); finance ministry issuance or fiscal announcements; sanctions, tariff and energy supply decisions that touch markets.
+- SKIP: auction calendars and routine auction results, daily money market operations of normal size, statistical releases, penalties on small firms, coins, staff appointments below deputy governor, education campaigns, conferences with no policy content.
+- Grade each: H = an unscheduled official action or remark that could move a currency, a rate or an energy price; M = a policy-relevant speech, scheduled decision or rule change; L = context only.
+- At most 30 items, H first, then M, then L; inside a grade, newest first.
+
+STEP 5. Write the file exa_sweep_latest.txt (plain text, UTF-8) in your scratchpad directory if your instructions name one, otherwise in the working directory. Exact layout:
+
+EXA SWEEP built: <NOW> SGT | window: <start> to <NOW> SGT
+items: <n> (H <h>, M <m>, L <l>)
+
+[H] <publish date and time as the source states it, with its zone; "time not stated" if only a date> | <country> | <institution> | <title>
+what: <one or two sentences, facts only>
+src: <URL> | <primary or press> | found: <page or search>
+
+(one blank line between items)
+
+FOOTER
+pages: <ok count> of 16 rendered; failed: <names or none>
+searches: <count>; extra calls: <count>; errors: <text or none>
+nothing found for: <the search lines, by number, that produced no item>
+
+STEP 6. Upload. In the shell run sha256sum and wc -c on the file. Call Google Drive create_file with: title "exa_sweep_latest"; parentId "1LLeuELL8CLpWmtcywt2DiCpJVopNgyqm"; contentMimeType "text/plain"; disableConversionToGoogleType true; base64Content "sha256:<the 64 hex characters>:<absolute path of the file>" (this is a file reference: the app sends the file's own bytes). The returned fileSize must equal wc -c. If the call errors or the size differs, call create_file once more with textContent holding the file's exact text instead of base64Content. Never trash or edit any other Drive file. Then, if the folder /mnt/project-files/exa_sweep/sweeps/ exists, copy the file there as exa_sweep_<D as YYYY-MM-DD>.txt (shell cp; skip silently if it fails).
+
+STEP 7. Finish quietly. You are running as a new thread of a project whose owner must not be disturbed by this run: post no checklist, post no message to him, send nothing to the coordinator, open no pull request and touch no repository file, send no email and change no scheduled task. Rename the thread to "Exa sweep <D>" if you have a rename tool, end the turn with the no_reply_needed tool (reason nothing_to_add) and, if you have set_thread_resolved, call it with resolved true first. Your last plain line of text: "exa sweep <D>: <n> items (H <h>, M <m>), uploaded <fileSize> bytes" or the reason it failed.
