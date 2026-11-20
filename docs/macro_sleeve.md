@@ -61,6 +61,26 @@ fundamentals base, and see how they do. He said "go for all eight" to the design
 - The task stores no connectors of its own; a run uses the project's settings (the same route as the weekly review).
   Its model is the project default. It posts nothing; check Drive for the file's date.
 
+## Changes on 20 Nov 2026 (owner's yes, thread "Show durable themes in daily Takeaways")
+
+- **Daily view: rule R27 (DURABLE THEMES) replaces R24.** Both Macro Takeaways print, after the trade book, one entry
+  per sleeve card: entry, today's level, R, distance to the stop, INTACT or BROKEN, the day's strongest evidence for
+  and against, then a CONFLICTS line naming daily cards that oppose a theme (information only, nothing is closed or
+  resized). A theme is BROKEN only on a daily close beyond its stop or when a signpost is met by a named, dated datum;
+  there is no WEAKENED verdict, so a three-month view is not churned on one day's noise. BROKEN lines say "flag for
+  Sunday review". A pending card shows an implied fill at its Monday close until the Sunday file records it.
+  `supabase/rules/R27_durable_themes.sql`; applies Sun 22 Nov 20:00 SGT unless opposed.
+- **Sunday run: Gemini's themes as candidates.** The task now reads the latest Gemini Carbon and Neon Macro Takeaways
+  from Gmail (FULL_CONTENT; section "1b. Gemini 3-Month Structural Macro Sleeve" and any structural lean in section 3)
+  and writes a GEMINI THEMES section: each Gemini theme is HELD as Mnn, ACCEPTED as Mnn (it passed this sleeve's own
+  test on our stop and p) or REJECTED with its reason (no universe proxy, EV <= 0, contradicts the scorecard, already
+  priced, against an open card, weekly cap). Gemini's marks are never copied. It also reads the week's BROKEN flags
+  from `dash.digests` (Gmail search misses some Takeaways mails). This keeps the sleeve from becoming an echo chamber
+  of its own scorecard without letting another model's book write cards directly.
+- **New task id.** A task that starts a new thread per run refuses prompt edits from a thread, so it was re-created:
+  `trig_01MR4enDHt1kp4AGfTKUcshd` (same name and schedule); the old `trig_01KqhJzihoFqnGDo7tWb2qi4` is switched off.
+  The new one has no model set, so it runs on the project default until the owner picks Fable 5.2 high on its page.
+
 ## Files
 
 | File | What |
@@ -68,5 +88,6 @@ fundamentals base, and see how they do. He said "go for all eight" to the design
 | `scripts/macro_sleeve/task_prompt.txt` | the task's prompt, as stored (no keys) |
 | `scripts/macro_sleeve/replay.sql` | the three-month replay of tested views (read-only, counts and R only) |
 | `scripts/fundpack/fundpack.py` | section 1b regime scorecard (`scorecard()`), HOW TO USE item 6 |
-| `supabase/rules/R24_macro_sleeve.sql` | the daily run's read-and-print rule |
+| `supabase/rules/R24_macro_sleeve.sql` | the first daily read-and-print rule, replaced by R27 before it went in force |
+| `supabase/rules/R27_durable_themes.sql` | the daily DURABLE THEMES block (both pipelines) |
 | project files `notes/macro_sleeve_proposal_16nov2026.md`, `notes/macro_sleeve_replay_16nov2026.md` | the proposal and the private replay result |
