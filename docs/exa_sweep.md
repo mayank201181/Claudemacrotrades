@@ -16,12 +16,19 @@ shows it finds things the Takeaways inputs miss. He said yes to the trial. Verdi
   OJK, Korea's finance ministry, the Bank of Korea's and PBoC's English lists, the Fed's press page (its RSS feeds come
   back without dates). The trial reaches those by search only, which is the weaker route: for them it sees what a
   wire or local paper has written up, not the regulator's own page.
-- **A scheduled cloud run can reach Exa: see the run notes below.**
+- **A scheduled-task run can reach Exa: passed.** The sweep task, fired by hand at 20:31 SGT, started a new project
+  thread, loaded the Exa tools, made 19 Exa calls (two answered 429 when sent in a burst and passed on one retry; the
+  prompt now caps a burst at four), rendered 16 of 16 listing pages and uploaded a 7,692-byte file by file reference in
+  under four minutes. The scorer, fired at 20:38, read that file, ran its one SELECT and the market pack read, and
+  wrote its score file and log line in about two minutes. Its first read is worth keeping: the sweep's one H item, an
+  unscheduled central-bank spot auction in an EM currency, was in the market pack's headlines and not in the digest.
 
 ## How the trial runs
 
 Two scheduled tasks, each starting a fresh project thread per run (prompts in `scripts/exa_sweep/`, the same files as
-project files `exa_sweep/`):
+project files `exa_sweep/`). A task of this kind runs on the project's default model with the project's connectors,
+and a thread cannot edit it or switch it back on: to change a prompt, delete the task and create it again (deleting
+also removes the threads it started). Sweep `trig_01RzPWAmrdbSyE8DzcJdFkyz`, score `trig_01AjMo1rkETBGEQMsaWByxu3`.
 
 | Task | When (SGT) | What it does |
 |---|---|---|

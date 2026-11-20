@@ -45,7 +45,7 @@ STEP 3. Searches: web_search_exa, numResults 5 each, one call per line below, wi
 12. UK and Canada: Bank of England, UK Treasury and Debt Management Office, Bank of Canada statements and speeches.
 13. Energy: OPEC+ and member energy ministry statements, IEA, strategic reserve releases, official notices on Strait of Hormuz shipping.
 14. Anywhere: an unscheduled, emergency or surprise central bank move, capital control, currency intervention or market halt.
-You may add at most 3 more Exa calls (search or fetch) to open the primary page of an item that looks important but whose facts are unclear. Hard cap: 2 + 14 + 3 = 19 Exa calls.
+You may add at most 3 more Exa calls (search or fetch) to open the primary page of an item that looks important but whose facts are unclear. Hard cap: 2 + 14 + 3 = 19 Exa calls. Send at most 4 Exa calls at a time (the connector answers 429 above about 10 requests a second); a call that returns 429 may be retried once and does not count twice.
 
 STEP 4. Choose the items.
 - Keep an item only if its own page, the listing page or Exa's "Published" field dates it inside the WINDOW. No date, no item. An older item that a result repeats is not an item.
