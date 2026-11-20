@@ -20,8 +20,7 @@ shows it finds things the Takeaways inputs miss. He said yes to the trial. Verdi
   thread, loaded the Exa tools, made 19 Exa calls (two answered 429 when sent in a burst and passed on one retry; the
   prompt now caps a burst at four), rendered 16 of 16 listing pages and uploaded a 7,692-byte file by file reference in
   under four minutes. The scorer, fired at 20:38, read that file, ran its one SELECT and the market pack read, and
-  wrote its score file and log line in about two minutes. Its first read is worth keeping: the sweep's one H item, an
-  unscheduled central-bank spot auction in an EM currency, was in the market pack's headlines and not in the digest.
+  wrote its score file and log line in about two minutes.
 
 ## How the trial runs
 
