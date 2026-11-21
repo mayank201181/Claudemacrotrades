@@ -457,9 +457,9 @@ a compliance view). Details in `docs/history.md`.
     run on Opus. The Takeaways task names its own model and is not affected.
     Bound to Fable sessions, which a thread cannot switch: the Weekly STATUS digest thread, the P20 check-in thread
     (one-off Sun 22 Nov 08:10) and the Exa trial thread (verdict Fri 27 Nov) were each messaged with his request to
-    switch themselves to Opus 5.5 high. Not reachable: the CFTC app session (Fable 5.2) that holds the one-off
-    "Twice-weekly COT switch check" `trig_01HpXjmrSjTWEyoWMj3s7WoC` for 3 Dec; it runs one turn on Fable unless he
-    switches that session's model in the app. A new fresh-session task should name `claude-opus-5-5` explicitly.
+    switch themselves to Opus 5.5 high. The CFTC app session that holds the one-off "Twice-weekly COT switch check"
+    `trig_01HpXjmrSjTWEyoWMj3s7WoC` (3 Dec) was Fable 5.2; he switched it to Opus 5.5 himself at about 16:40 SGT on
+    21 Nov (session reads claude-opus-5-5, effort medium), so nothing is left on Fable but the Takeaways. A new fresh-session task should name `claude-opus-5-5` explicitly.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
