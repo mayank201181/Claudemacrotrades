@@ -451,10 +451,10 @@ a compliance view). Details in `docs/history.md`.
     names and prompts untouched, so they still say "[Fable 5.2]"). Already off Fable: the watchdog (Opus thread),
     Opus Takeaways, feeders and transcriber (Haiku thread), the extremes scanner, the macro sleeve, the scorer, MSD brief,
     apply rules, weekly review (Opus or Sonnet).
-    STILL ON FABLE: the Exa sweep `trig_01RzPWAmrdbSyE8DzcJdFkyz` and score `trig_01AjMo1rkETBGEQMsaWByxu3` start a project
-    thread on the project's default model, which is Fable 5.1 (21 Nov sweep about US$4.70); update_trigger refuses any edit
-    to this kind of task. Fix: the owner sets the project's default model to Opus 5.5 in project settings (new threads then
-    start on Opus, as he wants since 10 Nov; the Takeaways task names its own model and is not affected).
+    The Exa sweep `trig_01RzPWAmrdbSyE8DzcJdFkyz` and score `trig_01AjMo1rkETBGEQMsaWByxu3` start a project thread on the
+    project's default thread model (update_trigger refuses any edit to this kind of task). That default was Fable 5.1 (the
+    21 Nov sweep cost about US$4.70); the coordinator set it to Opus 5.5 at about 16:32 SGT on 21 Nov, so from 22 Nov they
+    run on Opus. The Takeaways task names its own model and is not affected.
     Bound to Fable sessions, which a thread cannot switch: the Weekly STATUS digest thread, the P20 check-in thread
     (one-off Sun 22 Nov 08:10) and the Exa trial thread (verdict Fri 27 Nov) were each messaged with his request to
     switch themselves to Opus 5.5 high. Not reachable: the CFTC app session (Fable 5.2) that holds the one-off
