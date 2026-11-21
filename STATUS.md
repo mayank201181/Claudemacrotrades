@@ -464,6 +464,7 @@ a compliance view). Details in `docs/history.md`.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
+- 21 Nov: book review, Ekholm "Earn Twice the S&P" (80% SPY / 20% TQQQ, annual rebalance, 40% after a -40% TQQQ year): rebuilt on real NDX data the 1999-2024 edge is about +6 pts a year (book: +9) with an 84% drawdown (book: 54%), and it trails the S&P in 1965-82; the edge is levered Nasdaq beta plus three crash rebuys, no factor premium. Nothing transfers as a rule; no change (note in project files, `notes/earn_twice_sp/`).
 - 21 Nov: the owner keeps Fable only on the daily Fable Macro Takeaways; every other task moves to Opus 5.5 high (Open items 21).
 
 - 20 Nov: the owner turned the Opus Macro Takeaways back on ("now that I have credits can run that too alongside fable one"); it
