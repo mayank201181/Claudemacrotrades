@@ -412,7 +412,9 @@ a compliance view). Details in `docs/history.md`.
     (PAIR_DIV lines in section A, so R25 is unchanged); 56 series. Honesty line: about 60 of the 1,200 base rates pass p < 0.05 by chance each morning, printed in the file's section D.
 
 19. **Opus Macro Takeaways back on (20 Nov; owner's ask; thread "Turn Opus Macro Takeaways back on").** First run Sat 21 Nov
-    07:03 SGT. To check on it: the email "MACRO TAKEAWAYS [Opus 5.5] — Sat 21 Nov 2026" by about 08:30 SGT; its footer should
+    07:03 SGT CHECKED: email at 07:41 SGT, 5 themes, `opus` ledger written 07:36 (first since 31 Oct), brief state and book
+    written 07:45 (one new pending card), `dash.digests` and `dash.book_state` `opus` rows present, Fable run untouched. The
+    checks that were listed in advance: the email "MACRO TAKEAWAYS [Opus 5.5] — Sat 21 Nov 2026" by about 08:30 SGT; its footer should
     read the stance ledger as stale since 31 Oct once (then `stance.status('opus')` moves on), backfill at most 3 days, and
     print a brief state with the stale questions retired or resolved; the trade book in Drive folder `1LLeu…` (last written
     30 Oct, three cards then open) is reviewed under spec v21 and the rules; `dash.digests` and `dash.book_state` gain `opus`
