@@ -44,7 +44,7 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | `dash-mark` (v7) | live R per open trade (one R = the card's planned risk when it carries a `risk` key, R17), hourly-close stop flag (spec v15), option twins priced on the smile and marked hourly (R18, `twin_*` keys in the card's meta), shadow outcomes in ATR(20) units. Stub pinned to 9fcaed6, rollback fe335fd | pg_cron `7 * * * *` |
 | dashboard banner (`site/app.js`) | a red banner on every tab when today's Fable digest row is still absent at 08:20 SGT | on page load |
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rule inputs | pg_cron `40 22 * * *` UTC |
-| `dash-trend` (v8, TM1) | 38-asset trend monitor, events, FX one-touch board, Carver forecast block (R10). FX closes at 17:00 New York since 10 Nov (all pairs but USDCNH, USDINR, USDIDR). The deployed function is a stub importing this repo at `main` commit d334277; rollback is the same stub pinned to 64d1f84 | pg_cron 00:30 UTC Tue-Sat |
+| `dash-trend` (v9, TM1) | 38-asset trend monitor, events, FX one-touch board, Carver forecast block (R10). FX closes at 17:00 New York since 10 Nov (all pairs but USDCNH, USDINR, USDIDR). The deployed function is a stub importing this repo at `main` commit 3ac3126 (PR #111, 22 Nov: CPU cut under the 2 s cap); rollback is the same stub pinned to d334277 | pg_cron 00:30 UTC Tue-Sat |
 | `dash-history`, `dash-gdelt` | research relays (Yahoo bars, GDELT DOC API). `dash-probe` is a retired stub that answers 410 | on call |
 | `dash.put_drivers`, Drivers tab | one drivers snapshot as of 2024-09-30; no part passed its holdout, engine parked | none |
 | event library (`016_event_library.sql`) | `dash.event_brief()` and `dash.event_lookup()` for the digests (R05); calendar ends 8 Jan 2027 | loaded by hand |
@@ -292,7 +292,7 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    `feeders/status.csv` is 16 Nov). A re-check on Wed 25 Nov 10:30 SGT deletes them if 19 to 25 Nov are clean.
    The shadow tasks' crons recur in Nov 2027; the
    16 Nov verdict task switches them off.
-2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to d334277), `dash-mark`
+2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to 3ac3126 since 22 Nov), `dash-mark`
    (9fcaed6) and `dash-ingest` (08a5516; `main` has the colspan change since 009d343, a deploy from a thread was refused by the permission classifier on 12 Nov, so re-pin it with the next function change) are one-file stubs that import this repo at a `main` commit: merge,
    deploy the stub with the new commit, POST a dry run through `pg_net` and read the reply in `net._http_response`.
    The branch `claude/project-thread-e80nxd` holds the `dash-trend` rollback commit 64d1f84; keep it until the New
@@ -308,7 +308,14 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
 7. **Spec and rules disagree on one sentence:** fold the spec's TACTICAL WASHOUT sentence into the next spec version
     (a `trade_book_spec_edits` file) so that the Doc matches R08 and R14.
 8. **FOMC presser rule (R11):** recheck the post-May-2026 pressers as the new chair's sample grows.
-9. **Known data fragility in `dash-trend`:** MOF JGB file intermittently 404s (falls back to stored closes); CSI300
+9. **`dash-trend` CPU cap (22 Nov).** The 2 s CPU cap of the edge worker killed the run about 52 s in on 18, 20
+    and 21 Nov ("CPU Time exceeded" in the function logs) while pg_cron still logged "succeeded", because the reply
+    streams a 200 before the work ends: a missing `dash.trend_run` row is the only sign. PR #111 cut the measured CPU
+    by about 40% with unchanged outputs (checked bar for bar); 18, 20 and 21 Nov were replayed with `run_utc` and
+    stored OK (a replay sees MOF and FRED files as of 22 Nov). 19 Nov is left as stored (PARTIAL, 12 FX pairs on the
+    New York clock stale at 17 Nov), since cards that day read it. If the cap is hit again, split the run (fetch and
+    write `trend_px` in one call, compute in a second) rather than trimming inputs; a one-off check of the Tue 24 Nov
+    run is scheduled. Also known data fragility: MOF JGB file intermittently 404s (falls back to stored closes); CSI300
     on the 510300.SS ETF goes stale over China holidays; USDCNH vol percentile is short-sample until about Feb 2027;
     no second price source, so the cross-check always reads `XCHECK_NA`.
 10. **Housekeeping left over from the audit:** about forty merged or superseded branches (threads cannot delete
