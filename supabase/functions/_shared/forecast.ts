@@ -56,12 +56,14 @@ export function robustVol(p: number[]): number[] {
     if (i === 1) { m = d; v = d * d; } else { const dm = d - m; m += a * dm; v = (1 - a) * (v + a * dm * dm); }
     raw[i] = Math.sqrt(v);
   }
-  // The floor is re-sorted every 20 days and at the last day (the edge function's CPU budget is 2 s).
-  const out = new Array<number>(n).fill(NaN);
+  // The floor is re-sorted every 20 days and at the last day (the edge function's CPU budget is 2 s);
+  // a Float64Array's native numeric sort, since a comparator sort here cost about a third of the
+  // run's CPU (22 Nov 2026, when the run began to hit the 2 s cap).
+  const out = new Array<number>(n).fill(NaN), rawF = Float64Array.from(raw);
   let fl = 0;
   for (let i = 1; i < n; i++) {
     if (i === 1 || i % 20 === 0 || i === n - 1) {
-      const w = raw.slice(Math.max(1, i - FLOOR_WIN + 1), i + 1).sort((x, y) => x - y);
+      const w = rawF.slice(Math.max(1, i - FLOOR_WIN + 1), i + 1).sort();
       fl = w[Math.floor(FLOOR_PCT * (w.length - 1))];
     }
     out[i] = Math.max(raw[i], fl);
