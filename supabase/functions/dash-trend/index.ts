@@ -105,12 +105,23 @@ export function parseYahoo(j: any, field: AssetDef['field']): { bars: Bar[]; las
   let lastAdj = -1;
   if (field === 'adjclose') for (let i = ts.length - 1; i >= 0; i--) if (fin(src[i]) && fin(q?.close?.[i]) && q.close[i] > 0) { lastAdj = i; break; }
   const factor = lastAdj >= 0 ? (src[lastAdj] as number) / q.close[lastAdj] : null;
+  // The exchange's date of a bar, by arithmetic from its current UTC offset when the bar sits more than
+  // 3 hours from that local midnight (a DST change or a past offset change of up to 2 hours cannot move
+  // its date), else from Intl: one Intl call per bar cost about a tenth of the run's CPU (22 Nov 2026).
+  const off0 = Number(res.meta?.gmtoffset);
+  const dateOf = (t: number) => {
+    if (Number.isFinite(off0)) {
+      const loc = t + off0, sec = loc - Math.floor(loc / 86400) * 86400;
+      if (sec > 10800 && sec < 75600) return isoDate(loc * 1000);
+    }
+    return day.format(new Date(t * 1000));
+  };
   const bars: Bar[] = [];
   let filled = 0;
   ts.forEach((t, i) => {
     let v = src[i];
     if (!fin(v) && factor != null && i > lastAdj && fin(q?.close?.[i])) { v = q.close[i] * factor; filled++; }
-    if (fin(v)) bars.push({ date: day.format(new Date(t * 1000)), value: v });
+    if (fin(v)) bars.push({ date: dateOf(t), value: v });
   });
   const last = ts[ts.length - 1];
   return { bars, last_bar_utc: Number.isFinite(last) ? new Date(last * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z') : null, filled };
@@ -170,9 +181,11 @@ export function parseYahooHourlyNy(j: any): { bars: Bar[]; last_bar_utc: string 
     const utcDay = Math.floor(t / 86400);
     let off = offset.get(utcDay);
     if (off == null) { off = ((Number(hourFmt.format(new Date((utcDay * 86400 + 43200) * 1000))) - 12 + 36) % 24) - 12; offset.set(utcDay, off); }
-    const local = new Date((t + off * 3600) * 1000), wd = local.getUTCDay(), h = local.getUTCHours();
+    // Weekday and hour by arithmetic, and the date string only for the five kept hours of a day
+    // (a Date and toISOString per bar cost real CPU on ~17,500 bars x 12 pairs).
+    const loc = t + off * 3600, day = Math.floor(loc / 86400), wd = (day + 4) % 7, h = Math.floor((loc - day * 86400) / 3600);
     if (wd === 0 || wd === 6 || h < 12 || h > 16) return;
-    const date = local.toISOString().slice(0, 10), b = best.get(date);
+    const date = isoDate(day * 86400000), b = best.get(date);
     if (!b || h >= b.h) best.set(date, { h, v });
   });
   const bars = [...best].map(([date, b]) => ({ date, value: b.v })).sort((a, b) => (a.date < b.date ? -1 : 1));
