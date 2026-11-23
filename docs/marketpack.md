@@ -15,10 +15,11 @@ data for the Fable Macro Takeaways before it runs. The takeaways read the newest
 | E headlines | Google News queries plus FT, Nikkei Asia, CNBC, WSJ, MarketWatch RSS, last 24h | leads for the completeness sweep only |
 | F disclosed shorts JP/AU | QuiVad (keyless republication of the JFSA and ASIC short registers), added 1 Nov 2026 | most shorted Japanese and ASX names and 1-week build-ups; cited only on single-name JP/AU cards or themes |
 | H credit and cycle | FRED daily (`BAMLH0A0HYM2`, `DFEDTARU`, `EFFR`), Yahoo `^VIX` and fed funds futures, added 16 Nov 2026 | one CREDIT line and one CYCLE line that R22 prints on equity, USD and UST cards; evidence only |
+| I dollar drivers | US Treasury daily par curve (2y), ECB AAA curve 2y, Japan MOF JGB 2y (`jgb2y_history.csv` cache), Yahoo daily closes (DXY, EURUSD, USDJPY, SPX, SOX, ^TNX, USDKRW, USDTWD), CFTC TFF leveraged funds and asset managers in seven G10 currency futures converted to USD at the weekly spot, section D's RR25, added 23 Nov 2026 | inputs of the DOLLAR DRIVERS block (R37): 2y differentials and the rate-model part of USD's 1m move, DXY per -1% SPX/SOX on down days, sell-America days, KRW/TWD residual against SOX, net USD positioning, a mechanical TAG; one row a day in `dollar_history.csv` |
 
 Usage: `python3 -I marketpack.py --out DIR [--sql posbuild.sql] [--skip D,E]`. Prints
 `ok: <path> <bytes> · A n · B n · D <date> · E n`. Every section fails soft. History files in DIR:
-`oi_history.csv` (120 days), `dtcc_daily.csv`, `dtcc_strikes.csv`, `shorts_history.csv` (top 60 names per market, 120 days), `credit_cycle_history.csv` (one row a day: HY OAS, 6-month change, VIX z, credit state, cycle stage).
+`oi_history.csv` (120 days), `dtcc_daily.csv`, `dtcc_strikes.csv`, `shorts_history.csv` (top 60 names per market, 120 days), `credit_cycle_history.csv` (one row a day: HY OAS, 6-month change, VIX z, credit state, cycle stage), `dollar_history.csv` (one row a day of the section I numbers and tag), `jgb2y_history.csv` (MOF 2y closes, about two years).
 
 `verify_drive.py` compares a Drive read-back with the local file after undoing Drive's markdown escapes.
 
