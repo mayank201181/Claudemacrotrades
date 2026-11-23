@@ -447,6 +447,12 @@ a compliance view). Details in `docs/history.md`.
     "[Opus" / "[Fable" thread found (Opus 65,353 bytes, Fable 64,825; both read back identical; before and after copies in
     the project files under notes/prompt_backups). Monday 07:03 is the first Opus run that can see the veto, before the
     07:45 fill. CHECK Mon 23 Nov: the Opus book shows the card vetoed and the brief state's FEEDBACK LOG has a line.
+    MON 23 NOV RESULT: the fix was live, but the Opus run again printed "feedback processed: none (no replies on Opus
+    threads in 4 days)", and the Fable run also printed none. So the reply route STILL DOES NOT WORK; cause not found (the run
+    may now follow the new opus_mt_spec v1 rather than STEP 1d). The card was voided by a project thread instead: a new Drive
+    trade_book_current with the card marked vetoed (never filled, never scored) and the 07:45 copy renamed
+    trade_book_archive_2026-11-23, in the run's own veto format. OPEN: find why neither run reads his replies; until then a
+    "veto/close Pnn" reply is not reliable and a thread must apply it.
 
 20. **Exa sweep trial (20 Nov; owner's yes; thread "Trial Exa for overnight announcements"; `docs/exa_sweep.md`).** Both
     pre-tests passed on 20 Nov: same-day items on 16 official listing pages through Exa's page reader, and a scheduled-task
