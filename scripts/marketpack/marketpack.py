@@ -14,6 +14,8 @@ Sections
   E  HEADLINES      wire and newspaper RSS headlines from the last 24 hours, plus the Fed's own feeds.
   F  SHORTS JP/AU   QuiVad republication of JFSA (fund-level) and ASIC (aggregate) disclosed short positions.
   G  FUNDAMENTALS   the weekly fundamentals pack (scripts/fundpack/fundpack.py), copied in when built within 9 days.
+  H  CREDIT/CYCLE   FRED HY OAS, VIX z, Fed target and futures (R22).
+  I  DOLLAR DRIVERS 2y differentials vs EUR/JPY, USD beta on equity down days, Asia FX vs SOX, CFTC and DTCC USD positioning.
 
 Usage: python3 -I marketpack.py --out /mnt/project-files/marketpack/ [--sql posbuild.sql]
 Writes market_pack_latest.md plus small history files (oi_history.csv, dtcc_daily.csv,
@@ -218,6 +220,7 @@ def section_a():
                 st["trend"], f"ext {fmt(st['ext'], 1)}", f"z10 {fmt(st['z10'], 1)}", f"run {st['run']:+d}",
                 f"rv {fmt(st['rvr'], 2, False)}", ", ".join(st["flags"]) or "-"]))
             SPOT[label] = st["last"]
+            BARS[label] = rows
             RVOL[label] = st["rv20"]
             ok += 1
         except Exception as e:  # noqa: BLE001
@@ -1258,6 +1261,283 @@ def section_h(outdir):
     return L, f"{state}/{stage}"
 
 
+# ---------------------------------------------------------------- I. dollar drivers (added 23 Nov 2026)
+# What is driving USD, every morning: 2y rate differentials and how much of the move they explain, USD's sign on
+# equity down days, the "sell America" signature, Asia exporter FX against SOX, CFTC and DTCC positioning, and a
+# mechanical tag. The digest makes the regime call itself; the tag is a starting point, never the call.
+TREASURY_CSV = ("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/"
+                "{y}/all?type=daily_treasury_yield_curve&field_tdr_date_value={y}&page&_format=csv")
+ECB_2Y = "https://data-api.ecb.europa.eu/service/data/YC/B.U2.EUR.4F.G_N_A.SV_C_YM.SR_2Y?format=csvdata&startPeriod={s}"
+MOF_CUR = "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/jgbcme.csv"
+MOF_ALL = "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/historical/jgbcme_all.csv"
+# TFF codes, contract size in the foreign currency, Yahoo pair, True when the pair is quoted XXXUSD
+CFTC_FX = [("EUR", "099741", 125000, "EURUSD=X", True), ("JPY", "097741", 12500000, "JPY=X", False),
+           ("GBP", "096742", 62500, "GBPUSD=X", True), ("AUD", "232741", 100000, "AUDUSD=X", True),
+           ("CAD", "090741", 100000, "CAD=X", False), ("CHF", "092741", 125000, "CHF=X", False),
+           ("NZD", "112741", 100000, "NZDUSD=X", True)]
+BARS = {}  # label -> Yahoo daily rows, filled by section A
+
+
+def _ust2y():
+    out = {}
+    for y in (NOW.year - 1, NOW.year):
+        t = get(TREASURY_CSV.format(y=y), timeout=40).decode("utf-8", "replace").splitlines()
+        hdr = [h.strip('"') for h in t[0].split(",")]
+        i = hdr.index("2 Yr")
+        for ln in t[1:]:
+            c = ln.split(",")
+            try:
+                m, d, yy = c[0].split("/")
+                out[f"{yy}-{int(m):02d}-{int(d):02d}"] = float(c[i])
+            except (ValueError, IndexError):
+                continue
+    return out
+
+
+def _ecb2y():
+    s = (NOW - dt.timedelta(days=400)).strftime("%Y-%m-%d")
+    rd = csv.DictReader(io.StringIO(get(ECB_2Y.format(s=s), timeout=40).decode()))
+    return {r["TIME_PERIOD"]: float(r["OBS_VALUE"]) for r in rd if r.get("OBS_VALUE")}
+
+
+def _jgb2y(outdir):
+    """MOF: the month file every day, the 1974-on file only when the cache is short (it is 1.2 MB)."""
+    cp = os.path.join(outdir, "jgb2y_history.csv")
+    out = {}
+    if os.path.exists(cp):
+        for ln in open(cp).read().splitlines()[1:]:
+            d, _, v = ln.partition(",")
+            out[d] = float(v)
+    def parse(raw):
+        for ln in raw.decode("shift_jis", "replace").splitlines():
+            c = ln.split(",")
+            m = re.match(r"(\d{4})/(\d{1,2})/(\d{1,2})$", c[0].strip())
+            if m and len(c) > 2:
+                try:
+                    out[f"{m[1]}-{int(m[2]):02d}-{int(m[3]):02d}"] = float(c[2])
+                except ValueError:
+                    pass
+    cut = (NOW - dt.timedelta(days=380)).strftime("%Y-%m-%d")
+    if sum(1 for d in out if d >= cut) < 200:
+        try:
+            parse(get(MOF_ALL, timeout=60))
+        except Exception:  # noqa: BLE001
+            pass
+    parse(get(MOF_CUR, timeout=30))
+    keep = sorted(d for d in out if d >= (NOW - dt.timedelta(days=800)).strftime("%Y-%m-%d"))
+    with open(cp, "w") as f:
+        f.write("date,jgb2y\n" + "".join(f"{d},{out[d]}\n" for d in keep))
+    return {d: out[d] for d in keep}
+
+
+def _bars(label, sym):
+    rows = BARS.get(label)
+    if not rows:
+        _, rows = yahoo_chart(sym)
+    return {dt.datetime.fromtimestamp(r[0], dt.timezone.utc).strftime("%Y-%m-%d"): r[4] for r in rows}
+
+
+def _rets(series, dates):
+    """% returns between consecutive dates of a common calendar."""
+    return [(series[dates[i]] / series[dates[i - 1]] - 1) * 100 for i in range(1, len(dates))]
+
+
+def _ols(x, y):
+    n = len(x)
+    if n < 8:
+        return None, None
+    mx, my = sum(x) / n, sum(y) / n
+    sxx = sum((a - mx) ** 2 for a in x)
+    syy = sum((b - my) ** 2 for b in y)
+    sxy = sum((a - mx) * (b - my) for a, b in zip(x, y))
+    if sxx <= 0 or syy <= 0:
+        return None, None
+    return sxy / sxx, sxy / math.sqrt(sxx * syy)
+
+
+def _pct(xs, x):
+    return 100.0 * sum(1 for v in xs if v <= x) / len(xs) if xs else None
+
+
+def _rr25(dlines):
+    """RR25 per pair from section D's implied vol table (+ = base-currency calls over)."""
+    out = {}
+    for ln in dlines:
+        m = re.match(r"([A-Z]{6}) \| fwd .*?RR25 ([+-]?\d+\.\d+) ±(\d+\.\d+)", ln)
+        if m:
+            out[m[1]] = (float(m[2]), float(m[3]))
+    return out
+
+
+def _cftc_usd():
+    since = (NOW - dt.timedelta(days=3 * 365 + 60)).strftime("%Y-%m-%d")
+    codes = ",".join(f"'{c}'" for _, c, _, _, _ in CFTC_FX)
+    cols = "cftc_contract_market_code,report_date_as_yyyy_mm_dd,lev_money_positions_long,lev_money_positions_short,asset_mgr_positions_long,asset_mgr_positions_short"
+    where = urllib.parse.quote(f"cftc_contract_market_code in({codes}) and report_date_as_yyyy_mm_dd>'{since}'")
+    data = json.loads(get(f"https://publicreporting.cftc.gov/resource/gpe5-46if.json?$select={cols}&$where={where}&$limit=20000", timeout=90, tries=2))
+    spot = {}
+    for ccy, _, _, sym, _ in CFTC_FX:
+        _, rows = yahoo_chart(sym, rng="5y", interval="1wk")
+        spot[ccy] = [(dt.datetime.fromtimestamp(r[0], dt.timezone.utc).strftime("%Y-%m-%d"), r[4]) for r in rows]
+    meta = {c: (ccy, size, xxxusd) for ccy, c, size, _, xxxusd in CFTC_FX}
+    agg = {}  # date -> {"lev": usd bn, "am": usd bn, "n": ccys}
+    for r in data:
+        ccy, size, xxxusd = meta[r["cftc_contract_market_code"]]
+        d = r["report_date_as_yyyy_mm_dd"][:10]
+        s = _asof(spot[ccy], d)
+        if not s:
+            continue
+        usd_per_ccy = s if xxxusd else 1.0 / s
+        a = agg.setdefault(d, {"lev": 0.0, "am": 0.0, "n": 0})
+        a["n"] += 1
+        for k, lc, sc in (("lev", "lev_money_positions_long", "lev_money_positions_short"), ("am", "asset_mgr_positions_long", "asset_mgr_positions_short")):
+            net = float(r.get(lc) or 0) - float(r.get(sc) or 0)
+            a[k] -= net * size * usd_per_ccy / 1e9  # long foreign currency = short USD
+    return [(d, agg[d]) for d in sorted(agg) if agg[d]["n"] == len(CFTC_FX)]
+
+
+def section_i(outdir, dlines):
+    L = ["## I. DOLLAR DRIVERS (rule on the Takeaways' DOLLAR DRIVERS block; US Treasury, ECB AAA curve, Japan MOF, Yahoo daily closes, CFTC TFF, DTCC section D; evidence, never a gate)"]
+    tag_bits, row = [], {}
+    # 1. 2y differentials
+    diffs = {}
+    try:
+        us = _ust2y()
+        others = {}
+        for name, fn in (("EUR", _ecb2y), ("JPY", lambda: _jgb2y(outdir))):
+            try:
+                others[name] = fn()
+            except Exception as e:  # noqa: BLE001
+                L.append(f"RATES {name}: 2y not available ({type(e).__name__})")
+        eur_px, jpy_px = _bars("EURUSD", "EURUSD=X"), _bars("USDJPY", "JPY=X")
+        for name, o2, px, usd_base in (("EUR", others.get("EUR"), eur_px, False), ("JPY", others.get("JPY"), jpy_px, True)):
+            if not o2:
+                continue
+            dates = sorted(set(us) & set(o2))
+            d = {k: (us[k] - o2[k]) * 100 for k in dates}  # bp
+            last = dates[-1]
+            ch = lambda n: d[last] - d[dates[-1 - n]] if len(dates) > n else None  # noqa: E731
+            pct1y = _pct([d[k] for k in dates[-250:]], d[last])
+            # rate model: daily pair % move on daily diff change, last 120 common days, USD-up sign
+            cd = [k for k in dates if k in px][-121:]
+            x = [d[cd[i]] - d[cd[i - 1]] for i in range(1, len(cd))]
+            y = [(px[cd[i]] / px[cd[i - 1]] - 1) * 100 * (1 if usd_base else -1) for i in range(1, len(cd))]
+            beta, corr = _ols(x, y)
+            fit = act = None
+            if beta is not None and len(cd) > 21:
+                fit = beta * (d[cd[-1]] - d[cd[-22]])
+                act = (px[cd[-1]] / px[cd[-22]] - 1) * 100 * (1 if usd_base else -1)
+            diffs[name] = dict(last=last, lvl=d[last], d1=ch(1), d5=ch(5), d21=ch(21), fit=fit, act=act, corr=corr)
+            L.append(f"RATES USD-{name} 2y: {d[last]:+.0f}bp ({last}; US {us[last]:.2f}%, {name} {o2[last]:.2f}%) · 1d {fmt(ch(1), 0)} · 1w {fmt(ch(5), 0)} · 1m {fmt(ch(21), 0)}bp · 1y pct {pct1y:.0f}"
+                     f" · USD vs {name} 1m {fmt(act, 2)}%, of which the rate model explains {fmt(fit, 2)}% (daily fit over 120 days, corr {fmt(corr, 2)}; the rest is risk premium, flows or the other side's story)")
+            row[f"diff_{name.lower()}"] = f"{d[last]:.0f}"
+        common = min(v["last"] for v in diffs.values()) if diffs else max(us)
+        since = f", {fmt((us[max(us)] - us[common]) * 100, 0)}bp since {common}, not yet in the differentials" if max(us) > common and common in us else ""
+        L.append(f"US 2y as of {max(us)}: {us[max(us)]:.2f}%{since}. Each side's date is printed: the differential is taken on the last date both sides publish (ECB about one day behind, MOF and Treasury same day).")
+        agree = [k for k, v in diffs.items() if v["d21"] is not None and v["act"] is not None and v["d21"] * v["act"] > 0 and abs(v["act"]) >= 0.3]
+        against = [k for k, v in diffs.items() if v["d21"] is not None and v["act"] is not None and v["d21"] * v["act"] < 0 and abs(v["act"]) >= 0.3]
+        if agree:
+            tag_bits.append(f"rates-led vs {'/'.join(agree)}")
+        if against:
+            tag_bits.append(f"against rates vs {'/'.join(against)}")
+    except Exception as e:  # noqa: BLE001
+        L.append(f"RATES: not available ({type(e).__name__})")
+    # 2. USD on equity down days, sell-America days
+    hedge20 = hedge60 = None
+    try:
+        dxy, spx, sox, tnx = _bars("DXY", "DX-Y.NYB"), _bars("SPX", "^GSPC"), _bars("SOX", "^SOX"), _bars("UST10Y", "^TNX")
+        for eq_name, eq in (("SPX", spx), ("SOX", sox)):
+            cal = sorted(set(dxy) & set(eq))
+            parts = []
+            for w in (20, 60):
+                c = cal[-(w + 1):]
+                er, ur = _rets(eq, c), _rets(dxy, c)
+                dn = [(a, b) for a, b in zip(er, ur) if a < 0]
+                b_dn, _ = _ols([a for a, _ in dn], [b for _, b in dn])
+                _, corr = _ols(er, ur)
+                big = [b for a, b in zip(er, ur) if a <= (-1.0 if eq_name == "SPX" else -2.0)]
+                hedge = -b_dn if b_dn is not None else None  # DXY % per -1% equity
+                if eq_name == "SPX":
+                    hedge20, hedge60 = (hedge, hedge60) if w == 20 else (hedge20, hedge)
+                parts.append(f"{w}d: DXY per -1% {eq_name} on its down days {fmt(hedge, 2)}% ({len(dn)} days), all-day corr {fmt(corr, 2)}, "
+                             f"on {eq_name} {'-1' if eq_name == 'SPX' else '-2'}% days DXY up {sum(1 for b in big if b > 0)} of {len(big)}")
+            L.append(f"RISK BETA {eq_name} (to {cal[-1]}): " + " · ".join(parts))
+        cal = sorted(set(dxy) & set(spx) & set(tnx))[-21:]
+        sa = [cal[i] for i in range(1, len(cal)) if spx[cal[i]] < spx[cal[i - 1]] * 0.995 and tnx[cal[i]] > tnx[cal[i - 1]] and dxy[cal[i]] < dxy[cal[i - 1]]]
+        L.append(f"SELL-AMERICA DAYS (SPX -0.5% or worse, UST 10y yield up, DXY down; last 20 sessions): {len(sa)}" + (f" ({', '.join(sa)})" if sa else ""))
+        row.update(hedge20=fmt(hedge20, 2), hedge60=fmt(hedge60, 2), sell_america=str(len(sa)))
+        if hedge60 is not None and hedge60 >= 0.10:
+            tag_bits.append("risk-off hedge (60d)")
+        if hedge20 is not None and hedge20 <= -0.10:
+            tag_bits.append("hedge broken (20d)")
+        if len(sa) >= 3:
+            tag_bits.append(f"sell-America days {len(sa)}")
+    except Exception as e:  # noqa: BLE001
+        L.append(f"RISK BETA: not available ({type(e).__name__})")
+    # 3. Asia exporter FX against SOX
+    try:
+        sox = _bars("SOX", "^SOX")
+        for label, sym in (("USDKRW", "KRW=X"), ("USDTWD", "TWD=X")):
+            px = _bars(label, sym)
+            cal = sorted(set(px) & set(sox))[-61:]
+            s_r, f_r = _rets(sox, cal), _rets(px, cal)
+            beta, corr = _ols(s_r, f_r)
+            res = [b - beta * a for a, b in zip(s_r, f_r)] if beta is not None else []
+            sd = _sd(res) if res else float("nan")
+            bits = []
+            for n, nm in ((5, "1w"), (21, "1m")):
+                act = (px[cal[-1]] / px[cal[-1 - n]] - 1) * 100
+                fit = beta * (sox[cal[-1]] / sox[cal[-1 - n]] - 1) * 100 if beta is not None else None
+                z = (act - fit) / (sd * math.sqrt(n)) if fit is not None and sd == sd and sd > 0 else None
+                bits.append(f"{nm} {label} {fmt(act, 2)}% vs SOX-implied {fmt(fit, 2)}% (residual z {fmt(z, 1)})")
+                if nm == "1m":
+                    row[f"{label.lower()}_resz"] = fmt(z, 1)
+            L.append(f"ASIA vs SOX {label} (60d to {cal[-1]}): beta {fmt(beta, 3)} (USD{label[3:]} % per +1% SOX), corr {fmt(corr, 2)} · " + " · ".join(bits))
+    except Exception as e:  # noqa: BLE001
+        L.append(f"ASIA vs SOX: not available ({type(e).__name__})")
+    # 4. positioning
+    try:
+        cf = _cftc_usd()
+        d, last = cf[-1]
+        for k, nm in (("lev", "leveraged funds"), ("am", "asset managers")):
+            xs = [v[k] for _, v in cf][-157:]
+            w1 = last[k] - cf[-2][1][k] if len(cf) > 1 else None
+            w4 = last[k] - cf[-5][1][k] if len(cf) > 4 else None
+            L.append(f"CFTC net USD vs 7 G10 futures, {nm}: {last[k]:+.1f}bn ({d}) · 1w {fmt(w1, 1)} · 4w {fmt(w4, 1)}bn · 3y pct {_pct(xs, last[k]):.0f}")
+            row[f"cftc_{k}"] = f"{last[k]:.1f}"
+            row[f"cftc_{k}_pct"] = f"{_pct(xs, last[k]):.0f}"
+        p = _pct([v["lev"] for _, v in cf][-157:], last["lev"])
+        if p >= 90 or p <= 10:
+            tag_bits.append(f"CFTC USD {'long' if p >= 90 else 'short'} extreme (lev funds pct {p:.0f})")
+    except Exception as e:  # noqa: BLE001
+        L.append(f"CFTC: not available ({type(e).__name__})")
+    rr = _rr25(dlines)
+    usd_rr = [(-v[0] if pair[3:] == "USD" else v[0], v[1], pair) for pair, v in rr.items() if "USD" in pair]
+    if usd_rr:
+        avg = sum(v for v, _, _ in usd_rr) / len(usd_rr)
+        L.append("OPTIONS (section D RR25, signed so + = USD calls over): " + " · ".join(f"{pr} {v:+.2f}±{se:.2f}" for v, se, pr in usd_rr) + f" · average {avg:+.2f}")
+        row["usd_rr_avg"] = f"{avg:.2f}"
+    else:
+        L.append("OPTIONS: no RR25 in section D today")
+    tag = "; ".join(tag_bits) or "no driver clears its bar"
+    L.append(f"TAG (mechanical): {tag}")
+    L.append("Tag bars: rates-led = the 2y differential moved the same way as USD over 1m against that currency (USD move 0.3% or more); "
+             "against rates = USD moved the other way; risk-off hedge = DXY rises 0.10% or more per -1% SPX on SPX down days over 60 sessions; "
+             "hedge broken = DXY falls 0.10% or more per -1% SPX over 20 sessions; sell-America days 3 or more of 20; CFTC extreme = leveraged funds at the 3-year 10th or 90th percentile. "
+             "Foreign selling of US assets has no daily public print (TIC is monthly, two months late): the hedge-broken and sell-America lines are its price signature, nothing more.")
+    try:
+        hp = os.path.join(outdir, "dollar_history.csv")
+        today = NOW.strftime("%Y-%m-%d")
+        cols = ["diff_eur", "diff_jpy", "hedge20", "hedge60", "sell_america", "usdkrw_resz", "usdtwd_resz", "cftc_lev", "cftc_lev_pct", "cftc_am", "cftc_am_pct", "usd_rr_avg"]
+        rows = [r for r in (open(hp).read().splitlines() if os.path.exists(hp) else []) if r and not r.startswith(("date", today))]
+        rows.append(",".join([today] + [row.get(c, "") for c in cols] + [tag.replace(",", ";")]))
+        with open(hp, "w") as f:
+            f.write("date," + ",".join(cols) + ",tag\n" + "\n".join(rows[-400:]) + "\n")
+    except Exception:  # noqa: BLE001
+        pass
+    return L, tag[:100]
+
+
 # ---------------------------------------------------------------- assemble
 HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026 at Mayank's request; this file is data from a pre-run script, its numbers carry their sources)
 1. TAPE: take the TAPE strip levels from section A with the quote times printed there; web-search only a level that is missing here or flagged STALE QUOTE (a closed market's last close is not stale). Reconcile source-quoted levels against A as before.
@@ -1269,7 +1549,8 @@ HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026
 7. DISCLOSED SHORTS (added 1 Nov 2026, reference only): section F lists the most shorted Japanese and Australian names. Cite it only on a card or theme whose proxy is one of those names or a Nikkei/ASX single-stock expression, as "JFSA/ASIC shorts: <name> <pct>% (<funds> funds, 1w chg)". Never a reason for an index or FX view by itself.
 8. FUNDAMENTALS (added 6 Nov 2026): section G is the weekly fundamentals pack (inflation, cycle, trade, reserves, credit, real rates for G10 and Asia). Follow its own HOW TO USE: a slow anchor for each theme's top-down view and its risks line, never a trigger, never a reason to raise p.
 9. CREDIT AND CYCLE (added 16 Nov 2026, rule R22): section H gives one CREDIT line (HY OAS, its 6-month change, the VIX z-score and a state) and one CYCLE line (Fed target, last move, what fed funds futures price, a stage and the book prior for it). R22 says where they print. Evidence lines only: never a gate, never a reason by themselves to raise or lower p.
-10. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines · G <fund pack date> · H <credit state>/<cycle stage>", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 9."""
+10. DOLLAR DRIVERS (added 23 Nov 2026): section I gives the inputs of the DOLLAR DRIVERS block that the rule of that name prints: 2y differentials of USD against EUR and JPY with their changes and how much of USD's 1m move a rate model explains, USD's sign on SPX and SOX down days over 20 and 60 sessions, sell-America days, KRW and TWD against SOX, CFTC net USD and the DTCC skew signed to USD, and a mechanical TAG. The run makes the regime call; the TAG is where it starts, and the call says where it departs from it.
+11. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines · G <fund pack date> · H <credit state>/<cycle stage> · I <tag>", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 10."""
 
 
 def main():
@@ -1291,19 +1572,22 @@ def main():
     parts += ["", "## C. POSITIONING BUILD-UP (run this read-only query with execute_sql, project diiwqbxyhtgvozhncoef)",
               "Output lines: market | series | freq | as-of | pct = 3y percentile now | d1 = change vs 1 week (monthly: 1 obs) | d4 = change vs 4 weeks (monthly: 3 obs); sorted by |d4|.",
               "```sql", sql, "```"]
+    dsec = []
     if "D" not in skip:
-        sec, status["D"] = section_d(a.out); parts += [""] + sec
+        sec, status["D"] = section_d(a.out); parts += [""] + sec; dsec = sec
     if "E" not in skip:
         sec, status["E"] = section_e(); parts += [""] + sec
     if "F" not in skip:
         sec, status["F"] = section_f(a.out); parts += [""] + sec
     if "H" not in skip:
         sec, status["H"] = section_h(a.out); parts += [""] + sec
+    if "I" not in skip:
+        sec, status["I"] = section_i(a.out, dsec); parts += [""] + sec
     if "G" not in skip:
         sec, status["G"] = section_g(a.fund); parts += [""] + sec
     head = [f"MARKET PACK — built {built:%a %d %b %Y %H:%M} SGT · A {status.get('A', 0)} assets · "
-            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines · F {status.get('F', 0)} short names · G {status.get('G') or 'n/a'} · H {status.get('H') or 'n/a'}",
-            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS, QuiVad (JFSA/ASIC short registers), fundamentals pack (IMF, OECD, Eurostat, BIS, FRED; weekly), FRED daily (HY OAS, Fed target, EFFR). "
+            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines · F {status.get('F', 0)} short names · G {status.get('G') or 'n/a'} · H {status.get('H') or 'n/a'} · I {status.get('I') or 'n/a'}",
+            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS, QuiVad (JFSA/ASIC short registers), fundamentals pack (IMF, OECD, Eurostat, BIS, FRED; weekly), FRED daily (HY OAS, Fed target, EFFR), US Treasury, ECB and Japan MOF 2y yields, CFTC TFF. "
             "Built by scripts/marketpack/marketpack.py in mayank201181/Claudemacrotrades.", "", HOW_TO]
     text = "\n".join(head + parts) + "\n"
     path = os.path.join(a.out, "market_pack_latest.md")
