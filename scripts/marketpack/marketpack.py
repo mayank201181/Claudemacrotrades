@@ -1395,10 +1395,54 @@ def _cftc_usd():
             a[k] -= net * size * usd_per_ccy / 1e9  # long foreign currency = short USD
     return [(d, agg[d]) for d in sorted(agg) if agg[d]["n"] == len(CFTC_FX)]
 
+WINDOWS = ((1, "1d"), (3, "3d"), (5, "1w"))
+
+
+def _windows(W):
+    """One row per driver, three columns: the same attribution over 1, 3 and 5 sessions to the last common close."""
+    L = ["WINDOWS (1d | 3d | 1w, each to the last close both series share; a 1d read is noisy, the 1w one carries more weight):"]
+    for name in ("EUR", "JPY"):
+        if name not in W:
+            continue
+        d, px, usd_base, beta = W[name]
+        cal = sorted(k for k in d if k in px)
+        cells = []
+        for n, nm in WINDOWS:
+            if len(cal) <= n:
+                cells.append(f"{nm} n/a"); continue
+            mv = (px[cal[-1]] / px[cal[-1 - n]] - 1) * 100 * (1 if usd_base else -1)
+            dd = d[cal[-1]] - d[cal[-1 - n]]
+            cells.append(f"{nm} USD {fmt(mv, 2)}%, diff {fmt(dd, 0)}bp, rates {fmt(beta * dd if beta is not None else None, 2)}%")
+        L.append(f"- USD vs {name} (to {cal[-1]}): " + " | ".join(cells))
+    dxy = _bars("DXY", "DX-Y.NYB")
+    for eq_name, sym in (("SPX", "^GSPC"), ("SOX", "^SOX")):
+        eq = _bars(eq_name, sym)
+        cal = sorted(set(dxy) & set(eq))
+        cells = []
+        for n, nm in WINDOWS:
+            u = (dxy[cal[-1]] / dxy[cal[-1 - n]] - 1) * 100
+            e = (eq[cal[-1]] / eq[cal[-1 - n]] - 1) * 100
+            how = "hedge" if (e <= -0.5 and u > 0.05) else "falls with it" if (e <= -0.5 and u < -0.05) else "risk-on, USD down" if (e >= 0.5 and u < -0.05) else "risk-on, USD up" if (e >= 0.5 and u > 0.05) else "quiet"
+            cells.append(f"{nm} DXY {fmt(u, 2)}% / {eq_name} {fmt(e, 1)}% ({how})")
+        L.append(f"- DXY vs {eq_name} (to {cal[-1]}): " + " | ".join(cells))
+    for label in ("USDKRW", "USDTWD"):
+        if label not in W:
+            continue
+        px, sox, beta, sd = W[label]
+        cal = sorted(set(px) & set(sox))
+        cells = []
+        for n, nm in WINDOWS:
+            act = (px[cal[-1]] / px[cal[-1 - n]] - 1) * 100
+            fit = beta * (sox[cal[-1]] / sox[cal[-1 - n]] - 1) * 100 if beta is not None else None
+            z = (act - fit) / (sd * math.sqrt(n)) if fit is not None and sd else None
+            cells.append(f"{nm} {fmt(act, 2)}% vs SOX-implied {fmt(fit, 2)}% (z {fmt(z, 1)})")
+        L.append(f"- {label} vs SOX (to {cal[-1]}): " + " | ".join(cells))
+    return L
+
 
 def section_i(outdir, dlines):
     L = ["## I. DOLLAR DRIVERS (rule on the Takeaways' DOLLAR DRIVERS block; US Treasury, ECB AAA curve, Japan MOF, Yahoo daily closes, CFTC TFF, DTCC section D; evidence, never a gate)"]
-    tag_bits, row = [], {}
+    tag_bits, row, W = [], {}, {}  # W: series kept for the 1d / 3d / 1w window table
     # 1. 2y differentials
     diffs = {}
     try:
@@ -1427,6 +1471,7 @@ def section_i(outdir, dlines):
             if beta is not None and len(cd) > 21:
                 fit = beta * (d[cd[-1]] - d[cd[-22]])
                 act = (px[cd[-1]] / px[cd[-22]] - 1) * 100 * (1 if usd_base else -1)
+            W[name] = (d, px, usd_base, beta)
             diffs[name] = dict(last=last, lvl=d[last], d1=ch(1), d5=ch(5), d21=ch(21), fit=fit, act=act, corr=corr)
             L.append(f"RATES USD-{name} 2y: {d[last]:+.0f}bp ({last}; US {us[last]:.2f}%, {name} {o2[last]:.2f}%) · 1d {fmt(ch(1), 0)} · 1w {fmt(ch(5), 0)} · 1m {fmt(ch(21), 0)}bp · 1y pct {pct1y:.0f}"
                      f" · USD vs {name} 1m {fmt(act, 2)}%, of which the rate model explains {fmt(fit, 2)}% (daily fit over 120 days, corr {fmt(corr, 2)}; the rest is risk premium, flows or the other side's story)")
@@ -1482,6 +1527,7 @@ def section_i(outdir, dlines):
             cal = sorted(set(px) & set(sox))[-61:]
             s_r, f_r = _rets(sox, cal), _rets(px, cal)
             beta, corr = _ols(s_r, f_r)
+            W[label] = (px, sox, beta, _sd([b - beta * a for a, b in zip(s_r, f_r)]) if beta is not None else None)
             res = [b - beta * a for a, b in zip(s_r, f_r)] if beta is not None else []
             sd = _sd(res) if res else float("nan")
             bits = []
@@ -1519,6 +1565,10 @@ def section_i(outdir, dlines):
         row["usd_rr_avg"] = f"{avg:.2f}"
     else:
         L.append("OPTIONS: no RR25 in section D today")
+    try:
+        L.extend(_windows(W))
+    except Exception as e:  # noqa: BLE001
+        L.append(f"WINDOWS: not available ({type(e).__name__})")
     tag = "; ".join(tag_bits) or "no driver clears its bar"
     L.append(f"TAG (mechanical): {tag}")
     L.append("Tag bars: rates-led = the 2y differential moved the same way as USD over 1m against that currency (USD move 0.3% or more); "
