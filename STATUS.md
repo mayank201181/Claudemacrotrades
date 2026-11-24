@@ -520,9 +520,10 @@ a compliance view). Details in `docs/history.md`.
     vs JPY; against rates vs EUR; CFTC USD long extreme (lev funds pct 92)"; DXY per -1% SPX on down days -0.06% on
     20d and 60d (no haven bid); KRW's 60d correlation with SOX is near zero, so its SOX residual means little until it
     recouples. Known limits: the differentials lag a day (ECB publishes T+1), the US 2y move since is printed apart;
-    no daily print of foreign selling of US assets exists, so that test is the price signature only. TO CHECK Tue 24
-    Nov: the build's status line shows `I <tag>` and both editions print the block with its WINDOWS rows, and a "USD
-    drivers: <REGIME>" email arrives after the Fable digest. Judge at review 21 Dec whether the regime call earned its
+    no daily print of foreign selling of US assets exists, so that test is the price signature only. CHECKED Tue 24
+    Nov: the 06:52 build printed section I (status line "I <tag>"), both editions carry the block, and the "USD
+    drivers: FRAGILE" alert came at 07:38 SGT, right after the Fable digest; the same build's section B failed
+    on a Yahoo 429 (0 futures), not seen before, watch it. Judge at review 21 Dec whether the regime call earned its
     place.
 24. **Slack feed missing on 24 Nov (thread "Find missing feed in Opus Takeaways").** The Opus edition said "feeds 4
     of 5": the Claude Slack digest built at 04:12 SGT (21 of 21 channels) but a built-in privacy guard
