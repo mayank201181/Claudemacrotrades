@@ -546,7 +546,10 @@ a compliance view). Details in `docs/history.md`.
     folder was already allowlisted, no bridge redeploy). WHY NEON DID NOT SEND 24 Nov: Pipeline Neon's three crons
     (06:48, 07:05, 07:16 SGT, added 23 Nov) never fired, the workflow was active and every earlier run had been
     started by hand; the merge touched the workflow file to re-register the schedule, and today's run was fired by
-    hand at 08:28 SGT. Separately the Gemini app's Neon run failed at 07:20 SGT with a Gemini platform error ("Something
+    hand at 08:28 SGT; that run read Slack but its own gate blocked the send on its footer line ("CFTC=True" read as
+    an unverified CFTC figure, would have blocked every day; fixed, PR #2 there); the rerun delivered at 08:54 SGT
+    with "Feeds 5/5" and "Slack: Claude". A display bug printing index levels twice (SPX 7,237.17.17) fixed, PR #3
+    there. Separately the Gemini app's Neon run failed at 07:20 SGT with a Gemini platform error ("Something
     went wrong"); he had already asked Gemini and re-pasted the prompt in that chat. Today Carbon could not have seen
     Slack anyway: the Slack file landed at 07:52 SGT after the rerun. TO CHECK Wed 25 Nov: a schedule-event run of
     Pipeline Neon exists (Actions tab) and its email lands by 07:30 SGT; Carbon and both Neons print Slack as arrived.
