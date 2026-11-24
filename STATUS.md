@@ -465,8 +465,11 @@ a compliance view). Details in `docs/history.md`.
     is unchanged; it reads R35. TEST: a harmless reply "reply-search test 23 Nov ... no action wanted" was sent on the 23 Nov
     Fable thread (msg 1a205cfbfcb8f4e2); the Fable query now finds that thread. CHECK Tue 24 Nov about 08:50 SGT (reminder
     set in the thread): Opus footer "reply search: 1 threads, 1 new replies" and "P20 already vetoed" (no book change);
-    Fable footer quotes the test reply as unparsed feedback. Until that check passes, a thread still applies any
-    "veto/close Pnn" he sends.
+    Fable footer quotes the test reply as unparsed feedback.
+    TUE 24 NOV CHECK PASSED: Opus footer "feedback processed: 21 Nov (reply search: 1 thread, 1 new reply — "veto P20": P20
+    already vetoed)", CHANGES line "No change", book untouched; Fable footer "feedback processed: 2026-11-23 (1 reply,
+    unparsed) (reply search: 1 threads, 1 new replies)" with the test reply quoted verbatim. CLOSED: his "veto/close Pnn"
+    and other replies are read by both runs again; a thread no longer needs to apply them.
 
 20. **Exa sweep trial (20 Nov; owner's yes; thread "Trial Exa for overnight announcements"; `docs/exa_sweep.md`).** Both
     pre-tests passed on 20 Nov: same-day items on 16 official listing pages through Exa's page reader, and a scheduled-task
