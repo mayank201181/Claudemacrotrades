@@ -78,10 +78,9 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | Weekly STATUS digest | `trig_01MYWHLQohf1qjDVYepNpfEd` | Mon 08:45 | reads this file; bound to its thread, whose session was Fable 5.1 until 21 Nov (asked to switch to Opus 5.5 high) |
 | CFTC dashboard weekly refresh | `trig_0112AstLD6EnpvsiLHoqYEge` | Tue, Thu, Sat 09:13 | refreshes the CFTC Positioning Monitor artifact from mayank201181/Cftcclaude; model Opus 5.5 since 21 Nov (was Fable 5.2) |
 
-Disabled: Question Hunt `trig_01E1MeWdsE7x7z79XC4gcZo9` (paused 10 Nov; borrowed once on 11 Nov as a test vehicle, its
-prompt put back and byte-compared), the Opus Email Digest, and the three old
-feeder tasks that the Haiku thread replaced on 10 Nov (`trig_01UvLHEc5HZn6cbcCtbsdGob`,
-`trig_01Uz92j76ozWE1EJ3SHxbHWz`, `trig_01KTuAEzuMfvBNr98nBEEfhk`; delete them after a clean week). The paused Fable
+Disabled: the Opus Email Digest. Deleted 25 Nov after a clean feeder week: the Question Hunt
+(`trig_01E1MeWdsE7x7z79XC4gcZo9`) and the three old feeder tasks the Haiku thread replaced on 10 Nov
+(`trig_01UvLHEc5HZn6cbcCtbsdGob`, `trig_01Uz92j76ozWE1EJ3SHxbHWz`, `trig_01KTuAEzuMfvBNr98nBEEfhk`). The paused Fable
 YouTube `trig_01X6SstZSnanyjyrfyhirx85`, Fable Podcast `trig_011qkFh4EkgsNgQbxm5a1tRK` and Fable Email
 `trig_01Q7JHUSc11TGiWQfhjDHwBz` tasks were the Sonnet test vehicles of 10 to 13 Nov and are back as they were since
 13 Nov: named "Daily ... Digest [Fable 5.2]", model Fable 5.2, paused, prompts untouched. Fired by hand they mail a
@@ -232,7 +231,7 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
      carried section D dated 11 Nov and the implied vol table; no alert mail came, and with the digest in at 08:21
      the mailbox cannot show whether the 08:15 to 08:45 check ran before or after it. Done on 11 Nov: `dash-ingest`
      v10 stored the digest and two "[Gemini]" copies as `gemini`; the feeder thread's first scheduled morning built
-     and uploaded all three files on the first try (delete the three disabled old feeder tasks after a clean week).
+     and uploaded all three files on the first try (the three old feeder tasks were deleted on 25 Nov).
    - *Sonnet 5.5 side by side: ended 13 Nov, no switch.* Mornings of 11 to 13 Nov for the YouTube, Podcast and
      Email digests; notes and results in project files `notes/model_tests_nov2026/`. Pass rule: no cited item
      lost, no wrong number that production had right, no skipped step, on all three mornings. No kind passed all
@@ -288,10 +287,9 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    `feeder.py fundpack` timed out in a test on 13 Nov (the build outlasts the feeder's time budget), so the Sunday
    task keeps its direct build and textContent upload. Waiting on the owner's visit: the Opus YouTube prompt's two
    API keys and `opus` ledger key (last entry 30 Oct), and 21 to 26 connectors on the digest, evidence-pass, MSD
-   brief, Research Radar and Longevity tasks. Old feeder tasks and the paused Question Hunt NOT deleted (checked
-   18 Nov): the week was not clean. 13 Nov the odds build came out short (Polymarket HTTP 406) and was never uploaded,
-   and on 17 and 18 Nov no feed built at all because the feeder thread hit the account's spend limit (last line in
-   `feeders/status.csv` is 16 Nov). A re-check on Wed 25 Nov 10:30 SGT deletes them if 19 to 25 Nov are clean.
+   brief, Research Radar and Longevity tasks. The three old feeder tasks and the paused Question Hunt were
+   deleted on 25 Nov: every feed built and uploaded every morning 19 to 25 Nov (`feeders/status.csv`). The 18 Nov check
+   had skipped it (13 Nov odds never uploaded; no builds 17 and 18 Nov after the feeder thread hit the spend limit).
    The shadow tasks' crons recur in Nov 2027; the
    16 Nov verdict task switches them off.
 2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to 3ac3126 since 22 Nov), `dash-mark`
