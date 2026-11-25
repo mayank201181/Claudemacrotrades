@@ -532,9 +532,10 @@ a compliance view). Details in `docs/history.md`.
     name and all firm affiliations out of the body, and falls back to a pointer email if the guard refuses; Opus
     prompt step 3c and R34 point 6 (single-statement UPDATE) read the Drive copy. The rerun at 07:41 SGT: full email
     refused again three times, Drive upload and pointer email delivered. A same-day Fable top-up ("2nd edition, Slack
-    added") was fired at 07:57 SGT. TO CHECK Wed 25 Nov: the 04:03 run's Drive file carries key
-    SLACKDIGEST-CLAUDE-20261125-0400, and both Takeaways footers show "Slack: Claude (Drive)". If the full email keeps
-    being refused, the pointer is the normal route; the digest itself is not affected.
+    added") was fired at 07:57 SGT. Checked Wed 25 Nov: the 04:03 run
+    sent the pointer email at 04:10 SGT (full email refused again, so the pointer is the normal route), and both the
+    Fable and Opus editions read the Drive copy and say "feeds 5 of 5"; the 24 Nov Fable 2nd edition landed 08:15 SGT
+    with no trade book step. Closed.
 
 25. **Gemini pipelines read the Slack digest from Drive (24 Nov; thread "Point other models at Slack digest link").**
     Three Gemini Takeaways read his Slack digest. (i) Gemini Carbon and Gemini Neon are Gemini app scheduled tasks
