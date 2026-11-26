@@ -17,7 +17,7 @@ Sections
   H  CREDIT/CYCLE   FRED HY OAS, VIX z, Fed target and futures (R22).
   I  DOLLAR DRIVERS 2y differentials vs EUR/JPY, USD beta on equity down days, Asia FX vs SOX, CFTC and DTCC USD positioning.
   J  ASIA RATES     Asia govvies (MOF, BOK ECOS, ChinaMoney, Trading Economics) and swaps (DTCC rates prints) with
-                    1d/3d/1w bp changes, curves, swap-gov spreads, and an Asia rates commentary list (asia_rates_history.csv).
+                    1d/3d/1w bp changes, curves, swap-gov spreads, a UST beta split of the 10Y moves (J4), and an Asia rates commentary list (asia_rates_history.csv).
 
 Usage: python3 -I marketpack.py --out /mnt/project-files/marketpack/ [--sql posbuild.sql]
 Writes market_pack_latest.md plus small history files (oi_history.csv, dtcc_daily.csv,
@@ -1595,6 +1595,13 @@ def section_i(outdir, dlines):
 # rallied hard). Government bonds from official sources where a keyless daily series exists (Japan MOF, Bank of Korea
 # ECOS, ChinaMoney CGB curve), Trading Economics' public country pages for the rest; swaps from US-reported DTCC
 # prints (the only free daily IRS/NDIRS source found); commentary from central-bank RSS, ING Think and Google News.
+# UST beta split for the 10Y govvies (R39 line h): 5-session OLS slope on the UST 10Y close of the last US date strictly
+# before each Asian date, and the sd of the 5-session residual, both from the Astra A3 study (2010-2026, official curves,
+# rolling 250 sessions, verified 26 Nov 2026). Full-sample result: local residual moves did NOT revert (0 of 93 cells at
+# BH q<=0.10), so the split is attribution, never a fade signal. Frozen as of 2026-11-25; refresh from a re-run.
+ASIA_BETA_ASOF = "2026-11-25"
+ASIA_BETA = {"JP": (0.519, 5.76), "KR": (0.661, 8.93), "CN": (0.059, 1.84), "SG": (0.618, 7.36), "HK": (0.667, 6.07),
+             "IN": (0.390, 7.33), "MY": (0.245, 6.13), "TW": (0.050, 4.88), "PH": (0.238, 14.70)}
 ASIA_HIST = "asia_rates_history.csv"          # date,kind,market,tenor,source,value  (kind gov | swap | gov_d1)
 ASIA_KEEP_DAYS = 400
 GOV_SHOW = {"JP": ("2Y", "5Y", "10Y", "30Y"), "KR": ("3Y", "5Y", "10Y", "30Y"), "CN": ("2Y", "5Y", "10Y", "30Y"),
@@ -1863,6 +1870,35 @@ def _dtcc_rates_day(day):
         return rows, f"intraday to {end} ({n} files)"
 
 
+def _beta_split(H):
+    """J4: each 10Y govvy's last 5-session move split into UST beta and local residual, with the residual z."""
+    ust = {d: (v, "") for d, v in _bars("UST10Y", "^TNX").items()}
+    ud = sorted(ust)
+
+    def uprior(d):
+        old = [x for x in ud if x < d]
+        return ust[old[-1]][0] if old and (dt.date.fromisoformat(d) - dt.date.fromisoformat(old[-1])).days <= 7 else None
+    out = [f"### J4. UST BETA SPLIT, 10Y (last 5 sessions, bp; beta and residual sd from the 2010-2026 study, as of "
+           f"{ASIA_BETA_ASOF}; UST = 10Y close of the last US date before each Asian date; local = move minus beta x UST; "
+           "z = local / its usual size. ATTRIBUTION ONLY: local moves did not revert in the study, 0 of 93 cells)",
+           "market | move | UST | beta | UST part | local | local z | window"]
+    for mkt, (beta, sd) in ASIA_BETA.items():
+        ser = H.get(("gov", mkt, "10Y"), {})
+        ds = sorted(ser)
+        if len(ds) < 6:
+            continue
+        t, t5 = ds[-1], ds[-6]
+        if not 5 <= (dt.date.fromisoformat(t) - dt.date.fromisoformat(t5)).days <= 10:
+            continue
+        u1, u0 = uprior(t), uprior(t5)
+        if u1 is None or u0 is None:
+            continue
+        da, du = (ser[t][0] - ser[t5][0]) * 100, (u1 - u0) * 100
+        loc = da - beta * du
+        out.append(f"{GOV_NAME[mkt]} | {da:+.1f} | {du:+.1f} | {beta:.2f} | {beta * du:+.1f} | {loc:+.1f} | {loc / sd:+.1f} | {t5} to {t}")
+    return out if len(out) > 2 else []
+
+
 def section_j(outdir):
     L = ["## J. ASIA RATES (govvies and swaps; added 26 Nov 2026. Official curves: Japan MOF, Bank of Korea ECOS, "
          "ChinaMoney CGB; Trading Economics country pages for the other markets; swaps = median fixed rate of US-reported "
@@ -1993,6 +2029,12 @@ def section_j(outdir):
                      f"{'' if last == latest.isoformat() else ' (no prints on ' + latest.isoformat() + ')'}")
             if not thin and last == latest.isoformat():
                 movers.append((f"{lab} {ten}", d1, d3, w1))
+
+    # ---- UST beta split (10Y)
+    try:
+        L.extend(_beta_split(H))
+    except Exception as e:  # noqa: BLE001
+        failed.append(f"beta split ({type(e).__name__})")
 
     # ---- movers summary, put right under the heading
     summ = []

@@ -603,7 +603,11 @@ a compliance view). Details in `docs/history.md`.
     RESULTS 26 Nov, all three verified (project files `astra_results/VERIFICATION_26nov2026.md`): A1 367 rows, blind
     overlap 37/40, gaps where 2027 schedules are unpublished (top-up late Dec), load needs one owner SQL paste before
     8 Jan; A2 vols and swap medians match the pack (median diff 0); A3 JGB/UST identical to our pulls, local residual
-    moves do not revert (0/93 cells), UST betas per market; owner asked yes/no on an attribution line in R39.
+    moves do not revert (0/93 cells), UST betas per market. Owner said yes (14:03 SGT): market pack section J4 (UST
+    beta split of each 10Y move, betas frozen from the study as of 25 Nov) and R39 point 6 (LOCAL / GLOBAL BETA / MIXED
+    call from J4) in force 26 Nov by one UPDATE (`supabase/rules/R39_amend_26nov2026_beta_split.sql`). J4 shows JGB, KTB,
+    CGB at once; TE markets appear once their pack history holds 6 sessions (about 3 Dec). CHECK Fri 27 Nov: J4 in the
+    06:52 build and the READ line quoting a split. Refresh the frozen betas from a re-run every few months.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
