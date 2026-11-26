@@ -16,6 +16,8 @@ Sections
   G  FUNDAMENTALS   the weekly fundamentals pack (scripts/fundpack/fundpack.py), copied in when built within 9 days.
   H  CREDIT/CYCLE   FRED HY OAS, VIX z, Fed target and futures (R22).
   I  DOLLAR DRIVERS 2y differentials vs EUR/JPY, USD beta on equity down days, Asia FX vs SOX, CFTC and DTCC USD positioning.
+  J  ASIA RATES     Asia govvies (MOF, BOK ECOS, ChinaMoney, Trading Economics) and swaps (DTCC rates prints) with
+                    1d/3d/1w bp changes, curves, swap-gov spreads, and an Asia rates commentary list (asia_rates_history.csv).
 
 Usage: python3 -I marketpack.py --out /mnt/project-files/marketpack/ [--sql posbuild.sql]
 Writes market_pack_latest.md plus small history files (oi_history.csv, dtcc_daily.csv,
@@ -385,7 +387,7 @@ def dtcc_file(day):
     return z.open(z.namelist()[0])
 
 
-def dtcc_slices(day):
+def dtcc_slices(day, kind="FOREX", key="CFTC_FX"):
     """A UTC day whose full-day file is not out yet, read from DTCC's intraday files.
     The full-day file of a UTC day appears at about 00:15 UTC on the next day, which is after the morning build,
     so without this the pack is a New York session behind. The intraday files (about 3,000 a day, a few rows
@@ -399,9 +401,9 @@ def dtcc_slices(day):
     if not re.fullmatch(r"[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]", bucket):
         bucket = DTCC_BUCKET
     base = f"https://{bucket}.s3.amazonaws.com/"
-    tag = f"CFTC_SLICE_FOREX_{day:%Y_%m_%d}_"
+    tag = f"CFTC_SLICE_{kind}_{day:%Y_%m_%d}_"
     listed = {}
-    for x in json.loads(get(base + "dashboard/Slice.json", timeout=60)).get("CFTC_FX") or []:
+    for x in json.loads(get(base + "dashboard/Slice.json", timeout=60)).get(key) or []:
         m = re.fullmatch(re.escape(tag) + r"(\d+)\.zip", x.get("fileName") or "")
         if m:
             listed[int(m.group(1))] = x
@@ -1588,6 +1590,488 @@ def section_i(outdir, dlines):
     return L, tag[:100]
 
 
+# ---------------------------------------------------------------- J. Asia rates
+# Added 26 Nov 2026 (owner's ask: Asia rates were missing from the Takeaways while MYR, THB, TWD, SGD and JPY rates
+# rallied hard). Government bonds from official sources where a keyless daily series exists (Japan MOF, Bank of Korea
+# ECOS, ChinaMoney CGB curve), Trading Economics' public country pages for the rest; swaps from US-reported DTCC
+# prints (the only free daily IRS/NDIRS source found); commentary from central-bank RSS, ING Think and Google News.
+ASIA_HIST = "asia_rates_history.csv"          # date,kind,market,tenor,source,value  (kind gov | swap | gov_d1)
+ASIA_KEEP_DAYS = 400
+GOV_SHOW = {"JP": ("2Y", "5Y", "10Y", "30Y"), "KR": ("3Y", "5Y", "10Y", "30Y"), "CN": ("2Y", "5Y", "10Y", "30Y"),
+            "SG": ("2Y", "5Y", "10Y", "30Y"), "IN": ("2Y", "5Y", "10Y", "30Y"), "ID": ("3Y", "5Y", "10Y", "30Y"),
+            "MY": ("10Y",), "TH": ("10Y",), "TW": ("10Y",), "PH": ("10Y",), "HK": ("10Y",)}
+GOV_NAME = {"JP": "JGB", "KR": "KTB", "CN": "CGB", "SG": "SGS", "IN": "IGB", "ID": "INDOGB", "MY": "MGS", "TH": "ThaiGB",
+            "TW": "TGB", "PH": "RPGB", "HK": "HKGB"}
+TE_SLUG = {"JP": "japan", "KR": "south-korea", "CN": "china", "SG": "singapore", "IN": "india", "ID": "indonesia",
+           "MY": "malaysia", "TH": "thailand", "TW": "taiwan", "PH": "philippines", "HK": "hong-kong"}
+ECOS = ("https://ecos.bok.or.kr/api/StatisticSearch/sample/json/kr/1/10/817Y002/D/{s}/{e}/{code}")  # BOK's public sample key: 10 rows a call
+ECOS_CODES = {"3Y": "010200000", "5Y": "010200001", "10Y": "010210000", "30Y": "010230000"}
+CHINAMONEY = ("https://www.chinamoney.com.cn/ags/ms/cm-u-bk-currency/ClsYldCurvHis?lang=CN&reference=1&bondType=CYCC000"
+              "&startDate={s}&endDate={e}&termId=10&pageNum={p}&pageSize=50")
+# DTCC rates: (label, notional currency, underlier test). Fixed-float or OIS swaps, outright, spot or IMM start.
+SWAP_IDX = [("JPY TONA OIS", "JPY", re.compile(r"TONA", re.I)), ("SGD SORA OIS", "SGD", re.compile(r"SORA", re.I)),
+            ("KRW CD NDIRS", "KRW", re.compile(r"\bCD\b", re.I)), ("TWD TAIBOR NDIRS", "TWD", re.compile(r"TAIBOR", re.I)),
+            ("CNY 7d repo IRS", "CNY", re.compile(r"REPO", re.I)), ("THB THOR OIS", "THB", re.compile(r"THOR", re.I)),
+            ("MYR KLIBOR NDIRS", "MYR", re.compile(r"KLIBOR", re.I)), ("HKD HIBOR IRS", "HKD", re.compile(r"HIBOR", re.I)),
+            ("INR MIBOR OIS", "INR", re.compile(r"MIBOR|MIOIS|FBIL", re.I))]
+SWAP_TENORS = (1, 2, 3, 5, 10)
+SWAP_BACKFILL = 9                             # UTC weekdays of full-day files fetched when the history is short
+SWAP_GOV = {"JPY TONA OIS": "JP", "SGD SORA OIS": "SG", "KRW CD NDIRS": "KR", "CNY 7d repo IRS": "CN", "THB THOR OIS": "TH",
+            "MYR KLIBOR NDIRS": "MY", "TWD TAIBOR NDIRS": "TW", "HKD HIBOR IRS": "HK", "INR MIBOR OIS": "IN"}
+RATE_WORDS = re.compile(r"\b(bonds?|yields?|jgbs?|mgs|sgs|ktbs?|gilts?|curve|swaps?|auctions?|debt|treasur\w*|"
+                        r"notes?|sukuk|duration|rate cuts?|rate hikes?|easing|policy rate|repo)\b", re.I)
+ASIA_PRESS = [  # (market, Google News query, title must also name the market)
+    ("JP", '(JGB OR "Japanese government bond" OR "Japan bond") yields', re.compile(r"\b(japan\w*|jgbs?|boj|tokyo)\b", re.I)),
+    ("KR", '(Korea OR Korean) (bond OR "treasury bond" OR KTB) yields', re.compile(r"\b(korea\w*|ktbs?|bok|seoul)\b", re.I)),
+    ("CN", '(China OR Chinese) (bond yields OR "government bond" OR CGB)', re.compile(r"\b(china|chinese|cgbs?|pboc|beijing)\b", re.I)),
+    ("IN", '(India OR Indian) (bond yields OR "government bond" OR gilt)', re.compile(r"\b(india\w*|rbi|g-sec\w*|gilt\w*)\b", re.I)),
+    ("ID", '(Indonesia OR Indonesian) (bond yields OR "government bonds" OR SBN)', re.compile(r"\b(indonesia\w*|sbn|bank indonesia)\b", re.I)),
+    ("PH", '(Philippine OR Philippines) (bond yields OR treasury bonds OR "T-bond")', re.compile(r"\b(philippin\w*|bsp|bureau of the treasury)\b", re.I)),
+    ("MY", '(Malaysia OR Malaysian) (bond OR MGS OR GII) yields', re.compile(r"\b(malaysia\w*|mgs|gii|bnm|ringgit)\b", re.I)),
+    ("TH", '(Thai OR Thailand) (bond yields OR "government bonds")', re.compile(r"\b(thai\w*|bot)\b", re.I)),
+    ("TW", '(Taiwan OR Taiwanese) (bond yields OR "government bonds")', re.compile(r"\b(taiwan\w*|cbc)\b", re.I)),
+    ("SG", '(Singapore OR SGS OR MAS) (bond OR "government securities" OR SORA) yields', re.compile(r"\b(singapore\w*|sgs|mas|sora)\b", re.I)),
+    ("ALL", '"Asian bonds" OR "Asia rates" OR "Asian government bonds"', re.compile(r"\b(asia\w*|emerging)\b", re.I)),
+]
+OFFICIAL_FEEDS = [  # (label, url, title filter, hours)
+    ("BOJ", "https://www.boj.or.jp/en/rss/whatsnew.xml",
+     re.compile(r"JGB|bond|purchase|outright|operation|monetary policy|statement|minutes|opinions|outlook|governor|deputy", re.I), 48),
+    ("RBI", "https://www.rbi.org.in/pressreleases_rss.xml",
+     re.compile(r"^(?!.*(full auction result|overnight variable rate repo)).*(auction|government stock|g-sec|treasury bill|omo|open market|liquidity|monetary policy|switch|buyback|state development)", re.I), 48),
+]
+RESEARCH_FEEDS = [
+    ("ING Think", "https://think.ing.com/rss/",
+     re.compile(r"\b(asia\w*|japan|boj|korea\w*|china|pboc|india\w*|rbi|indonesia\w*|philippin\w*|malaysia\w*|thai\w*|taiwan\w*|singapore\w*|mas|yen|won|rupee|ringgit|baht|asean)\b", re.I), 48),
+]
+
+
+def _asia_hist_load(path):
+    H = {}
+    if os.path.exists(path):
+        for r in csv.DictReader(open(path)):
+            try:
+                H[(r["kind"], r["market"], r["tenor"])] = H.get((r["kind"], r["market"], r["tenor"]), {})
+                H[(r["kind"], r["market"], r["tenor"])][r["date"]] = (float(r["value"]), r["source"])
+            except (KeyError, ValueError):
+                continue
+    return H
+
+
+def _asia_hist_save(path, H):
+    cut = (NOW - dt.timedelta(days=ASIA_KEEP_DAYS)).strftime("%Y-%m-%d")
+    with open(path, "w") as f:
+        f.write("date,kind,market,tenor,source,value\n")
+        for (kind, mkt, ten), ser in sorted(H.items()):
+            for d in sorted(ser):
+                if d >= cut:
+                    v, src = ser[d]
+                    f.write(f"{d},{kind},{mkt},{ten},{src},{round(v, 5)}\n")
+
+
+def _put(H, kind, mkt, ten, d, v, src):
+    H.setdefault((kind, mkt, ten), {})[d] = (float(v), src)
+
+
+def _chg(ser, n=None, days=None):
+    """Change in bp from a {date: (value, src)} series: n observations back, or the last observation at least `days`
+    calendar days before the latest. None when the history is too short."""
+    ds = sorted(ser)
+    if len(ds) < 2:
+        return None
+    last = ds[-1]
+    if n is not None:
+        return (ser[last][0] - ser[ds[-1 - n]][0]) * 100 if len(ds) > n else None
+    cut = (dt.date.fromisoformat(last) - dt.timedelta(days=days)).isoformat()
+    old = [d for d in ds if d <= cut]
+    if not old or (dt.date.fromisoformat(last) - dt.date.fromisoformat(old[-1])).days > days + 4:
+        return None
+    return (ser[last][0] - ser[old[-1]][0]) * 100
+
+
+def _sig(ser, k=5, need=30):
+    """The latest k-observation change in units of the series' own k-observation changes (last 250 obs), or None."""
+    ds = sorted(ser)[-251:]
+    if len(ds) < need + k:
+        return None
+    v = [ser[d][0] for d in ds]
+    xs = [(v[i] - v[i - k]) * 100 for i in range(k, len(v))]
+    sd = _sd(xs[:-1])
+    return xs[-1] / sd if sd else None
+
+
+def _bp(x, d=1):
+    return "n/a" if x is None else f"{x:+.{d}f}"
+
+
+def _gov_mof(H):
+    """Japan MOF JGB curve (official, published the same Tokyo evening)."""
+    def parse(raw):
+        n = 0
+        hdr = None
+        for ln in raw.decode("shift_jis", "replace").splitlines():
+            c = [x.strip() for x in ln.split(",")]
+            if c and c[0] == "Date":
+                hdr = c
+                continue
+            m = re.match(r"(\d{4})/(\d{1,2})/(\d{1,2})$", c[0]) if c else None
+            if not (m and hdr):
+                continue
+            d = f"{m[1]}-{int(m[2]):02d}-{int(m[3]):02d}"
+            for ten in ("2Y", "5Y", "10Y", "30Y"):
+                try:
+                    _put(H, "gov", "JP", ten, d, float(c[hdr.index(ten)]), "MOF")
+                    n += 1
+                except (ValueError, IndexError):
+                    pass
+        return n
+    ser = H.get(("gov", "JP", "10Y"), {})
+    if sum(1 for d in ser if d >= (NOW - dt.timedelta(days=45)).strftime("%Y-%m-%d")) < 20:
+        try:
+            parse(get(MOF_ALL, timeout=60))
+        except Exception:  # noqa: BLE001
+            pass
+    return parse(get(MOF_CUR, timeout=30))
+
+
+def _gov_ecos(H):
+    """Bank of Korea ECOS daily market rates (KTB final yields, KOFIA basis; same-day)."""
+    n = 0
+    short = len(H.get(("gov", "KR", "10Y"), {})) < 40
+    wins = range(7 if short else 1)  # 13-day windows (at most 10 rows each, the sample key's cap), back 90 days once
+    for ten, code in ECOS_CODES.items():
+      for w in wins:
+        e = (NOW.astimezone(SGT) - dt.timedelta(days=13 * w)).strftime("%Y%m%d")
+        s = (NOW.astimezone(SGT) - dt.timedelta(days=13 * w + 12)).strftime("%Y%m%d")
+        d = json.loads(get(ECOS.format(s=s, e=e, code=code), timeout=30))
+        for r in (d.get("StatisticSearch") or {}).get("row") or []:
+            t = r.get("TIME") or ""
+            try:
+                _put(H, "gov", "KR", ten, f"{t[:4]}-{t[4:6]}-{t[6:8]}", float(r["DATA_VALUE"]), "BOK ECOS")
+                n += 1
+            except (KeyError, ValueError):
+                pass
+    return n
+
+
+def _gov_chinamoney(H):
+    """ChinaMoney (CFETS) CGB yield curve: a date range, paged (the CN view honours the range; the EN view gives one day)."""
+    ser = H.get(("gov", "CN", "10Y"), {})
+    today = NOW.astimezone(SGT).date()
+    start = today - dt.timedelta(days=30 if len(ser) < 20 else 6)  # the site serves at most one month a query
+    n, page, pages = 0, 1, 1
+    while page <= pages and page <= 12:
+        d = json.loads(get(CHINAMONEY.format(s=start.isoformat(), e=today.isoformat(), p=page), timeout=30, tries=2))
+        pages = int((d.get("data") or {}).get("pageTotal") or 1)
+        for r in (d.get("records") or []):
+            ten = {"2.0": "2Y", "3.0": "3Y", "5.0": "5Y", "10.0": "10Y", "30.0": "30Y"}.get(r.get("yearTermStr"))
+            try:
+                if ten:
+                    _put(H, "gov", "CN", ten, r["newDateValueCN"], float(r["maturityYieldStr"]), "ChinaMoney")
+                    n += 1
+            except (KeyError, ValueError):
+                pass
+        page += 1
+    if not n:
+        raise ValueError((d.get("data") or {}).get("message") or "no rows")
+    return n
+
+
+def _te_page(mkt):
+    """Trading Economics country bond table: [(tenor, yield, day chg in pp, month chg in pp, 'Mon/DD')]."""
+    t = get(f"https://tradingeconomics.com/{TE_SLUG[mkt]}/government-bond-yield", timeout=30, tries=2).decode("utf-8", "replace")
+    i = t.find("<table")
+    j = t.find("</table>", i)
+    out = []
+    for r in re.findall(r"<tr.*?</tr>", t[i:j], re.S):
+        cells = [re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", c))).strip()
+                 for c in re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", r, re.S)]
+        if len(cells) < 7 or cells[0] == "Bonds":
+            continue
+        m = re.search(r"(\d+)([YMW])$", cells[0])
+        if not m:
+            continue
+        ten = {"52W": "1Y", "12M": "1Y"}.get(m[1] + m[2], m[1] + m[2])
+        try:
+            out.append((ten, float(cells[1]), float(cells[3].rstrip("%")), float(cells[4].rstrip("%")), cells[6]))
+        except ValueError:
+            continue
+    # the headline 10Y carries three decimals in the page's chart metadata
+    m = re.search(r'TEChartsMeta = \[\{"value":([0-9.]+)', t)
+    if m:
+        out = [(a, float(m[1]) if a == "10Y" else b, c, d, e) for a, b, c, d, e in out]
+    return out
+
+
+def _te_date(s):
+    """'Nov/25' -> ISO date in the current or previous year (never in the future)."""
+    try:
+        d = dt.datetime.strptime(s + f"/{NOW.year}", "%b/%d/%Y").date()
+    except ValueError:
+        return None
+    if d > NOW.astimezone(SGT).date() + dt.timedelta(days=1):
+        d = d.replace(year=d.year - 1)
+    return d.isoformat()
+
+
+def _swap_rows(rows, day_iso):
+    """Median fixed rate per (index, tenor) from one UTC day of DTCC rates rows."""
+    buckets = {}
+    for r in rows:
+        if r.get("Action type") != "NEWT" or r.get("Event type") not in ("TRAD", ""):
+            continue
+        if (r.get("Package indicator") or "").upper() == "TRUE" or (r.get("Non-standardized term indicator") or "").upper() == "TRUE":
+            continue
+        prod = r.get("Product name") or r.get("UPI FISN") or ""
+        if "Swap" not in prod or "Flt Flt" in prod or "/O " in prod:
+            continue
+        ccy = r.get("Notional currency-Leg 1") or ""
+        und = r.get("UPI Underlier Name") or r.get("Underlier ID-Leg 2") or ""
+        lab = next((x for x, c, rx in SWAP_IDX if c == ccy and rx.search(und)), None)
+        if not lab:
+            continue
+        fx = r.get("Fixed rate-Leg 1") or r.get("Fixed rate-Leg 2") or ""
+        try:
+            rate = float(fx) * 100
+            ex = dt.date.fromisoformat((r.get("Execution Timestamp") or "")[:10])
+            eff = dt.date.fromisoformat(r["Effective Date"][:10])
+            mat = dt.date.fromisoformat(r["Expiration Date"][:10])
+        except (KeyError, ValueError):
+            continue
+        if ex.isoformat() != day_iso or not (-3 <= (eff - ex).days <= 35) or not (-2.0 < rate < 25.0):
+            continue
+        yrs = (mat - eff).days / 365.25
+        ten = next((t for t in SWAP_TENORS if abs(yrs - t) <= (0.06 if t == 1 else 0.1)), None)
+        if ten:
+            buckets.setdefault((lab, f"{ten}Y"), []).append(rate)
+    out = {}
+    for k, xs in buckets.items():
+        med = _median(xs)
+        xs = [x for x in xs if abs(x - med) <= 0.30]  # off-market prints (old trades booked, packages missed) out
+        if xs:
+            out[k] = (_median(xs), len(xs))
+    return out
+
+
+def _dtcc_rates_day(day):
+    """Rows of one UTC day of DTCC CFTC rates: the full-day file, or the intraday files when it is not out yet."""
+    try:
+        name = f"CFTC_CUMULATIVE_RATES_{day:%Y_%m_%d}.zip"
+        z = zipfile.ZipFile(io.BytesIO(get(f"{DTCC_API}/report/cumulative/cftc/{name}", timeout=120, tries=2)))
+        return csv.DictReader(io.TextIOWrapper(z.open(z.namelist()[0]), encoding="utf-8", errors="replace")), "full day"
+    except Exception:  # noqa: BLE001
+        rows, end, n = dtcc_slices(day, kind="RATES", key="CFTC_IR")
+        return rows, f"intraday to {end} ({n} files)"
+
+
+def section_j(outdir):
+    L = ["## J. ASIA RATES (govvies and swaps; added 26 Nov 2026. Official curves: Japan MOF, Bank of Korea ECOS, "
+         "ChinaMoney CGB; Trading Economics country pages for the other markets; swaps = median fixed rate of US-reported "
+         "DTCC prints, spot or IMM start, outright only; evidence, never a gate)"]
+    path = os.path.join(outdir, ASIA_HIST)
+    H = _asia_hist_load(path)
+    failed, gov_n = [], 0
+    for mkt, fn in (("JP", _gov_mof), ("KR", _gov_ecos), ("CN", _gov_chinamoney)):
+        try:
+            gov_n += fn(H)
+        except Exception as e:  # noqa: BLE001
+            failed.append(f"{mkt} official ({type(e).__name__})")
+    TE = {}
+
+    def te(mkt):
+        try:
+            return mkt, _te_page(mkt)
+        except Exception as e:  # noqa: BLE001
+            return mkt, e
+    with concurrent.futures.ThreadPoolExecutor(6) as ex:
+        for mkt, res in ex.map(te, list(TE_SLUG)):
+            if isinstance(res, Exception):
+                failed.append(f"TE {mkt} ({type(res).__name__})")
+                continue
+            TE[mkt] = {r[0]: r for r in res}
+            if mkt in ("JP", "KR", "CN"):
+                continue
+            for ten, y, d1, m1, ds in res:
+                d = _te_date(ds)
+                if d and ten in GOV_SHOW.get(mkt, ()):
+                    _put(H, "gov", mkt, ten, d, y, "TE")
+                    _put(H, "gov_d1", mkt, ten, d, d1, "TE")  # TE's own day change (pp), exact to 0.1bp
+
+    # swaps: backfill full-day files for the UTC weekdays not held, then the latest day
+    swap_note = ""
+    held = set()
+    for (kind, _m, _t), ser in H.items():
+        if kind == "swapday":
+            held |= {d for d, (v, _s) in ser.items() if v >= 1}
+    latest = NOW.date() if NOW.hour >= SLICE_FROM_HOUR else NOW.date() - dt.timedelta(days=1)
+    days, d = [], latest
+    while len(days) < SWAP_BACKFILL:
+        if d.weekday() < 5:
+            days.append(d)
+        d -= dt.timedelta(days=1)
+    for day in sorted(days):
+        if day.isoformat() in held and day != latest:
+            continue
+        try:
+            rows, how = _dtcc_rates_day(day)
+            got = _swap_rows(rows, day.isoformat())
+            for (lab, ten), (v, n) in got.items():
+                _put(H, "swap", lab, ten, day.isoformat(), v, f"DTCC n={n}")
+            # a day read, even a holiday with no prints; 0 = read from the intraday files, re-read whole at the next build
+            _put(H, "swapday", "DTCC", "-", day.isoformat(), 1 if how == "full day" else 0, "read")
+            if day == latest:
+                swap_note = f"{day:%a %d %b} UTC, {how}"
+        except Exception as e:  # noqa: BLE001
+            if day == latest:
+                failed.append(f"DTCC rates {day} ({type(e).__name__})")
+    _asia_hist_save(path, H)
+
+    # ---- government bonds table
+    L.append("### J1. GOVERNMENT BONDS (yield %, changes in bp; 1w = vs the last close at least 7 days before; "
+             "1m = vs 30 days before, or Trading Economics' own month change while the history is short; sig = the 1w change in units of its own past 1w changes, "
+             "when 30+ days are held; TE levels print to 0.01, so a TE 3d/1w change is good to about 1bp)")
+    L.append("market | tenor | yield | 1d | 3d | 1w | 1m | sig | as of | src")
+    movers = []
+    as_of_max = ""
+    for mkt, tens in GOV_SHOW.items():
+        for ten in tens:
+            ser = H.get(("gov", mkt, ten), {})
+            if not ser:
+                continue
+            last = max(ser)
+            v, src = ser[last]
+            d1 = _chg(ser, n=1)
+            d1te = H.get(("gov_d1", mkt, ten), {}).get(last)
+            if src == "TE" and d1te is not None:
+                d1 = d1te[0] * 100
+            d3, w1 = _chg(ser, n=3), _chg(ser, days=7)
+            te_row = TE.get(mkt, {}).get(ten)
+            m1 = _chg(ser, days=30)
+            if m1 is None and te_row:
+                m1 = te_row[3] * 100
+            sg = _sig(ser)
+            stale = (NOW.astimezone(SGT).date() - dt.date.fromisoformat(last)).days > 4
+            L.append(f"{GOV_NAME[mkt]} | {ten} | {v:.3f} | {_bp(d1)} | {_bp(d3)} | {_bp(w1)} | {_bp(m1)} | "
+                     f"{'n/a' if sg is None else f'{sg:+.1f}'} | {last}{' STALE' if stale else ''} | {src}")
+            as_of_max = max(as_of_max, last)
+            if not stale:
+                movers.append((f"{GOV_NAME[mkt]} {ten}", d1, d3, w1))
+    # curve: 2s10s (or 3s10s) per market, 1w change
+    curve = []
+    for mkt, tens in GOV_SHOW.items():
+        short = next((t for t in ("2Y", "3Y") if t in tens), None)
+        a, b = H.get(("gov", mkt, short), {}), H.get(("gov", mkt, "10Y"), {})
+        com = sorted(set(a) & set(b))
+        if short and len(com) >= 2:
+            sp = {d: (b[d][0] - a[d][0], "") for d in com}  # 10y minus short, in %
+            curve.append(f"{GOV_NAME[mkt]} {short[:-1]}s10s {sp[com[-1]][0] * 100:+.0f}bp "
+                         f"(1d {_bp(_chg(sp, n=1), 0)}, 1w {_bp(_chg(sp, days=7), 0)})")
+    if curve:
+        L.append("CURVES: " + " · ".join(curve))
+
+    # ---- swaps table
+    L.append(f"### J2. SWAPS (DTCC US-reported prints, {swap_note or 'latest day not read'}; rate = median fixed rate %, "
+             "n = prints kept; changes in bp between daily medians, so a thin day (n<3) is noisy; "
+             "swap-gov = swap minus the same-tenor government yield where both print)")
+    L.append("index | tenor | rate | n | 1d | 3d | 1w | swap-gov | as of")
+    for lab, _c, _rx in SWAP_IDX:
+        for t in SWAP_TENORS:
+            ten = f"{t}Y"
+            ser = H.get(("swap", lab, ten), {})
+            if not ser:
+                continue
+            last = max(ser)
+            v, src = ser[last]
+            n = src.split("n=")[-1]
+            if (latest - dt.date.fromisoformat(last)).days > 6:
+                continue
+            g = H.get(("gov", SWAP_GOV.get(lab, ""), ten), {})
+            gd = max((d for d in g if d <= last), default=None)
+            sg = f"{(v - g[gd][0]) * 100:+.0f}bp" if gd and (dt.date.fromisoformat(last) - dt.date.fromisoformat(gd)).days <= 3 else ""
+            d1, d3, w1 = _chg(ser, n=1), _chg(ser, n=3), _chg(ser, days=7)
+            thin = " thin" if n.isdigit() and int(n) < 3 else ""
+            L.append(f"{lab} | {ten} | {v:.3f} | {n}{thin} | {_bp(d1)} | {_bp(d3)} | {_bp(w1)} | {sg} | {last}"
+                     f"{'' if last == latest.isoformat() else ' (no prints on ' + latest.isoformat() + ')'}")
+            if not thin and last == latest.isoformat():
+                movers.append((f"{lab} {ten}", d1, d3, w1))
+
+    # ---- movers summary, put right under the heading
+    summ = []
+    for k, lab in ((1, "1d"), (2, "3d"), (3, "1w")):
+        xs = [(m[k], m[0]) for m in movers if m[k] is not None]
+        if xs:
+            xs.sort()
+            rally = ", ".join(f"{n} {x:+.0f}" for x, n in xs[:4] if x <= -0.5)
+            sell = ", ".join(f"{n} {x:+.0f}" for x, n in xs[::-1][:3] if x >= 0.5)
+            summ.append(f"{lab}: rallied most {rally or 'none'}; sold off most {sell or 'none'}")
+    L[1:1] = ["MOVERS (bp; govvies and liquid swaps): " + " | ".join(summ) if summ else "MOVERS: none computed"]
+
+    # ---- commentary
+    L.append("### J3. ASIA RATES COMMENTARY (leads with links where the feed gives one; a headline is never a level or a fact by itself)")
+    ncom = 0
+    for label, url, rx, hours in OFFICIAL_FEEDS + RESEARCH_FEEDS:
+        try:
+            root = ET.fromstring(get(url, timeout=25, tries=2))
+        except Exception as e:  # noqa: BLE001
+            failed.append(f"{label} RSS ({type(e).__name__})")
+            continue
+        since = NOW - dt.timedelta(hours=hours)
+        items = []
+        for it in root.iter("item"):
+            title = html.unescape((it.findtext("title") or "").strip())
+            try:
+                when = email.utils.parsedate_to_datetime(it.findtext("pubDate") or "")
+                when = when if when.tzinfo else when.replace(tzinfo=dt.timezone.utc)
+            except Exception:  # noqa: BLE001
+                continue
+            if when >= since and rx.search(title):
+                items.append((when, title, (it.findtext("link") or "").strip()))
+        for when, title, link in sorted(items, reverse=True)[:4]:
+            L.append(f"- {when.astimezone(SGT):%d %b %H:%M} SGT · {label} · {title} · {link}")
+            ncom += 1
+    seen = set()
+
+    def press(job):
+        mkt, q, rx = job
+        try:
+            root = ET.fromstring(get("https://news.google.com/rss/search?" + urllib.parse.urlencode(
+                {"q": q + " when:2d", "hl": "en-US", "gl": "US", "ceid": "US:en"}), timeout=25, tries=2))
+            return mkt, rx, root, None
+        except Exception as e:  # noqa: BLE001
+            return mkt, rx, None, e
+    with concurrent.futures.ThreadPoolExecutor(6) as ex:
+        res = list(ex.map(press, ASIA_PRESS))
+    since = NOW - dt.timedelta(hours=36)
+    for mkt, rx, root, err in res:
+        if err is not None:
+            failed.append(f"news {mkt} ({type(err).__name__})")
+            continue
+        items = []
+        for it in root.iter("item"):
+            title = html.unescape((it.findtext("title") or "").strip())
+            src = (it.find("source").text or "").strip() if it.find("source") is not None else ""
+            if src:
+                title = re.sub(r"\s+-\s+" + re.escape(src) + r"$", "", title)
+            try:
+                when = email.utils.parsedate_to_datetime(it.findtext("pubDate") or "")
+            except Exception:  # noqa: BLE001
+                continue
+            key = re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()[:70]
+            if when < since or key in seen or not RATE_WORDS.search(title) or not rx.search(title) or "TradingView" in src:
+                continue
+            if re.search(r"\b(reit|dividend|stock price|shares? price|ipo|mortgage|seasonal returns|fund)\b|\(0P", title, re.I):
+                continue
+            seen.add(key)
+            items.append((when, title, src))
+        for when, title, src in sorted(items, reverse=True)[:2 if mkt != "ALL" else 3]:
+            L.append(f"- {when.astimezone(SGT):%d %b %H:%M} SGT · {mkt} · {src or 'Google News'} · {title}")
+            ncom += 1
+    L.append(f"J status: {gov_n} official curve points read · TE {len(TE)} of {len(TE_SLUG)} pages · swaps {swap_note or 'none'} · "
+             f"{ncom} commentary lines" + (f" · failed: {', '.join(failed)}" if failed else ""))
+    ng = sum(1 for x in L if x.count(" | ") == 9 and not x.startswith("market"))
+    ns = sum(1 for x in L if x.count(" | ") == 8 and not x.startswith("index"))
+    return L, f"{ng} govvy + {ns} swap lines, govvies to {as_of_max or 'n/a'}"
+
+
 # ---------------------------------------------------------------- assemble
 HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026 at Mayank's request; this file is data from a pre-run script, its numbers carry their sources)
 1. TAPE: take the TAPE strip levels from section A with the quote times printed there; web-search only a level that is missing here or flagged STALE QUOTE (a closed market's last close is not stale). Reconcile source-quoted levels against A as before.
@@ -1600,7 +2084,8 @@ HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026
 8. FUNDAMENTALS (added 6 Nov 2026): section G is the weekly fundamentals pack (inflation, cycle, trade, reserves, credit, real rates for G10 and Asia). Follow its own HOW TO USE: a slow anchor for each theme's top-down view and its risks line, never a trigger, never a reason to raise p.
 9. CREDIT AND CYCLE (added 16 Nov 2026, rule R22): section H gives one CREDIT line (HY OAS, its 6-month change, the VIX z-score and a state) and one CYCLE line (Fed target, last move, what fed funds futures price, a stage and the book prior for it). R22 says where they print. Evidence lines only: never a gate, never a reason by themselves to raise or lower p.
 10. DOLLAR DRIVERS (added 23 Nov 2026): section I gives the inputs of the DOLLAR DRIVERS block that the rule of that name prints: 2y differentials of USD against EUR and JPY with their changes and how much of USD's 1m move a rate model explains, USD's sign on SPX and SOX down days over 20 and 60 sessions, sell-America days, KRW and TWD against SOX, CFTC net USD and the DTCC skew signed to USD, and a mechanical TAG. The run makes the regime call; the TAG is where it starts, and the call says where it departs from it.
-11. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines · G <fund pack date> · H <credit state>/<cycle stage> · I <tag>", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 10."""
+11. ASIA RATES (added 26 Nov 2026, owner's ask): section J gives Asia government bond yields (JGB, KTB, CGB, SGS, IGB, INDOGB, MGS, ThaiGB, TGB, RPGB, HKGB) and swap rates from DTCC prints (JPY TONA, SGD SORA, KRW CD, TWD TAIBOR, CNY repo, THB THOR, MYR KLIBOR, HKD HIBOR), each with 1d | 3d | 1w changes in bp, a MOVERS line, curve changes, swap-minus-govvy spreads and a commentary list (central banks, ING Think, press). The rule of that name says where the block prints. Cite levels and changes from J only, with its as-of dates; a commentary line is a lead, checked at its source before it carries a claim; "n/a" stays n/a, never filled from the web.
+12. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines · G <fund pack date> · H <credit state>/<cycle stage> · I <tag> · J <status>", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 11."""
 
 
 def main():
@@ -1633,11 +2118,17 @@ def main():
         sec, status["H"] = section_h(a.out); parts += [""] + sec
     if "I" not in skip:
         sec, status["I"] = section_i(a.out, dsec); parts += [""] + sec
+    if "J" not in skip:
+        try:
+            sec, status["J"] = section_j(a.out)
+        except Exception as e:  # noqa: BLE001  (a new section never stops the pack)
+            sec, status["J"] = [f"## J. ASIA RATES: failed ({type(e).__name__}: {e})"], "failed"
+        parts += [""] + sec
     if "G" not in skip:
         sec, status["G"] = section_g(a.fund); parts += [""] + sec
     head = [f"MARKET PACK — built {built:%a %d %b %Y %H:%M} SGT · A {status.get('A', 0)} assets · "
-            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines · F {status.get('F', 0)} short names · G {status.get('G') or 'n/a'} · H {status.get('H') or 'n/a'} · I {status.get('I') or 'n/a'}",
-            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS, QuiVad (JFSA/ASIC short registers), fundamentals pack (IMF, OECD, Eurostat, BIS, FRED; weekly), FRED daily (HY OAS, Fed target, EFFR), US Treasury, ECB and Japan MOF 2y yields, CFTC TFF. "
+            f"B {status.get('B', 0)} futures · D {status.get('D') or 'n/a'} · E {status.get('E', 0)} headlines · F {status.get('F', 0)} short names · G {status.get('G') or 'n/a'} · H {status.get('H') or 'n/a'} · I {status.get('I') or 'n/a'} · J {status.get('J') or 'n/a'}",
+            "Sources: Yahoo Finance (delayed quotes and daily bars), DTCC public swap data (CFTC FX), public RSS, QuiVad (JFSA/ASIC short registers), fundamentals pack (IMF, OECD, Eurostat, BIS, FRED; weekly), FRED daily (HY OAS, Fed target, EFFR), US Treasury, ECB and Japan MOF 2y yields, CFTC TFF; Asia rates from Japan MOF, Bank of Korea ECOS, ChinaMoney, Trading Economics, DTCC rates prints, BOJ/RBI/ING RSS and Google News. "
             "Built by scripts/marketpack/marketpack.py in mayank201181/Claudemacrotrades.", "", HOW_TO]
     text = "\n".join(head + parts) + "\n"
     path = os.path.join(a.out, "market_pack_latest.md")
