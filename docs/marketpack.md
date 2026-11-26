@@ -16,6 +16,7 @@ data for the Fable Macro Takeaways before it runs. The takeaways read the newest
 | F disclosed shorts JP/AU | QuiVad (keyless republication of the JFSA and ASIC short registers), added 1 Nov 2026 | most shorted Japanese and ASX names and 1-week build-ups; cited only on single-name JP/AU cards or themes |
 | H credit and cycle | FRED daily (`BAMLH0A0HYM2`, `DFEDTARU`, `EFFR`), Yahoo `^VIX` and fed funds futures, added 16 Nov 2026 | one CREDIT line and one CYCLE line that R22 prints on equity, USD and UST cards; evidence only |
 | I dollar drivers | US Treasury daily par curve (2y), ECB AAA curve 2y, Japan MOF JGB 2y (`jgb2y_history.csv` cache), Yahoo daily closes (DXY, EURUSD, USDJPY, SPX, SOX, ^TNX, USDKRW, USDTWD), CFTC TFF leveraged funds and asset managers in seven G10 currency futures converted to USD at the weekly spot, section D's RR25, added 23 Nov 2026 | inputs of the DOLLAR DRIVERS block (R37): 2y differentials and the rate-model part of USD's 1m move, DXY per -1% SPX/SOX on down days, sell-America days, KRW/TWD residual against SOX, net USD positioning, a WINDOWS table (each driver over 1d, 3d, 1w), a mechanical TAG; one row a day in `dollar_history.csv` |
+| J Asia rates | Japan MOF JGB curve, Bank of Korea ECOS (public sample key, 10 rows a call), ChinaMoney CGB curve (one month a query), Trading Economics country pages (SGS, IGB, INDOGB, MGS, ThaiGB, TGB, RPGB, HKGB), DTCC CFTC rates files (median fixed rate of outright spot or IMM-start swaps per index and tenor: JPY TONA, SGD SORA, KRW CD, TWD TAIBOR, CNY repo, THB THOR, MYR KLIBOR, HKD HIBOR, INR MIBOR), BOJ/RBI/ING Think RSS and Google News; added 26 Nov 2026 | the ASIA RATES block of rule R39: MOVERS, 1d/3d/1w bp by market, curves, swap minus govvy, a LOCAL vs GLOBAL read, a candidate expression, commentary leads. History in `asia_rates_history.csv` (400 days) |
 
 Usage: `python3 -I marketpack.py --out DIR [--sql posbuild.sql] [--skip D,E]`. Prints
 `ok: <path> <bytes> · A n · B n · D <date> · E n`. Every section fails soft. History files in DIR:
@@ -37,3 +38,10 @@ Usage: `python3 -I marketpack.py --out DIR [--sql posbuild.sql] [--skip D,E]`. P
   strikes, prints and summaries; the 06:52 build holds about 99.6% of the day's option trades.
 - JFSA rows carry QuiVad's register snapshot date, not the filing date; ASIC is aggregate per stock, T+4 or so.
 - Base-call share is a demand-for-calls proxy, not a risk reversal. Real 25-delta risk reversals need LSEG.
+- Section J (26 Nov 2026): Trading Economics prints levels to 0.01 and only a day and month change, so for SGS, IGB,
+  INDOGB, MGS, ThaiGB, TGB, RPGB and HKGB the 3d and 1w columns fill from the pack's own history (first full 1w on
+  Wed 2 Dec). The official curves (MOF, ECOS, ChinaMoney) are curve yields, not benchmark bonds, so compare changes
+  across sources, not levels. DTCC swaps are a US-reported sample: a row with n<3 is marked thin. A day read from the
+  intraday files is re-read from the full-day file at the next build. Sites tried and not usable from the cloud:
+  investing.com (403), worldgovernmentbonds (API refuses outside origins), CNBC (403), stooq (reset), ThaiBMA
+  (Cloudflare), BIX Malaysia (unreachable), BNM/BOT/BSP/BI RSS (403 or none).
