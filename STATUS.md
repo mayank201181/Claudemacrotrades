@@ -600,6 +600,10 @@ a compliance view). Details in `docs/history.md`.
     implied vol, RR25 and Asia swap medians (the archive keeps about two years and drops a day daily); A3 Asia govvy
     panel 2010-2026, beta to USTs and residual-reversion base rates for R39. Open: owner pastes them; zips come back via
     Downloads or Drive; we verify per README before anything is loaded or proposed as a rule.
+    RESULTS 26 Nov, all three verified (project files `astra_results/VERIFICATION_26nov2026.md`): A1 367 rows, blind
+    overlap 37/40, gaps where 2027 schedules are unpublished (top-up late Dec), load needs one owner SQL paste before
+    8 Jan; A2 vols and swap medians match the pack (median diff 0); A3 JGB/UST identical to our pulls, local residual
+    moves do not revert (0/93 cells), UST betas per market; owner asked yes/no on an attribution line in R39.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
