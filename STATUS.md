@@ -614,6 +614,10 @@ a compliance view). Details in `docs/history.md`.
     110/110 event dates match our library (BoJ: Astra has the real statement minute, ours a 12:00 JST placeholder,
     candidate backfill); 0/22 cells significant, thin (152 event-pairs); its median test is biased toward "implied
     rich", on means FOMC priced 2.2 extra days vs 0.8 delivered, CPI and BoJ fair to cheap. No rule from A5.
+    ROUND 3 (26 Nov evening): A8 foreign equity flows vs KRW/TWD verified: flows do not lead FX (OOS incremental R2
+    negative, 0/8 cells), FX leads flows (TWSE t -4.4); use in the R16 review 15 Dec. A7 auction tails verified: 0/39
+    cells, weak JGB/UST auctions do not predict the next 5 sessions. A6 prediction-market calibration still running
+    in ChatGPT (feeds the R12 review). His ChatGPT is signed in in the Claude app's built-in browser.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
