@@ -592,7 +592,11 @@ a compliance view). Details in `docs/history.md`.
     (JGB 10Y -20bp, KTB 10Y -21, TONA 5Y -23, TWD 5Y -17, THOR 5Y -15, SORA 5Y -12, MYR 5Y -7) matched UST 10Y -19bp,
     so it read as global beta; CGB flat. No INR/IDR/PHP swaps of any depth in DTCC. CHECK Fri 27 Nov: the 06:52 build's
     status line shows "J <n> govvy + <n> swap lines" with swaps "intraday to ~22:5xZ", and both editions print the
-    block after DOLLAR DRIVERS.
+    block after DOLLAR DRIVERS. CHECKED Fri 27 Nov: build ok (swaps intraday to 22:52Z), both editions print the block
+    after DOLLAR DRIVERS, but both led MOVERS with two off-market swap prints (SORA 3Y "-46 1w" against a 1-print
+    day; MYR 2Y "+21 1d" while its 1Y and 5Y moved +1/+2). Fixed the same morning: swap changes only between days
+    with 3+ prints, and a CHECK flag (day change 10bp+ apart from the same index's other tenors) keeps a row out of
+    MOVERS; the pack's HOW TO says thin and CHECK rows are never cited.
 
 28. **Spare ChatGPT capacity: three Astra tasks (26 Nov; owner's offer, thread "Pick ChatGPT tasks for spare capacity").**
     Prompts and our verification plan in project files `astra_tasks/` (README.md). A1 forward event calendar 1 Dec 2026
