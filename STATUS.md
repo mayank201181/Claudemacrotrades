@@ -459,7 +459,7 @@ a compliance view). Details in `docs/history.md`.
     METADATA_ONLY (no text), and concluded "no replies in 4 days"; the 21 Nov thread holding "veto P20" was outside that
     window. The Fable "none" was correct: he had not replied to any Fable digest in 30 days. FIX: rule R35 (both pipelines,
     in force 23 Nov by single-statement UPDATE; `supabase/rules/R35_reply_search.sql`) and step 3b in the Opus loader prompt:
-    one dedicated search `subject:"Re: MACRO TAKEAWAYS [Opus|[Fable" from:mayank2011@gmail.com newer_than:7d` (returns only
+    one dedicated search `subject:"Re: MACRO TAKEAWAYS [Opus|[Fable" from:OWNER_EMAIL newer_than:7d` (returns only
     threads he replied to; checked), every hit opened PLAIN_TEXT, a command on an already vetoed/closed card is logged as
     "already <status>", and the footer prints "(reply search: n threads, m new replies)". The Fable prompt (at its byte cap)
     is unchanged; it reads R35. TEST: a harmless reply "reply-search test 23 Nov ... no action wanted" was sent on the 23 Nov
