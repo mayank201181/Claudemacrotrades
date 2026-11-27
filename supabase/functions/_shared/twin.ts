@@ -183,7 +183,7 @@ export function exitBar(hourly: Bar[], closedDate: string, px: number | null): n
   let best: Bar | null = null;
   for (const b of hourly) {
     const end = b.ts + HOUR;
-    if (end <= d0 || end > d0 + DAY) continue;
+    if (end < d0 || end >= d0 + DAY) continue; // A14 TS-11: the Singapore close date as a half-open day
     if (!best || Math.abs(b.c - px) < Math.abs(best.c - px)) best = b;
   }
   return best && Math.abs(best.c / px - 1) <= 5e-4 ? best.ts + HOUR : null;

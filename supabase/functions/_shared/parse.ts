@@ -289,7 +289,11 @@ export function ideaDirection(idea: string, proxy?: string | null): number | nul
   if (!m) return null;
   let dir = ['long', 'buy', 'receive', 'steepener', 'widener'].includes(m[1]) ? 1 : -1;
   // A bond position priced on a single yield index moves opposite to the yield.
-  if (proxy && YIELD_PROXY.test(proxy.trim()) && !/steepener|flattener|widener|tightener|yield/.test(s)) dir = -dir;
+  // A14 TS-10: only a yield named as the thing traded ("long 10y yield", "short the yield") keeps the sign;
+  // "buy 10Y Treasuries as the yield falls" is a bond position. Curve words anywhere keep it, as before.
+  const object = s.slice((m.index ?? 0) + m[0].length).trimStart();
+  const explicitYield = /^(?:the\s+)?(?:(?:us|ust|treasury|bond|\d+[- ]?(?:year|yr|y)s?)\s+)*yields?\b/.test(object);
+  if (proxy && YIELD_PROXY.test(proxy.trim()) && !/steepener|flattener|widener|tightener/.test(s) && !explicitYield) dir = -dir;
   return dir;
 }
 
@@ -320,9 +324,15 @@ export function parseLedgerT(line: string, model: Model, seq: number): Tested | 
   }
   const vp = verdictParts(f[0] ?? '');
   const reason = [vp.reason, ...free].filter(Boolean).join(' · ') || null;
-  const proxy = kv.proxy && kv.proxy !== 'none' && kv.proxy !== '-' ? kv.proxy : null;
+  // The ledger can state the side on the proxy itself ("proxy long INR=X" for a short-rupee idea): that side is
+  // the direction on the symbol, and the word is not part of it (27 Nov 2026: such rows were never priced).
+  // "several" names no single symbol.
+  const pm = (kv.proxy ?? '').match(/^(long|short)\s+(\S.*)$/i);
+  const proxy0 = pm ? pm[2].trim() : kv.proxy;
+  const proxy = proxy0 && !/^(none|-|several)$/i.test(proxy0) ? proxy0 : null;
+  const direction = pm && proxy ? (pm[1].toLowerCase() === 'long' ? 1 : -1) : ideaDirection(idea, proxy);
   return {
-    model, d: m[1], seq, idea: idea.trim(), proxy, direction: ideaDirection(idea, proxy),
+    model, d: m[1], seq, idea: idea.trim(), proxy, direction,
     verdict: vp.verdict, fail_code: vp.fail_code, covered_by: vp.covered_by,
     rr: num(kv.rr), p: num(kv.p), p0: num(kv.p0), ev: num(kv.ev), reason, source: 'ledger',
   };

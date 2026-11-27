@@ -129,7 +129,7 @@ export function parseYellowTag(inner: string, d: string): { move?: QMove } | nul
     move: {
       qid: hm[2].toUpperCase(), tag_n: Number(hm[1]), net, net_val, question,
       // Tags without a "resolves" field still carry the deadline in the question ("… by 9 Oct?").
-      resolves: dateNear(resolves_text, d) ?? dateNear(question?.match(/\b(?:by|through|before)\s+(?:[A-Z][a-z]{2}\s+)?(\d{1,2}\s+[A-Z][a-z]{2,8})/)?.[1], d),
+      resolves: dateNear(resolves_text, d) ?? dateNear(question?.match(/\b(?:by|through|before)\s+(?:[A-Z][a-z]{2}\s+)?(\d{1,2}\s+[A-Z][a-z]{2,8}(?:\s+\d{4})?)/)?.[1], d), // A14 TS-13: a written year is kept
       resolves_text, implied, priced, evidence,
     },
   };
@@ -163,7 +163,7 @@ function footerEvents(t: string, d: string): { events: QEvent[]; scorecard: Reco
     }
   }
   const sc = t.match(/SCORECARD:\s*resolved\s+(\d+)\s*·\s*hit\s+(\d+)\s*·\s*miss\s+(\d+)\s*·\s*flat\s+(\d+)(?:\s*·\s*against-market:\s*(\d+)\s*calls?\s*·\s*(\d+)\s*hit)?/i);
-  const scorecard = sc ? { resolved: +sc[1], hit: +sc[2], miss: +sc[3], flat: +sc[4], against_calls: sc[5] ? +sc[5] : 0, against_hit: sc[6] ? +sc[6] : 0 } : null;
+  const scorecard = sc ? { resolved: +sc[1], hit: +sc[2], miss: +sc[3], flat: +sc[4], ...(sc[5] == null ? {} : { against_calls: +sc[5], against_hit: +sc[6] }) } : null; // A14 TS-12: absent stays absent
   return { events, scorecard };
 }
 

@@ -153,3 +153,35 @@ test('EDGE-014: an older trade book snapshot is recognised', async () => {
   assert.equal(isOlderBook(null, '2026-11-27 07:45 SGT'), false);
   assert.equal(isOlderBook('2026-11-27', '2026-11-27 07:45 SGT'), true);
 });
+
+test('TS-10: a bond trade on a yield index is inverted unless the yield itself is traded', async () => {
+  const { ideaDirection } = await import('./parse.ts');
+  assert.equal(ideaDirection('Buy 10Y Treasuries as the yield falls', '^TNX'), -1, 'the old code gave +1');
+  assert.equal(ideaDirection('long 10y yield into supply', '^TNX'), 1);
+  assert.equal(ideaDirection('short the yield', '^TNX'), -1);
+  assert.equal(ideaDirection('long 10y futures', '^TNX'), -1);
+  assert.equal(ideaDirection('2s10s steepener: long the long end', '^TNX'), 1);
+});
+
+test('ledger proxies that carry their side ("proxy long INR=X") are priced on the symbol in that direction', async () => {
+  const { parseLedgerT } = await import('./parse.ts');
+  const a = parseLedgerT('- 2026-11-20 · T · short the rupee into outflows → not carded (c) · proxy long INR=X · rr 1.5', 'fable', 0)!;
+  assert.equal(a.proxy, 'INR=X'); assert.equal(a.direction, 1);
+  const b = parseLedgerT('- 2026-11-20 · T · long Korea → not carded (c) · proxy short ^KS11', 'fable', 0)!;
+  assert.equal(b.proxy, '^KS11'); assert.equal(b.direction, -1);
+  assert.equal(parseLedgerT('- 2026-11-20 · T · Asia basket → not carded (c) · proxy several', 'fable', 0)!.proxy, null);
+  const c = parseLedgerT('- 2026-11-20 · T · long gold → not carded (c) · proxy GC=F', 'fable', 0)!;
+  assert.equal(c.proxy, 'GC=F'); assert.equal(c.direction, 1);
+});
+
+test('TS-11, TS-12, TS-13', async () => {
+  const { exitBar } = await import('./twin.ts');
+  // close date 3 Nov SGT starts at 2 Nov 16:00 UTC; a bar ending exactly then belongs to the 3rd, one ending a day later does not
+  const d0 = Date.UTC(2026, 10, 2, 16);
+  const mk = (end: number, c: number): Bar => ({ ts: end - HOUR, o: c, h: c, l: c, c });
+  assert.equal(exitBar([mk(d0, 100), mk(d0 + 24 * HOUR, 100.001)], '2026-11-03', 100), d0);
+  assert.equal(exitBar([mk(d0 + 24 * HOUR, 100)], '2026-11-03', 100), null, 'the next date is outside');
+  const { extractQuestions } = await import('./questions.ts');
+  const q = extractQuestions('<p>SCORECARD: resolved 4 · hit 2 · miss 1 · flat 1</p>', '2026-11-27');
+  if (q.scorecard) assert.equal('against_calls' in q.scorecard, false);
+});
