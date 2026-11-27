@@ -638,6 +638,14 @@ a compliance view). Details in `docs/history.md`.
     within $0.15 median of our CL bars; curve percentile 0/36 cells; inventory surprises 14/288 cells, all 2010-19, sign
     flips after 2020 (crude release-day R2 5% to ~0%); no rule. Write-ups in project files
     astra_results/VERIFICATION_A4_A5_26nov2026.md. A6 still running at 08:00 SGT 27 Nov.
+    ROUND 5 (27 Nov, his ask to use spare ChatGPT capacity; write-up astra_results/VERIFICATION_round5_27nov2026.md):
+    A11 2027 holiday/settlement/FX tenor calendar accepted (JPY, GBP, EUR, USD checked against official sources; INR,
+    NSE, SGX MSCI, IDR, PHP Eid still unpublished, re-run with the A1 top-up in late Dec). A12 regime playbook: 0/464
+    cells survive OOS after BH, no rule, use for stress tests. A13 FX touch calibration: engine verified, no G10
+    mispricing, onshore USDCNY upside touches overstated by carry, no rule. A14 code audit of commit ec6b1fb: 89
+    findings (1 critical, 31 high); 4 checked and real (US stock daily bars dated a day late in dash-mark; oneR reads
+    ".0025" as 25; fxopt 10d strikes use the 25d vol; DNT zero in extreme corridors); fixes go to a separate thread
+    with our own tests before any redeploy. A15 event reaction DB and A6 still running.
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
