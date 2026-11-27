@@ -73,8 +73,10 @@ items); search earned the misses.
 Cost: two short runs a day. They ran on the project's default model, Fable 5.1, on 21 Nov (about US$4.70 for the
 sweep) and on Opus 5.5 from 22 Nov after the default changed.
 
-The scorer was switched off on 27 Nov. The fixed sweep prompt is in `scripts/exa_sweep/sweep_prompt.txt`; the task
-still holds the trial prompt until it is deleted and created again, which happens only on the owner's keep.
+The scorer was switched off on 27 Nov. The owner chose keep with the fix (27 Nov). The trial sweep task was switched
+off and the sweep re-created as `trig_01SZVyo7MymHk7FFPX6Wd3rx` (05:51 SGT) with the fixed prompt in
+`scripts/exa_sweep/sweep_prompt.txt`. Rule R40 (`supabase/rules/R40_exa_sweep.sql`) lets both Takeaways read Drive
+`exa_sweep_latest` from Sun 29 Nov 20:00 SGT, as dated leads confirmed at source before they move a view; review 27 Dec.
 
 ## Known limits
 
