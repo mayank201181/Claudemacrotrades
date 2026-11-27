@@ -178,6 +178,9 @@ def kalshi():
 
 def implied_median(ladder):
     """Strike where P(above) crosses 50%, linearly interpolated; None if never crossed."""
+    for o in ladder:
+        if o["p"] == 0.5:
+            return o["strike"]
     for a, b in zip(ladder, ladder[1:]):
         if a["p"] >= 0.5 > b["p"]:
             return a["strike"] + (a["p"] - 0.5) / max(a["p"] - b["p"], 1e-9) * (b["strike"] - a["strike"])
@@ -208,19 +211,23 @@ def render(rows, stamp):
     order = [b for b, _ in BUCKETS] + ["Other macro"]
     lines = [f"# Prediction-market odds, {stamp}",
              "Polymarket + Kalshi, public APIs. p = mid (or last) YES price = crowd-implied probability; "
-             "d1/d7 = change in pp over 1 day / 7 days (Kalshi: d1 only). v24 = 24h volume $; liq = "
-             "Polymarket liquidity or Kalshi open interest $. Ladders ('Above X') show P(above) per strike "
+             "d1/d7 = change in pp over 1 day / 7 days (Kalshi: d1 only). Polymarket volume and liquidity are USD; "
+             "Kalshi volume and open interest are contracts. Ranked by volume within venue. Ladders ('Above X') show P(above) per strike "
              "and the implied median. Contracts with p under 3% or over 97% are hidden unless they are the "
              "leading outcome. Evidence of what the crowd prices, not a view.", ""]
     for b in order:
         rs = [r for r in rows if r["bucket"] == b]
         if not rs:
             continue
-        rs = sorted(rs, key=lambda r: -(r["v24"] or 0))[:BUCKET_CAP]
+        groups = {venue: sorted((r for r in rs if r["venue"] == venue), key=lambda r: -(r["v24"] or 0))
+                  for venue in sorted({r["venue"] for r in rs})}
+        # Interleave within-venue ranks under the existing total cap.
+        rs = [g[i] for i in range(max(map(len, groups.values()))) for g in groups.values() if i < len(g)][:BUCKET_CAP]
         lines.append(f"## {b}")
         for r in rs:
-            head = (f"- {r['title']} [{r['venue']}; resolves {r['end'] or '?'}; v24 ${r['v24']:,.0f}; "
-                    f"liq ${r['liq']:,.0f}]")
+            activity = (f"v24 {r['v24']:,.0f} contracts; OI {r['liq']:,.0f} contracts" if r['venue'] == 'Kalshi'
+                        else f"v24 ${r['v24']:,.0f}; liq ${r['liq']:,.0f}")
+            head = f"- {r['title']} [{r['venue']}; resolves {r['end'] or '?'}; {activity}]"
             if r.get("ladder"):
                 live = [o for o in r["outcomes"] if 0.03 <= o["p"] <= 0.97]
                 med = r.get("median")

@@ -210,16 +210,19 @@ def fred():
 def yoy_3mma(lv):
     """3-month sum y/y % from a monthly level series."""
     d = dict(lv)
-    ps = [p for p, _ in lv]
     out = []
-    for i in range(14, len(ps)):
-        cur = ps[i - 2:i + 1]
-        y, mth = int(ps[i][:4]), int(ps[i][5:7])
-        prev = [f"{y - 1}-{int(p[5:7]):02d}" for p in cur]
-        if all(p in d for p in prev) and len(cur) == 3:
+    for period in sorted(d):
+        year, month = map(int, period.split("-"))
+        index = 12 * year + month - 1
+        def period_at(i):
+            y, m = divmod(i, 12)
+            return f"{y:04d}-{m + 1:02d}"
+        cur = [period_at(index - k) for k in range(3)]
+        prev = [period_at(index - 12 - k) for k in range(3)]
+        if all(p in d for p in cur + prev):
             a, b = sum(d[p] for p in cur), sum(d[p] for p in prev)
             if b:
-                out.append((ps[i], 100 * (a / b - 1)))
+                out.append((period, 100 * (a / b - 1)))
     return out
 
 
@@ -315,10 +318,8 @@ def build():
         }
         if r["pol"] and r["cpi"]:
             real = r["pol"]["v"] - r["cpi"]["v"]
-            # real rate 6 months ago from the two series' own history
-            p6 = pol[-7][1] if len(pol) > 6 else None
-            c6 = cpi[-7][1] if len(cpi) > 6 else None
-            r["real"] = {"v": real, "d6": (real - (p6 - c6)) if p6 is not None and c6 is not None else None}
+            policy_d6, cpi_d6 = r["pol"]["d6"], r["cpi"]["d6"]
+            r["real"] = {"v": real, "d6": policy_d6 - cpi_d6 if policy_d6 is not None and cpi_d6 is not None else None}
         rows[cc] = r
     return rows, data
 
@@ -328,7 +329,7 @@ def regime(r):
     out = []
     if r["cpi"]:
         out.append("infl " + {"↑": "rising", "↓": "falling", "→": "flat", "·": "?"}[arrow(r["cpi"]["d3"], 0.2)])
-    if r["cli"]:
+    if r["cli"] and r["cli"]["d3"] is not None:
         lv, d = r["cli"]["v"], r["cli"]["d3"]
         phase = ("expansion" if d > 0 else "slowdown") if lv >= 100 else ("recovery" if d > 0 else "downturn")
         out.append(f"cycle {phase}")

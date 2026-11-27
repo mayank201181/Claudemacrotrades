@@ -248,7 +248,13 @@ def claims(snippet):
 
 
 def found(tok_forms, text_l):
-    return any(re.search(r"(?<![\w])" + re.escape(f.lower()) + r"(?![\w])", text_l) for f in tok_forms)
+    for form in tok_forms:
+        pattern = re.escape(form.lower())
+        if form[0].isdigit():
+            pattern = r"(?<!\d[.,])" + pattern + r"(?![.,]\d)"
+        if re.search(r"(?<!\w)" + pattern + r"(?!\w)", text_l):
+            return True
+    return False
 
 
 def cmd_score(digests_path, out):

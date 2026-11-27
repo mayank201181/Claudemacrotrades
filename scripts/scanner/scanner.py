@@ -132,7 +132,17 @@ def yahoo_bars(sym, rng):
     res = j["chart"]["result"][0]
     q = res["indicators"]["quote"][0]
     out = []
+    now = dt.datetime.now(dt.timezone.utc)
+    regular = res.get("meta", {}).get("currentTradingPeriod", {}).get("regular", {})
+    session_end = regular.get("end")
     for i, ts in enumerate(res.get("timestamp") or []):
+        d_utc = dt.datetime.fromtimestamp(ts, dt.timezone.utc).date()
+        if d_utc > now.date():
+            continue
+        if d_utc == now.date() and not (
+                session_end and dt.datetime.fromtimestamp(session_end, dt.timezone.utc).date() == d_utc
+                and ts <= session_end <= now.timestamp()):
+            continue
         c = q["close"][i]
         if c is None or not (c == c) or c <= 0:
             continue
@@ -196,9 +206,10 @@ def merge(old, new):
     rows = sorted(d.values())
     cutoff = (dt.date.today() - dt.timedelta(days=366 * MAX_YEARS)).isoformat()
     rows = [r for r in rows if r[0] >= cutoff]
-    # drop the incomplete bar Yahoo serves for a session still open (its date is today in UTC)
+    # Only newly fetched, session-checked bars can supply today's value.
     today = dt.datetime.now(dt.timezone.utc).date().isoformat()
-    return [r for r in rows if r[0] < today]
+    today_seen = any(r[0] == today for r in new)
+    return [r for r in rows if r[0] < today or (r[0] == today and today_seen)]
 
 
 def load_history(outdir, fetch=True):
@@ -286,7 +297,7 @@ def rsi_series(closes, n=14):
             gains = (gains * (n - 1) + g) / n
             losses = (losses * (n - 1) + l) / n
         if i >= n:
-            out[i] = 100.0 if losses == 0 else 100 - 100 / (1 + gains / losses)
+            out[i] = 50.0 if gains == losses == 0 else (100.0 if losses == 0 else 100 - 100 / (1 + gains / losses))
     return out
 
 
@@ -366,7 +377,7 @@ def base_rate(kind, closes, atr, evs, direction, exclude_last=0, dates=None):
     for k in HORIZONS:
         f = [fwd(kind, closes, i, k) for i, d in evs if d == direction and i < n - k - exclude_last]
         f = [x for x in f if x is not None]
-        allf = [fwd(kind, closes, j, k) for j in range(20, n - k, 3)]
+        allf = [fwd(kind, closes, j, k) for j in range(0, n - k - exclude_last)]
         allf = [x for x in allf if x is not None]
         base = sum(1 for x in allf if x * direction < 0) / len(allf) if allf else 0.5
         hits = sum(1 for x in f if x * direction < 0)
@@ -509,14 +520,16 @@ def seasonal(label, s, today, k=20):
     if n < SEAS_MIN_YEARS:
         return None
     ups = sum(1 for _, r in this if r > 0)
-    hit = max(ups, n - ups) / n
-    direction = 1 if ups >= n - ups else -1
+    downs = sum(1 for _, r in this if r < 0)
+    hit = max(ups, downs) / n
+    direction = 1 if ups >= downs else -1
     med = statistics.median(r for _, r in this)
-    allf = [fwd(kind, closes, j, k) for j in range(20, len(closes) - k, 3)]
+    allf = [fwd(kind, closes, j, k) for j in range(0, len(closes) - k)]
     allf = [x for x in allf if x is not None]
     base_up = sum(1 for x in allf if x > 0) / len(allf) if allf else 0.5
-    base = base_up if direction > 0 else 1 - base_up
-    p = binom_p(max(ups, n - ups), n, base)
+    base_down = sum(x < 0 for x in allf) / len(allf) if allf else 0.5
+    base = base_up if direction > 0 else base_down
+    p = binom_p(max(ups, downs), n, base)
     # placebo: share of all start dates in the calendar year passing the same rule
     passed = total = 0
     for doy in range(1, 366, 3):
@@ -525,7 +538,8 @@ def seasonal(label, s, today, k=20):
         if len(w) >= SEAS_MIN_YEARS:
             total += 1
             u = sum(1 for _, r in w if r > 0)
-            if max(u, len(w) - u) / len(w) >= SEAS_HIT:
+            down = sum(1 for _, r in w if r < 0)
+            if max(u, down) / len(w) >= SEAS_HIT:
                 passed += 1
     placebo = passed / total if total else None
     last5 = ", ".join(f"{y % 100:02d}:{r:+.1f}" for y, r in this[-5:])
@@ -625,14 +639,16 @@ def cftc_scan(cache, series):
                 for i, fl in evs:
                     if fl != direction:
                         continue
-                    j = px_index(dates[i])
+                    # A14 PY03: a Tuesday position is published on Friday at 15:30 New York (later after a US
+                    # holiday), so its forward move starts at the first close after that Friday, never on Tuesday.
+                    j = px_index((dt.date.fromisoformat(dates[i]) + dt.timedelta(days=4)).isoformat())
                     if j is None:
                         continue
                     for k in HORIZONS:
                         r = fwd(s["kind"], closes, j, k)
                         if r is not None:
                             f[k].append(r)
-                allf = {k: [x for x in (fwd(s["kind"], closes, j, k) for j in range(20, len(closes) - k, 3)) if x is not None] for k in HORIZONS}
+                allf = {k: [x for x in (fwd(s["kind"], closes, j, k) for j in range(0, len(closes) - k)) if x is not None] for k in HORIZONS}
                 br[direction] = {}
                 for k in HORIZONS:
                     base = sum(1 for x in allf[k] if x * bet < 0) / len(allf[k]) if allf[k] else 0.5
@@ -756,7 +772,8 @@ def build(outdir, fetch):
                 brs = ("record after past crowded " + ("longs" if near > 0 else "shorts") + ": " + fmt_br(br, c["kind"]))
                 v = verdict(br)
         chg = f"{c['chg4']:+,.0f}" if c["chg4"] is not None else "n/a"
-        L.append(f"{c['label']} | {c['asof']} | {fmt_num(c['net'])} | {chg} | {c['pct'] * 100:.0f} | {state} | {brs or '-'} | {v or '-'}")
+        pct_text = f"{c['pct'] * 100:.0f}" if c['pct'] is not None else "n/a"
+        L.append(f"{c['label']} | {c['asof']} | {fmt_num(c['net'])} | {chg} | {pct_text} | {state} | {brs or '-'} | {v or '-'}")
     L.append("")
     exp_fp = 0.05 * tests
     L.append("## D. METHOD AND HONESTY")

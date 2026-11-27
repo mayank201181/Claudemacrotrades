@@ -24,7 +24,7 @@ YouTube's public Atom feeds
 the YouTube step prints what it skipped.
 
 Output, under the data root (default /mnt/project-files/transcribe/):
-  transcripts/<SGT date>/<show>__<slug>.md     one file per episode (header, then the text with offsets)
+  transcripts/<SGT date>/<show>__<slug>__<guid hash>.md one file per episode (header, then the text with offsets)
   transcripts/podcast_transcripts_<SGT date>.md     the day's podcast transcripts (Drive: podcast_transcripts_latest)
   transcripts/youtube_transcripts_<date>_pNN.md     the day's YouTube transcripts in parts of at most 2.5 MB
                                                     (Drive: youtube_transcripts_latest_pNN), A-tier channels first
@@ -202,7 +202,8 @@ def parse_rss(xml_bytes):
 
 
 def discover_podcasts(hours, state, cache):
-    since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
+    now = dt.datetime.now(dt.timezone.utc)
+    since = now - dt.timedelta(hours=hours)
     found, problems = [], []
     for apple_id, name in read_shows():
         url = feed_url(apple_id, cache)
@@ -215,7 +216,7 @@ def discover_podcasts(hours, state, cache):
             problems.append(f"{name}: feed failed ({str(e)[:80]})")
             continue
         for ep in eps:
-            if ep["published"] < since:
+            if not since <= ep["published"] <= now:
                 continue
             if ep["guid"] in state["done"]:
                 continue
@@ -304,7 +305,8 @@ def transcribe_file(audio_path, api_key, workdir):
 def write_episode(ep, text, minutes, usd, parts, date):
     day_dir = rpath("transcripts", date)
     os.makedirs(day_dir, exist_ok=True)
-    name = f"{slug(ep['show'], 30)}__{slug(ep['title'])}.md"
+    uid = hashlib.sha256(ep["guid"].encode()).hexdigest()[:16]
+    name = f"{slug(ep['show'], 30)}__{slug(ep['title'])}__{uid}.md"
     path = os.path.join(day_dir, name)
     words = len(text.split())
     head = [
@@ -463,7 +465,8 @@ def channel_feed(ch):
 
 
 def discover_youtube(hours, state):
-    since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=hours)
+    now = dt.datetime.now(dt.timezone.utc)
+    since = now - dt.timedelta(hours=hours)
     found, problems = [], []
     chans = read_channels()
     with cf.ThreadPoolExecutor(max_workers=8) as ex:
@@ -473,7 +476,7 @@ def discover_youtube(hours, state):
             problems.append(f"{ch['name']}: {str(res)[:60]}")
             continue
         for vid, title, when in res:
-            if when < since or f"yt:{vid}" in state["done"]:
+            if not since <= when <= now or f"yt:{vid}" in state["done"]:
                 continue
             found.append({"guid": f"yt:{vid}", "video_id": vid, "title": html.unescape(title), "published": when,
                           "show": ch["name"], "url": f"https://www.youtube.com/watch?v={vid}", "source": "youtube",

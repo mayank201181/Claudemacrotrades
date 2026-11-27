@@ -1023,7 +1023,7 @@ def section_e():
                     when = when.replace(tzinfo=dt.timezone.utc)
             except Exception:  # noqa: BLE001
                 continue
-            if when < since or (len(title) < 25 and not keep_all):
+            if not since <= when <= NOW or (len(title) < 25 and not keep_all):
                 continue
             if "Stock Price & Latest News" in title or "Trending News" in title or not (keep_all or words.search(title)):
                 continue
@@ -1178,7 +1178,7 @@ def _asof(rows, day):
 
 def credit_state(vix_z, d6_bp):
     """Book rule (Willer and Saunders ch. 3): a VIX +2 sigma spike carries information only when HY spreads are wider over six months."""
-    if vix_z is None or d6_bp is None:
+    if vix_z is None or d6_bp is None or not all(map(math.isfinite, (vix_z, d6_bp))):
         return "n/a"
     if vix_z >= 2.0:
         return "confirmed" if d6_bp > 0 else "unconfirmed"
@@ -1375,7 +1375,7 @@ def _rr25(dlines):
     """RR25 per pair from section D's implied vol table (+ = base-currency calls over)."""
     out = {}
     for ln in dlines:
-        m = re.match(r"([A-Z]{6}) \| fwd .*?RR25 ([+-]?\d+\.\d+) ±(\d+\.\d+)", ln)
+        m = re.match(r"([A-Z]{6})(?: \[5d\])? \| fwd .*?RR25 ([+-]?\d+\.\d+) ±(\d+\.\d+)", ln.replace("USDCNH/CNY [5d]", "USDCNY [5d]"))
         if m:
             out[m[1]] = (float(m[2]), float(m[3]))
     return out
@@ -1389,7 +1389,7 @@ def _cftc_usd():
     data = json.loads(get(f"https://publicreporting.cftc.gov/resource/gpe5-46if.json?$select={cols}&$where={where}&$limit=20000", timeout=90, tries=2))
     spot = {}
     for ccy, _, _, sym, _ in CFTC_FX:
-        _, rows = yahoo_chart(sym, rng="5y", interval="1wk")
+        _, rows = yahoo_chart(sym, rng="5y", interval="1d")
         spot[ccy] = [(dt.datetime.fromtimestamp(r[0], dt.timezone.utc).strftime("%Y-%m-%d"), r[4]) for r in rows]
     meta = {c: (ccy, size, xxxusd) for ccy, c, size, _, xxxusd in CFTC_FX}
     agg = {}  # date -> {"lev": usd bn, "am": usd bn, "n": ccys}
@@ -1398,6 +1398,10 @@ def _cftc_usd():
         d = r["report_date_as_yyyy_mm_dd"][:10]
         s = _asof(spot[ccy], d)
         if not s:
+            continue
+        fields = ("lev_money_positions_long", "lev_money_positions_short",
+                  "asset_mgr_positions_long", "asset_mgr_positions_short")
+        if any(r.get(field) in (None, "") for field in fields):
             continue
         usd_per_ccy = s if xxxusd else 1.0 / s
         a = agg.setdefault(d, {"lev": 0.0, "am": 0.0, "n": 0})
@@ -2090,7 +2094,7 @@ def section_j(outdir):
                 when = when if when.tzinfo else when.replace(tzinfo=dt.timezone.utc)
             except Exception:  # noqa: BLE001
                 continue
-            if when >= since and rx.search(title):
+            if since <= when <= NOW and rx.search(title):
                 items.append((when, title, (it.findtext("link") or "").strip()))
         for when, title, link in sorted(items, reverse=True)[:4]:
             L.append(f"- {when.astimezone(SGT):%d %b %H:%M} SGT · {label} · {title} · {link}")
@@ -2123,7 +2127,9 @@ def section_j(outdir):
             except Exception:  # noqa: BLE001
                 continue
             key = re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()[:70]
-            if when < since or key in seen or not RATE_WORDS.search(title) or not rx.search(title) or "TradingView" in src:
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=dt.timezone.utc)
+            if not since <= when <= NOW or key in seen or not RATE_WORDS.search(title) or not rx.search(title) or "TradingView" in src:
                 continue
             if re.search(r"\b(reit|dividend|stock price|shares? price|ipo|mortgage|seasonal returns|fund)\b|\(0P", title, re.I):
                 continue
