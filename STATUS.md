@@ -40,12 +40,12 @@ Scheduled tasks and rules were read from the live systems on 10 Nov._
 | `scripts/apps_script/Code.gs` | Gmail and Drive feeder in the owner's Google account, posts to `dash-ingest`. Uses a Grok Bot HTML attachment as the body and mails one inline copy for the digests. Opens the trade book with DocumentApp, so a plain-text `trade_book_current` is skipped | every 10 min |
 | `scripts/apps_script/Spec.gs` | applies a staged `trade_book_spec_edits` JSON to the spec Doc, archiving it first | every 10 min |
 | `scripts/apps_script/Alert.gs` | the morning check outside Claude: mails the owner when no Macro Takeaways email has arrived. Installed by the owner on 11 Nov (file `alert.gs` in the Apps Script project of `Code.gs`, `setupTakeawaysAlert` run once, confirmation mail received). The file must hold only that code: pasted inside the editor's empty `myFunction` stub it installs nothing | daily 08:15 to 08:45 SGT, first check 12 Nov |
-| `dash-ingest` (v10) | raw payloads into the `dash` tables (digests, trade books, feeds, questions). Since 10 Nov it keeps a card's `risk` key (R17) and its TWIN line (R18), and stores a "[Gemini]" digest copy under the source `gemini` (it had been stored as `claude`). On `main` since 12 Nov the sanitiser keeps `colspan` on table cells (for the digest's full-width Next rows; not yet deployed, the site spans such rows by CSS instead). The deployed function is a stub importing this repo at `main` commit 08a5516; rollback is the same stub pinned to 9fcaed6 | on post |
-| `dash-mark` (v7) | live R per open trade (one R = the card's planned risk when it carries a `risk` key, R17), hourly-close stop flag (spec v15), option twins priced on the smile and marked hourly (R18, `twin_*` keys in the card's meta), shadow outcomes in ATR(20) units. Stub pinned to 9fcaed6, rollback fe335fd | pg_cron `7 * * * *` |
+| `dash-ingest` (v11) | raw payloads into the `dash` tables (digests, trade books, feeds, questions). Since 10 Nov it keeps a card's `risk` key (R17) and its TWIN line (R18), and stores a "[Gemini]" digest copy under the source `gemini` (it had been stored as `claude`). On `main` since 12 Nov the sanitiser keeps `colspan` on table cells (for the digest's full-width Next rows; not yet deployed, the site spans such rows by CSS instead). Since 27 Nov (Astra A14 fixes): an older copy of a digest or book never overwrites a newer one (marks and log lines only), tested lines are replaced only from the current copy, today is the Singapore date, ledger proxies written "long X" carry the side as direction. The deployed function is a stub importing this repo at commit 47825f3; rollback is the same stub pinned to 08a5516 | on post |
+| `dash-mark` (v9) | live R per open trade (one R = the card's planned risk when it carries a `risk` key, R17), hourly-close stop flag (spec v15), option twins priced on the smile and marked hourly (R18, `twin_*` keys in the card's meta), shadow outcomes in ATR(20) units. Since 27 Nov (Astra A14): daily bars carry their own session date and close time (US stocks and ^TNX had been dated a day late), the fill bar counts for the hourly-close stop, ideas and fills older than 25 days use 6-month hourly bars, `{dry:true}` writes nothing and returns `would`; idea upserts are batched and the bar archive is 48 hourly / 10 daily bars, which brought it back under the 2 s CPU cap (v7 had died in about 9 of 24 hourly runs). Stub pinned to 47825f3, rollback 9fcaed6 | pg_cron `7 * * * *` |
 | dashboard banner (`site/app.js`) | a red banner on every tab when today's Fable digest row is still absent at 08:20 SGT | on page load |
 | `dash.refresh_scores()` | Voices scoring v2, crowding, rule inputs | pg_cron `40 22 * * *` UTC |
 | `dash-trend` (v9, TM1) | 38-asset trend monitor, events, FX one-touch board, Carver forecast block (R10). FX closes at 17:00 New York since 10 Nov (all pairs but USDCNH, USDINR, USDIDR). The deployed function is a stub importing this repo at `main` commit 3ac3126 (PR #111, 22 Nov: CPU cut under the 2 s cap); rollback is the same stub pinned to d334277 | pg_cron 00:30 UTC Tue-Sat |
-| `dash-history`, `dash-gdelt` | research relays (Yahoo bars, GDELT DOC API). `dash-probe` is a retired stub that answers 410 | on call |
+| `dash-history`, `dash-gdelt` | research relays (Yahoo bars, GDELT DOC API); `dash-history` is a stub at 47825f3 since 27 Nov (bad start dates refused, missing volume and adjusted closes blank). `dash-probe` is a retired stub that answers 410 | on call |
 | `dash.put_drivers`, Drivers tab | one drivers snapshot as of 2024-09-30; no part passed its holdout, engine parked | none |
 | event library (`016_event_library.sql`) | `dash.event_brief()` and `dash.event_lookup()` for the digests (R05); calendar ends 8 Jan 2027 | loaded by hand |
 | `msd-*` functions and jobs, `chatgpt_macro` job | the macro-state database's own pipelines, not part of this repo | pg_cron |
@@ -294,8 +294,8 @@ of an hourly high or low, stop on an hourly close (v15, from 26 Oct). Retention:
    had skipped it (13 Nov odds never uploaded; no builds 17 and 18 Nov after the feeder thread hit the spend limit).
    The shadow tasks' crons recur in Nov 2027; the
    16 Nov verdict task switches them off.
-2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to 3ac3126 since 22 Nov), `dash-mark`
-   (9fcaed6) and `dash-ingest` (08a5516; `main` has the colspan change since 009d343, a deploy from a thread was refused by the permission classifier on 12 Nov, so re-pin it with the next function change) are one-file stubs that import this repo at a `main` commit: merge,
+2. **After a change to a function or to `_shared`, re-pin its stub.** `dash-trend` (pinned to 3ac3126 since 22 Nov; `main` has the A14 TS-06 fix in `forecast.ts` since 27 Nov, not deployed, re-pin with its next change), `dash-mark`
+   and `dash-ingest` (both 47825f3 since 27 Nov) are one-file stubs that import this repo at a `main` commit: merge,
    deploy the stub with the new commit, POST a dry run through `pg_net` and read the reply in `net._http_response`.
    The branch `claude/project-thread-e80nxd` holds the `dash-trend` rollback commit 64d1f84; keep it until the New
    York clock has run cleanly for a couple of weeks.
@@ -646,6 +646,20 @@ a compliance view). Details in `docs/history.md`.
     findings (1 critical, 31 high); 4 checked and real (US stock daily bars dated a day late in dash-mark; oneR reads
     ".0025" as 25; fxopt 10d strikes use the 25d vol; DNT zero in extreme corridors); fixes go to a separate thread
     with our own tests before any redeploy. A15 event reaction DB and A6 still running.
+
+29. **Astra A14 code audit fixed (27 Nov; thread "Fix Astra code audit findings").** 89 findings on ec6b1fb; every fix
+    came with our own test that fails on the old code (`supabase/functions/_shared/audit_a14.test.ts`,
+    `scripts/fxopt/test_audit_a14.py`, `scripts/marketpack/test_marketpack_iv.py` section 8, `scripts/tests_a14/`).
+    Fixed and live: dash-mark, dash-ingest, dash-history (above), fxopt pricer (EX01-09, VAN-001-006, `price_pips` now
+    real pips with `price_terms` beside it; Drive loader fxopt.py pinned to 47825f3), marketpack PY01/02/18 and the
+    feeder fixes PY03-07/10-17/19-26 (copies in project files updated). Declined: TS-14 and TS-17 (they would skip live
+    cards and twins that omit carry or pay; the defaults stay documented). Not done, low value or replay-only:
+    TS-04/05, EDGE-010/011 (dash-trend replays), PY08/09 (sleeve replay.sql), SQL02/06-10/12/13. 4 of 1,046 frozen
+    idea references came from the old daily-close fallback; left as they are. OPEN: the owner pastes
+    `supabase/migrations/020_audit_a14.sql` (project files `astra_results/a14_sql_fixes.sql`) in the SQL editor:
+    weekly review "closed recently" (13 of 14 listed cards had closed weeks earlier), open R null when a card is
+    unmarked, Voices backfill cut on the Singapore date, put_drivers payload check, 52 ledger proxies with a side
+    word. The owner's email is still in older public commits (removed from HEAD in #136; history not rewritten).
 
 ## Decisions on record (one line each; detail in `docs/history.md` and the pull request named there)
 
