@@ -343,7 +343,8 @@ test('XNYS session of an hourly bar', () => {
 const H0 = Date.UTC(2026, 9, 1); // hourly history starts 1 Oct
 
 // 20 weekday sessions before a Monday fill: the latest 10 with a 0.1 range, the 10 before with 1.0, plus
-// Sunday-evening FX bars (21:00–23:00 UTC, range 0.1). The median range of the 20 sessions is 1.0; counting
+// Sunday-evening FX bars (21:00–23:00 UTC, range 0.1). The median range of the 20 sessions is 0.55 (the mean of
+// the two middle ranges, TS-15); counting
 // the Sundays as dates would pull in fewer large days and drop it to 0.1.
 test('liveSinceFill: the 20 sessions of an FX symbol are Mon–Fri UTC dates', () => {
   const fill = Date.UTC(2026, 9, 12); // Mon 12 Oct 00:00 UTC
@@ -358,9 +359,9 @@ test('liveSinceFill: the 20 sessions of an FX symbol are Mon–Fri UTC dates', (
     k++;
   }
   bars.sort((a, b) => a.ts - b.ts);
-  const probe: Bar = { ts: fill + 2 * HOUR, o: 1.01, h: 1.05, l: 0.95, c: 1 }; // range 0.1, 4 prices
+  const probe: Bar = { ts: fill + 2 * HOUR, o: 1.01, h: 1.035, l: 0.965, c: 1 }; // range 0.07, 4 prices
   const fx = liveSinceFill([...bars, probe], fill, true);
-  assert.equal(fx[fx.length - 1].live, false, 'floor 0.15 from the 20 weekdays');
+  assert.equal(fx[fx.length - 1].live, false, 'floor 0.0825 from the 20 weekdays');
   // the old count (any UTC date) reached only 16–17 weekdays and set the floor at 0.015
   const anyDate = [...new Set(bars.map((b) => new Date(b.ts).toISOString().slice(0, 10)))].slice(-20);
   const old = bars.filter((b) => anyDate.includes(new Date(b.ts).toISOString().slice(0, 10))).map((b) => b.h - b.l).sort((a, b) => a - b);
@@ -369,7 +370,7 @@ test('liveSinceFill: the 20 sessions of an FX symbol are Mon–Fri UTC dates', (
 
 test('liveSinceFill: off FX the 20 sessions are XNYS session dates', () => {
   // Futures-style bars 22:00–20:00 UTC: the evening bars belong to the next session, holidays add none.
-  // Sessions before the fill: the latest 10 with a 0.1 range, the 10 before with 1.0 → floor 0.15.
+  // Sessions before the fill: the latest 10 with a 0.1 range, the 10 before with 1.0 → floor 0.0825.
   const fill = Date.UTC(2026, 10, 30, 14); // Mon 30 Nov, after Thanksgiving week
   const sess: string[] = [];
   for (let d = Date.UTC(2026, 10, 27); sess.length < 20; d -= 24 * HOUR) {
@@ -383,9 +384,9 @@ test('liveSinceFill: off FX the 20 sessions are XNYS session dates', () => {
     for (let t = close - 23 * HOUR; t < close; t += HOUR) bars.push({ ts: t, o: 1 + r / 4, h: 1 + r / 2, l: 1 - r / 2, c: 1 });
   });
   assert.equal(new Set(bars.map((b) => sessionOf(b.ts))).size, 20);
-  const probe: Bar = { ts: fill, o: 1.01, h: 1.05, l: 0.95, c: 1 };
+  const probe: Bar = { ts: fill, o: 1.01, h: 1.035, l: 0.965, c: 1 };
   const lv = liveSinceFill([...bars, probe], fill, false);
-  assert.equal(lv[lv.length - 1].live, false, 'floor 0.15 from the 20 sessions');
+  assert.equal(lv[lv.length - 1].live, false, 'floor 0.0825 from the 20 sessions');
   // counted as UTC dates the evening bars add dates of their own and the window loses large days
   const anyDate = [...new Set(bars.map((b) => new Date(b.ts).toISOString().slice(0, 10)))].slice(-20);
   const old = bars.filter((b) => anyDate.includes(new Date(b.ts).toISOString().slice(0, 10))).map((b) => b.h - b.l).sort((a, b) => a - b);

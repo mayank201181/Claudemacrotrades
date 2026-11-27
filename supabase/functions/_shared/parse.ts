@@ -276,7 +276,7 @@ export interface Tested {
 
 const num = (s: string | undefined | null): number | null => {
   if (s == null) return null;
-  const m = s.replace(/[−–]/g, '-').replace(/,/g, '').match(/[+-]?\d+(?:\.\d+)?/);
+  const m = s.replace(/[−–]/g, '-').replace(/,/g, '').match(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)/); // TS-07: leading-dot decimals
   const v = m ? parseFloat(m[0]) : NaN;
   return Number.isFinite(v) ? v : null;
 };
@@ -481,4 +481,13 @@ export function parseTradeBook(docText: string): TradeBook {
   const perDay: Record<string, number> = {};
   for (const t of tested) { perDay[t.d] = perDay[t.d] ?? 0; t.seq = perDay[t.d]++; }
   return { model, updated, scorecard, rules, trades, marks, log, tested };
+}
+
+// EDGE-014: whether a trade book's 'Last updated' is strictly older than the stored one (unknown dates never are).
+export function isOlderBook(incoming: string | null, stored: string | null | undefined): boolean {
+  const key = (s: string | null | undefined) => (s ?? '').match(/(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}):(\d{2}))?/);
+  const a = key(incoming), b = key(stored);
+  if (!a || !b) return false;
+  const norm = (m: RegExpMatchArray) => `${m[1]} ${(m[2] ?? '00').padStart(2, '0')}:${m[3] ?? '00'}`;
+  return norm(a) < norm(b);
 }

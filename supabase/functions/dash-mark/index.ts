@@ -14,7 +14,7 @@
 // Invoked by pg_cron with the ingest token; read-only towards trades, except the twin_* keys it adds to a
 // card's meta (the book never writes those keys, and ingest merges meta, so neither side overwrites the other).
 import postgres from 'npm:postgres@3.4.4';
-import { type Bar, HOUR, ideaRef, markLive, oneR as planned1R } from '../_shared/marks.ts';
+import { type Bar, barDate, completeDaily as completeDailyAt, HOUR, ideaRef, markLinear, markLive, oneR as planned1R, stampDaily } from '../_shared/marks.ts';
 import { cardFromMeta, fxBase, liveSinceFill, markConvexity } from '../_shared/convexity.ts';
 import { scoreTwin } from '../_shared/twin.ts';
 
@@ -40,30 +40,31 @@ async function yahoo(symbol: string, interval: '60m' | '1d', range: string): Pro
     if (c == null) return;
     out.push({ ts: t * 1000, o: q.open?.[i] ?? c, h: q.high?.[i] ?? c, l: q.low?.[i] ?? c, c });
   });
-  return out;
+  // Daily bars carry the venue's session date and close time (EDGE-001: a US stock bar is stamped 14:30 UTC).
+  return interval === '1d' ? stampDaily(out, res.meta?.exchangeTimezoneName, symbol) : out;
 }
 
 function combine(a: Bar[], b: Bar[], op: '-' | '/', daily: boolean): Bar[] {
-  const key = (t: number) => (daily ? barDate(t) : String(Math.floor(t / HOUR)));
-  const mb = new Map(b.map((x) => [key(x.ts), x]));
+  const key = (x: Bar) => (daily ? barDate(x) : String(Math.floor(x.ts / HOUR)));
+  const mb = new Map(b.map((x) => [key(x), x]));
   const f = (x: number, y: number) => (op === '-' ? x - y : x / y);
-  return a.filter((x) => mb.has(key(x.ts))).map((x) => {
-    const y = mb.get(key(x.ts))!;
-    const c = f(x.c, y.c);
-    // Spread highs/lows are not knowable from legs; the bar is live only when both legs traded.
-    return { ts: x.ts, o: f(x.o, y.o), h: c, l: c, c, live: !!x.live && !!y.live };
-  });
+  const out: Bar[] = [];
+  for (const x of a) {
+    const y = mb.get(key(x));
+    if (!y) continue;
+    const c = f(x.c, y.c), o = f(x.o, y.o);
+    if (!Number.isFinite(c) || !Number.isFinite(o)) continue; // EDGE-004: a zero leg makes no ratio bar
+    // Spread highs/lows are not knowable from legs; the bar is live only when both legs traded. A daily spread
+    // bar is complete when both legs' sessions are.
+    const ce = x.ce != null || y.ce != null ? Math.max(x.ce ?? 0, y.ce ?? 0) : undefined;
+    out.push({ ts: x.ts, o, h: c, l: c, c, live: !!x.live && !!y.live, ...(daily ? { sd: barDate(x), ce } : {}) });
+  }
+  return out;
 }
 
 const SGT = 8 * 3600000;
 const sgtDate = (t: number) => new Date(t + SGT).toISOString().slice(0, 10);
-// Yahoo stamps a daily bar at the exchange's local midnight; +12h lands inside the trading
-// day for every venue (NY, London/FX, Asia), so this is the bar's own session date.
-const barDate = (t: number) => new Date(t + 12 * HOUR).toISOString().slice(0, 10);
-// A daily bar is final once its session is over: about 22h after its stamp (17:00 ET for NY).
-const barClosed = (t: number, now: number) => now - t > 22 * HOUR;
-const barClosedH = (t: number, now: number) => now - t >= HOUR; // a 60m bar is complete once its hour has passed
-const barCloseTime = (t: number) => t + 21 * HOUR;
+// Daily session dates and close times come from the venue's time zone (marks.ts stampDaily, barDate).
 
 function parseFill(s: string | null): number | null {
   if (!s) return null;
@@ -89,12 +90,15 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const [{ value }] = await sql`select value from dash.config where key = 'ingest_token'`;
     if (body?.token !== value) return new Response('forbidden', { status: 403 });
+    // {dry: true}: compute everything, write nothing, and return the rows that would have been written.
+    const dry = body?.dry === true;
+    const would: Record<string, unknown[]> = { live_marks: [], twin_meta: [], idea_outcomes: [] };
 
     const trades = await sql`select model, pid, status, tclass, proxy, direction, ref, entry, stop, target, filled, meta from dash.trades
       where proxy is not null and status = 'open'`;
     // Live marks only ever describe open trades, except a convexity card's touch or settlement (paid set),
     // which is kept once the card closes so the scorecard's paid uses the settlement share.
-    await sql`delete from dash.live_marks v where not exists (select 1 from dash.trades t where t.model = v.model and t.pid = v.pid
+    if (!dry) await sql`delete from dash.live_marks v where not exists (select 1 from dash.trades t where t.model = v.model and t.pid = v.pid
       and (t.status = 'open' or (t.tclass = 'convexity' and v.paid is not null)))`;
     // References computed by the current method (ref_v = 4) are frozen; older ones are recomputed once.
     const known = new Map((await sql`select model, d::text d, idea, ref, ref_d::text ref_d from dash.idea_outcomes where ref_v = 4`).map((r) => [`${r.model}|${r.d}|${r.idea}`, r]));
@@ -114,17 +118,31 @@ Deno.serve(async (req) => {
     const longHourly = new Set<string>();
     for (const t of trades) if (t.tclass === 'convexity') for (const l of legs(t.proxy).legs) longHourly.add(l);
     for (const t of twins) longHourly.add(t.proxy); // a twin sits on one '=X' symbol
+    // EDGE-003: a linear trade filled more than 25 days ago needs hourly bars back to its fill, or a breach in its
+    // first weeks drops out of the one-month window. EDGE-013: an idea older than that with no frozen reference
+    // needs the hourly bars around its cut (ideas reach back 120 days); it never falls back to a daily close.
+    const old = Date.now() - 25 * 86400000;
+    for (const t of trades) {
+      const ft = parseFill(t.filled);
+      if (t.tclass !== 'convexity' && ft != null && ft < old) for (const l of legs(t.proxy).legs) longHourly.add(l);
+    }
+    for (const i of ideas) {
+      if (known.get(`${i.model}|${i.d}|${i.idea}`)?.ref != null) continue;
+      if (Date.parse(i.d + 'T00:00:00Z') < old) for (const l of legs(i.proxy).legs) longHourly.add(l);
+    }
     const hourly = new Map<string, Bar[]>(), daily = new Map<string, Bar[]>(), hourlyRaw = new Map<string, Bar[]>();
     for (const s of symbols) {
       const long = longHourly.has(s);
       const [h, d, h6] = await Promise.all([yahoo(s, '60m', '1mo'), yahoo(s, '1d', '1y'), long ? yahoo(s, '60m', '6mo') : Promise.resolve([])]);
       if (long) hourlyRaw.set(s, h6);
-      hourly.set(s, markLive(h)); daily.set(s, d);
+      // Linear marks and idea references read the six-month series where one was fetched (copies: the
+      // convexity code stamps its own liveness on hourlyRaw).
+      hourly.set(s, markLive(long && h6.length ? h6.map((b) => ({ ...b })) : h)); daily.set(s, d);
       const rows = [
         ...h.slice(-200).map((b) => ({ symbol: s, interval: '60m', ts: new Date(b.ts), o: b.o, h: b.h, l: b.l, c: b.c })),
         ...d.slice(-60).map((b) => ({ symbol: s, interval: '1d', ts: new Date(b.ts), o: b.o, h: b.h, l: b.l, c: b.c })),
       ];
-      if (rows.length) await sql`insert into dash.bars ${sql(rows)} on conflict (symbol, interval, ts) do update set o = excluded.o, h = excluded.h, l = excluded.l, c = excluded.c`;
+      if (rows.length && !dry) await sql`insert into dash.bars ${sql(rows)} on conflict (symbol, interval, ts) do update set o = excluded.o, h = excluded.h, l = excluded.l, c = excluded.c`;
     }
     const series = (proxy: string, daily_: boolean): Bar[] => {
       const { legs: ls, op } = legs(proxy);
@@ -133,7 +151,7 @@ Deno.serve(async (req) => {
       return combine(src.get(ls[0]) ?? [], src.get(ls[1]) ?? [], op, daily_);
     };
     const now = Date.now();
-    const completeDaily = (bars: Bar[]) => bars.filter((b) => barClosed(b.ts, now) && new Date(b.ts + 12 * HOUR).getUTCDay() % 6 !== 0);
+    const completeDaily = (bars: Bar[]) => completeDailyAt(bars, now);
 
     // Convexity: liveness is judged against the 20 sessions before the fill (R01 item 5), then legs combine.
     const convexSkipped: string[] = [];
@@ -153,7 +171,7 @@ Deno.serve(async (req) => {
         v: m.v, daily_v: m.daily_v, left_n: m.left_n, touched_at: m.touched_at == null ? null : new Date(m.touched_at),
         touched_px: m.touched_px, settled_px: m.settled_px, paid: m.paid,
       };
-      await sql`insert into dash.live_marks ${sql(row)} on conflict (model, pid) do update set
+      if (dry) would.live_marks.push(row); else await sql`insert into dash.live_marks ${sql(row)} on conflict (model, pid) do update set
         as_of = excluded.as_of, price = excluded.price, r = excluded.r, hi_since_fill = excluded.hi_since_fill,
         lo_since_fill = excluded.lo_since_fill, stop_touched = excluded.stop_touched, target_touched = excluded.target_touched,
         daily_close = excluded.daily_close, daily_close_d = excluded.daily_close_d, daily_r = excluded.daily_r,
@@ -173,32 +191,15 @@ Deno.serve(async (req) => {
       if (t.entry == null || t.stop == null || t.direction == null) continue;
       const dir = Number(t.direction), entry = Number(t.entry), stop = Number(t.stop), target = t.target == null ? null : Number(t.target);
       const oneR = planned1R(entry, stop, t.meta?.risk); // R17: the card's planned risk when it carries one
-      const h = series(t.proxy, false);
-      if (!h.length || !oneR) continue;
-      const last = h[h.length - 1];
-      const fillTs = parseFill(t.filled);
-      const since = fillTs ? h.filter((b) => b.ts >= fillTs) : [];
-      const hi = since.length ? Math.max(...since.map((b) => b.h)) : null;
-      const lo = since.length ? Math.min(...since.map((b) => b.l)) : null;
-      const stopTouched = since.length ? (dir > 0 ? lo! <= stop : hi! >= stop) : null;
-      const targetTouched = since.length && target != null ? (dir > 0 ? hi! >= target : lo! <= target) : null;
       // Spec v15: the stop fires on an hourly CLOSE at or beyond the level (a wick through it does not).
-      const closedH = since.filter((b) => barClosedH(b.ts, now));
-      const stopBarH = closedH.find((b) => (dir > 0 ? b.c <= stop : b.c >= stop)) ?? null;
-      const stopClosedH = closedH.length ? stopBarH != null : null;
-      const d = completeDaily(series(t.proxy, true));
-      const dSince = fillTs ? d.filter((b) => barCloseTime(b.ts) > fillTs) : [];
-      const dl = d[d.length - 1];
-      const stopClosed = dSince.length ? dSince.some((b) => (dir > 0 ? b.c <= stop : b.c >= stop)) : null;
-      const targetClosed = dSince.length && target != null ? dSince.some((b) => (dir > 0 ? b.c >= target : b.c <= target)) : null;
+      const m = markLinear(series(t.proxy, false), completeDaily(series(t.proxy, true)),
+        { dir, entry, stop, target, oneR, fillTs: parseFill(t.filled) }, now);
+      if (!m) continue;
       const row = {
-        model: t.model, pid: t.pid, as_of: new Date(last.ts), price: last.c, r: (dir * (last.c - entry)) / oneR,
-        hi_since_fill: hi, lo_since_fill: lo, stop_touched: stopTouched, target_touched: targetTouched,
-        daily_close: dl?.c ?? null, daily_close_d: dl ? barDate(dl.ts) : null,
-        daily_r: dl ? (dir * (dl.c - entry)) / oneR : null, stop_closed: stopClosed, target_closed: targetClosed,
-        stop_closed_h: stopClosedH, stop_closed_h_px: stopBarH?.c ?? null, stop_closed_h_at: stopBarH ? new Date(stopBarH.ts + HOUR) : null,
+        model: t.model, pid: t.pid, ...m, as_of: new Date(m.as_of),
+        stop_closed_h_at: m.stop_closed_h_at == null ? null : new Date(m.stop_closed_h_at),
       };
-      await sql`insert into dash.live_marks ${sql(row)} on conflict (model, pid) do update set
+      if (dry) would.live_marks.push(row); else await sql`insert into dash.live_marks ${sql(row)} on conflict (model, pid) do update set
         as_of = excluded.as_of, price = excluded.price, r = excluded.r, hi_since_fill = excluded.hi_since_fill,
         lo_since_fill = excluded.lo_since_fill, stop_touched = excluded.stop_touched, target_touched = excluded.target_touched,
         daily_close = excluded.daily_close, daily_close_d = excluded.daily_close_d, daily_r = excluded.daily_r,
@@ -220,7 +221,8 @@ Deno.serve(async (req) => {
         try {
           const res = scoreTwin(t as never, hourlyRaw.get(t.proxy) ?? [], closing.get(`${t.model}|${t.pid}`) ?? null, now);
           if (res.skipped) twinSkipped.push(`${t.model} ${t.pid}: ${res.skipped}`); else nTwin++;
-          if (res.meta) await sql`update dash.trades set meta = meta || ${sql.json(res.meta)}::jsonb where model = ${t.model} and pid = ${t.pid}`;
+          if (res.meta && dry) would.twin_meta.push({ model: t.model, pid: t.pid, ...res.meta });
+          else if (res.meta) await sql`update dash.trades set meta = meta || ${sql.json(res.meta)}::jsonb where model = ${t.model} and pid = ${t.pid}`;
         } catch (e) { twinSkipped.push(`${t.model} ${t.pid}: ${String(e)}`); }
       }
     }
@@ -231,29 +233,29 @@ Deno.serve(async (req) => {
       const d = completeDaily(series(i.proxy, true));
       const h = series(i.proxy, false);
       const cut = Date.parse(i.d + 'T00:00:00Z'); // 08:00 SGT on the idea's date
-      const before = d.filter((b) => barDate(b.ts) < i.d);
-      const after = d.filter((b) => barDate(b.ts) >= i.d);
+      const before = d.filter((b) => barDate(b) < i.d);
+      const after = d.filter((b) => barDate(b) >= i.d);
       const atr = atr20(before, spread);
       if (!atr) continue;
-      // Once set, the reference never moves (hourly history only reaches back a month). Ideas older
-      // than the hourly history fall back to the prior daily close.
+      // Once set, the reference never moves. Only a reference dealt on hourly bars is set: with no hourly
+      // history (a failed download) the idea waits for the next run (EDGE-013), never the prior daily close.
       const prev = known.get(`${i.model}|${i.d}|${i.idea}`);
       let ref: number | null = null, refD: string | null = null;
       if (prev?.ref != null) { ref = Number(prev.ref); refD = prev.ref_d; }
       else if (h.length && h[0].ts <= cut - 2 * 86400000) {
         const r = ideaRef(h, cut, now); // null: the market has not printed since the digest
         if (r) { ref = r.px; refD = sgtDate(r.ts); }
-      } else if (before.length) { ref = before[before.length - 1].c; refD = barDate(before[before.length - 1].ts); }
+      }
       const dir = Number(i.direction);
       const ret = (k: number) => (ref != null && after.length >= k ? (dir * (after[k - 1].c - ref)) / atr : null);
       const lastB = after[after.length - 1];
       const row = {
         model: i.model, d: i.d, idea: i.idea, proxy: i.proxy, direction: dir,
         ref_d: refD, ref, atr20: atr, ret1: ret(1), ret5: ret(5), ret10: ret(10), ret20: ret(20),
-        last_d: lastB && ref != null ? barDate(lastB.ts) : null,
+        last_d: lastB && ref != null ? barDate(lastB) : null,
         ret_last: lastB && ref != null ? (dir * (lastB.c - ref)) / atr : null, updated_at: new Date(), ref_v: 4,
       };
-      await sql`insert into dash.idea_outcomes ${sql(row)} on conflict (model, d, idea) do update set
+      if (dry) would.idea_outcomes.push(row); else await sql`insert into dash.idea_outcomes ${sql(row)} on conflict (model, d, idea) do update set
         proxy = excluded.proxy, direction = excluded.direction, ref_d = excluded.ref_d, ref = excluded.ref, atr20 = excluded.atr20,
         ret1 = excluded.ret1, ret5 = excluded.ret5, ret10 = excluded.ret10, ret20 = excluded.ret20,
         last_d = excluded.last_d, ret_last = excluded.ret_last, updated_at = excluded.updated_at, ref_v = excluded.ref_v`;
@@ -261,7 +263,7 @@ Deno.serve(async (req) => {
     }
     return new Response(JSON.stringify({ ok: true, symbols: symbols.size, live: nLive, convexity: nConvex, convexity_skipped: convexSkipped,
       twins: nTwin, twins_skipped: twinSkipped, outcomes: nOut,
-      empty: [...symbols].filter((s) => !(daily.get(s)?.length)) }), { headers: { 'Content-Type': 'application/json' } });
+      empty: [...symbols].filter((s) => !(daily.get(s)?.length)), ...(dry ? { dry: true, would } : {}) }), { headers: { 'Content-Type': 'application/json' } });
   } catch (e) {
     return new Response(JSON.stringify({ ok: false, error: String(e) }), { status: 500 });
   }
