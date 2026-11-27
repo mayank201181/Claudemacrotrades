@@ -82,7 +82,9 @@ export function ewmacSeries(p: number[]): number[][] {
 
 // Pooled correlation of the speeds over each asset's last CORR_WIN days, negatives floored at 0.
 export function fdmOf(series: number[][][]): number | null {
-  const k = SPEEDS.length, sx = new Array(k).fill(0), sxx = Array.from({ length: k }, () => new Array(k).fill(0));
+  // A16 TS06: centred cross-products (Welford), so a constant speed has exactly zero scatter and a rescaled
+  // speed keeps its correlation (the absolute 1e-12 guard made the answer depend on the speed's units).
+  const k = SPEEDS.length, mean = new Array(k).fill(0), sc = Array.from({ length: k }, () => new Array(k).fill(0));
   let cnt = 0;
   for (const s of series) {
     const n = s[0].length;
@@ -90,13 +92,14 @@ export function fdmOf(series: number[][][]): number | null {
       const v = s.map((x) => x[i]);
       if (v.some((x) => !Number.isFinite(x))) continue;
       cnt++;
-      for (let a = 0; a < k; a++) { sx[a] += v[a]; for (let b = 0; b < k; b++) sxx[a][b] += v[a] * v[b]; }
+      const dv = v.map((x, a) => x - mean[a]);
+      for (let a = 0; a < k; a++) mean[a] += dv[a] / cnt;
+      for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) sc[a][b] += dv[a] * (v[b] - mean[b]);
     }
   }
   if (cnt < 500) return null;
-  const mu = sx.map((x) => x / cnt), cov = sxx.map((r, a) => r.map((x, b) => x / cnt - mu[a] * mu[b]));
-  // A14 TS-06: a speed that never varies has no correlation (and rounding can leave a tiny variance).
-  if (cov.some((row, i) => !(row[i] > 1e-12 * (1 + mu[i] * mu[i])))) return null;
+  const cov = sc; // A14 TS-06: a speed that never varies has no correlation
+  if (cov.some((row, i) => !(row[i] > 0))) return null;
   let wcw = 0;
   for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) {
     const c = a === b ? 1 : Math.max(0, cov[a][b] / Math.sqrt(cov[a][a] * cov[b][b]));

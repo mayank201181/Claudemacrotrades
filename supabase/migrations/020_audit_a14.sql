@@ -7,9 +7,13 @@
 --   SQL03 refresh_scores: the backfill cut used the database's UTC date of created_at; now the Singapore date.
 --   SQL01 put_drivers: a payload with "parts" missing passed the array check and wiped the day's snapshot.
 --   Ledger proxies written "long X" / "short X" were never priced: side moved to direction, word dropped.
+-- Amended 27 Nov 2026 evening for the Astra A16 re-audit, before it was ever run:
+--   A16 SQL-001 review_inputs: "closed recently" spans p_days Singapore dates (it took 8, so a boundary close sat in two reviews).
+--   A16 SQL-002 refresh_scores: the sigma scaling a voice's or the crowd's move uses only changes published before the call
+--         (it used the latest vintage, so a later revision changed an old grade).
 begin;
 
--- dash.review_inputs: before md5 9e2ec2610d63b939d30fa06d67b44ced, after 221717bb0f02e67e388e19a399cc2adf
+-- dash.review_inputs: before md5 9e2ec2610d63b939d30fa06d67b44ced, after 2aedb33cad6c9fa58f679eee478394df
 do $chk$ begin if (select md5(prosrc) from pg_proc where oid = 'dash.review_inputs'::regproc) <> '9e2ec2610d63b939d30fa06d67b44ced' then raise exception 'dash.review_inputs changed since the audit; stop'; end if; end $chk$;
 create or replace function dash.review_inputs(p_days int default 7) returns jsonb
 language plpgsql security definer set search_path = dash, public as $fn$
@@ -72,7 +76,7 @@ begin
         from dash.trades where status like 'closed%'
           and case when pg_input_is_valid(substring(closed from '^\d{4}-\d{2}-\d{2}'), 'date')
                    then substring(closed from '^\d{4}-\d{2}-\d{2}')::date end
-              between (now() at time zone 'Asia/Singapore')::date - p_days
+              between (now() at time zone 'Asia/Singapore')::date - p_days + 1   -- A16 SQL-001: 7 dates, not 8
                   and (now() at time zone 'Asia/Singapore')::date),
     'trades_open', (select coalesce(jsonb_agg(jsonb_build_object('model', t.model, 'pid', t.pid, 'title', t.title, 'tclass', t.tclass,
           'p', t.p, 'rr', t.rr, 'ev', t.ev, 'live_r', l.r, 'daily_r', l.daily_r) order by t.model, t.pid), '[]')
@@ -115,7 +119,7 @@ begin
         from (select * from dash.lessons order by wk desc limit 2) l));
 end $fn$;
 
--- dash.refresh_scores: before md5 67f4298880c7b75dfe6e03fab910a4c0, after 411aa448f24cc08305948f27862eb819
+-- dash.refresh_scores: before md5 67f4298880c7b75dfe6e03fab910a4c0, after 3f64afc26026e5ce850330f7b94cf682
 do $chk$ begin if (select md5(prosrc) from pg_proc where oid = 'dash.refresh_scores'::regproc) <> '67f4298880c7b75dfe6e03fab910a4c0' then raise exception 'dash.refresh_scores changed since the audit; stop'; end if; end $chk$;
 create or replace function dash.refresh_scores() returns jsonb
 language plpgsql security definer set search_path = dash, public as $fn$
@@ -128,10 +132,10 @@ begin
   select least(coalesce(min(stance_date), v_today), v_today) - 150 into v_from from stance.entries;
   drop table if exists pg_temp._obs;
   create temp table _obs as
-    select o.series_id, o.as_of d, o.value v,
+    select o.series_id, o.as_of d, o.value v, o.vintage_date vint,
            row_number() over (partition by o.series_id order by o.as_of) rn,
            case when coalesce(s.unit, '') in ('pct', 'bp', 'vol', 'bp_vol', 'vol_pts') then 'diff' else 'log' end kind
-    from (select distinct on (series_id, as_of) series_id, as_of, value from msd.observations
+    from (select distinct on (series_id, as_of) series_id, as_of, value, vintage_date from msd.observations
           where series_id in (select distinct series_id from dash.stance_calls where series_id is not null)
             and as_of >= v_from and value is not null
           order by series_id, as_of, vintage_date desc nulls last) o
@@ -141,7 +145,8 @@ begin
   create index on _obs (series_id, d);
   drop table if exists pg_temp._chg;
   create temp table _chg as
-    select a.series_id, a.rn, case a.kind when 'diff' then a.v - b.v else ln(a.v / b.v) end chg
+    -- A16 SQL-002: vint = when the later of the two values was published; a sigma uses only changes known before its call
+    select a.series_id, a.rn, case a.kind when 'diff' then a.v - b.v else ln(a.v / b.v) end chg, greatest(a.vint, b.vint) vint
     from _obs a join _obs b on b.series_id = a.series_id and b.rn = a.rn - 1
     where a.d - b.d <= 10;                 -- a jump across a feed gap is not a daily move
   create index on _chg (series_id, rn);
@@ -196,7 +201,8 @@ begin
   -- reference: the first close after the view, if it comes within 14 days (longer means a feed gap)
   left join lateral (select * from _obs o where o.series_id = g.series_id and o.d > g.stance_date and o.d <= g.stance_date + 14
                      order by o.d limit 1) r on true
-  left join lateral (select stddev_samp(chg) sigma, count(*) n from _chg c where c.series_id = g.series_id and c.rn between r.rn - 60 and r.rn - 1) sg0 on true
+  left join lateral (select stddev_samp(chg) sigma, count(*) n from _chg c where c.series_id = g.series_id and c.rn between r.rn - 60 and r.rn - 1
+                       and c.vint < g.stance_date) sg0 on true
   left join lateral (select case when sg0.n >= 20 then sg0.sigma end sigma) sg on true
   -- prior trend: the 20-session change to the last close strictly before the view (nothing the speaker could not see)
   left join lateral (select sign(p.v - o.v) t20 from _obs p join _obs o on o.series_id = p.series_id and o.rn = p.rn - 20
@@ -306,7 +312,8 @@ begin
     from dash.crowd_daily c2
     join lateral (select * from _obs o where o.series_id = c2.series_id and o.d > c2.d and o.d <= c2.d + 14 order by o.d limit 1) r on true
     join lateral (select v from _obs o where o.series_id = c2.series_id and o.rn = r.rn + 10) f on true
-    join lateral (select stddev_samp(chg) sigma, count(*) n from _chg ch where ch.series_id = c2.series_id and ch.rn between r.rn - 60 and r.rn - 1) sg on true
+    join lateral (select stddev_samp(chg) sigma, count(*) n from _chg ch where ch.series_id = c2.series_id and ch.rn between r.rn - 60 and r.rn - 1
+                  and ch.vint < c2.d) sg on true
     where c2.bulls <> c2.bears) x
   where c.scope = x.scope and c.series_id = x.series_id and c.d = x.d;
   return jsonb_build_object('grades', n_g, 'crowd_days', n_c,

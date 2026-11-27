@@ -190,7 +190,8 @@ class Mkt:
         lam = math.sqrt(rad)
         z = math.log(H / S) / (vol * math.sqrt(T)) + lam * vol * math.sqrt(T)
         eta = 1.0 if H < S else -1.0
-        v = (H / S) ** (mu + lam) * N(eta * z) + (H / S) ** (mu - lam) * N(eta * z - 2 * eta * lam * vol * math.sqrt(T))
+        lr = math.log(H / S)  # A16 FX16-01: weights in log space (a huge weight times a tail rounded to 0)
+        v = _wN((mu + lam) * lr, eta * z) + _wN((mu - lam) * lr, eta * (z - 2 * lam * vol * math.sqrt(T)))
         return v * (H / S if pay == 'base' else 1.0)
 
     # ---- double touches (Hui 1996 series, as in Haug's Complete Guide), paid at expiry
@@ -256,8 +257,9 @@ class Mkt:
         ef, ed = math.exp((b - r) * T), math.exp(-r * T)
         A = phi * S * ef * N(phi * x1) - phi * K * ed * N(phi * x1 - phi * sd)
         B = phi * S * ef * N(phi * x2) - phi * K * ed * N(phi * x2 - phi * sd)
-        C = phi * S * ef * (H / S) ** (2 * (mu + 1)) * N(eta * y1) - phi * K * ed * (H / S) ** (2 * mu) * N(eta * y1 - eta * sd)
-        D = phi * S * ef * (H / S) ** (2 * (mu + 1)) * N(eta * y2) - phi * K * ed * (H / S) ** (2 * mu) * N(eta * y2 - eta * sd)
+        lr = math.log(H / S)  # A16 FX16-01: reflection weights in log space
+        C = phi * (S * ef * _wN(2 * (mu + 1) * lr, eta * y1) - K * ed * _wN(2 * mu * lr, eta * (y1 - sd)))
+        D = phi * (S * ef * _wN(2 * (mu + 1) * lr, eta * y2) - K * ed * _wN(2 * mu * lr, eta * (y2 - sd)))
         call = phi > 0
         if not up:  # down barriers
             if call:
@@ -346,8 +348,8 @@ class Smile:
         mu = m.rd - m.rf - 0.5 * atm * atm
         h2 = (math.log(H / S) + mu * T) / (atm * sq)
         h2p = (math.log(S / H) + mu * T) / (atm * sq)
-        pw = (H / S) ** (2 * mu / (atm * atm))
-        p_touch = N(h2p) + pw * N(-h2) if up else N(-h2p) + pw * N(h2)
+        lw = 2 * mu * math.log(H / S) / (atm * atm)
+        p_touch = N(h2p) + _wN(lw, -h2) if up else N(-h2p) + _wN(lw, h2)
         outp = max(0.0, min(vanilla_smile, p0 + (1 - p_touch) * adj))
         return outp if btype.endswith('out') else vanilla_smile - outp
 
@@ -356,6 +358,8 @@ def market_strangle_smile(m, atm, rr25, bf_ms, delta_type, atm_type):
     """Smile whose 25d strangle, struck at the market-strangle strikes (25d strikes at the single vol
     atm + bf_ms) and priced on the smile, is worth the same as both legs at atm + bf_ms: the broker
     (market) strangle convention. Returns the vanna-volga Smile with the solved smile strangle."""
+    if atm > 0 and rr25 == 0 and bf_ms == 0:  # A16 FX16-04: a flat quote is the flat smile (bisection left a residual)
+        return Smile(m, atm, 0.0, 0.0, delta_type, atm_type)
     v = atm + bf_ms
     kc = m.strike_from_delta(1, 0.25, v, delta_type)
     kp = m.strike_from_delta(-1, -0.25, v, delta_type)
@@ -512,7 +516,7 @@ def price(leg):
                 return Mkt(s, T, rd, rf).vanilla(phi, K, v)
             out['delta_' + dtype] = m.delta(phi, K, vol, dtype)
             if smile:  # A14 VAN-002: the smile's own exercise probability, -dC/dK with the smile slope, undiscounted
-                h = 1e-4 * K
+                h = K * max(1e-8, min(1e-4, 1e-3 * vol * math.sqrt(T)))  # A16 FX16-02: inside the diffusion
                 c = lambda k: m.vanilla(phi, k, smile.vol(k))
                 out['p_exercise'] = min(1.0, max(0.0, -phi * (c(K + h) - c(K - h)) / (2 * h * m.dfd)))
             else:
@@ -524,7 +528,7 @@ def price(leg):
         vol = smile.vol(K) if smile else vol_in
         px = m.digital(phi, K, vol, pay)
         if smile:  # skew term: -dC/dK including the smile slope (terms pay)
-            h = 1e-4 * K
+            h = K * max(1e-8, min(1e-4, 1e-3 * vol * math.sqrt(T)))  # A16 FX16-02
             c = lambda k: m.vanilla(phi, k, smile.vol(k))
             px_t = -phi * (c(K + h) - c(K - h)) / (2 * h)
             out['bs_strike_vol'] = px
@@ -559,6 +563,8 @@ def price(leg):
         if smile:
             notes.append('touch priced at ATM vol; smile not applied to touches (no QuantLib cross-check)')
         def reprice(s, v):
+            if H == S:  # A16 FX16-03: touched at inception; a bump cannot undo the event
+                return px
             mm = Mkt(s, T, rd, rf)
             o = mm.one_touch(H, v, pay, when if typ == 'one_touch' else 'expiry', up_t)
             return o if typ == 'one_touch' else (mm.dfd if pay == 'terms' else mm.dff) - o

@@ -40,8 +40,8 @@ test('EDGE-001: session close times follow the venue and its DST', () => {
   assert.equal(sessionClose('2026-07-01', 'America/New_York', 'SPY'), U('2026-07-01T20:00:00Z'));
   assert.equal(sessionClose('2026-11-20', 'America/New_York', 'CL=F'), U('2026-11-20T22:00:00Z'));
   assert.equal(sessionClose('2026-11-20', 'Europe/Berlin', '^GDAXI'), U('2026-11-20T16:30:00Z'));
-  assert.equal(sessionClose('2026-11-20', 'Asia/Tokyo', '^N225'), U('2026-11-20T08:00:00Z'));
-  assert.equal(sessionClose('2026-11-20', 'Europe/London', 'EURUSD=X'), U('2026-11-20T21:00:00Z'));
+  assert.equal(sessionClose('2026-11-20', 'Asia/Tokyo', '^N225'), U('2026-11-20T06:30:00Z')); // A16 VENUE: 15:30 Tokyo
+  assert.equal(sessionClose('2026-11-20', 'Europe/London', 'EURUSD=X'), U('2026-11-20T22:00:00Z')); // A16 FXCLOSE: 17:00 NY in winter
   // a US close at 21:00 UTC is before a 08:30 SGT fill the next morning, so that bar is not "since the fill"
   const d = stampDaily([bar(U('2026-11-19T14:30:00Z'), 100), bar(U('2026-11-20T14:30:00Z'), 95)], 'America/New_York', 'SPY');
   const h = [bar(U('2026-11-20T00:00:00Z'), 100)];
@@ -119,10 +119,10 @@ test('TS-01: a replay as of an earlier time does not see the high and low of the
   assert.equal(markConvexity(c, lv, [], fill, U('2026-11-19T11:00:00Z'))!.touched_at, hit.ts);
   // in the live feed the running bar is the latest one, and its traded low counts at once
   const feed = lv.filter((b) => b.ts <= hit.ts);
-  assert.equal(markConvexity(c, feed, [], fill, U('2026-11-19T10:07:00Z'))!.touched_at, hit.ts);
+  assert.equal(markConvexity(c, feed, [], fill, U('2026-11-19T10:07:00Z'), true)!.touched_at, hit.ts);
   // ... also with Yahoo's flat tick at the current time appended after it
   const tick = { ts: U('2026-11-19T10:06:30Z'), o: 146.4, h: 146.4, l: 146.4, c: 146.4, live: false };
-  assert.equal(markConvexity(c, [...feed, tick], [], fill, U('2026-11-19T10:07:00Z'))!.touched_at, hit.ts);
+  assert.equal(markConvexity(c, [...feed, tick], [], fill, U('2026-11-19T10:07:00Z'), true)!.touched_at, hit.ts);
 });
 
 test('TS-02: with no bars before the fill nothing is live (post-fill bars never set their own floor)', () => {
@@ -150,7 +150,8 @@ test('EDGE-014: an older trade book snapshot is recognised', async () => {
   assert.equal(isOlderBook('2026-11-27 7:05 SGT', '2026-11-27 07:45 SGT'), true);
   assert.equal(isOlderBook('2026-11-27 07:45 SGT', '2026-11-27 07:45 SGT'), false, 'the same snapshot re-posted is ingested');
   assert.equal(isOlderBook('2026-11-27 08:10 SGT', '2026-11-27 07:45 SGT'), false);
-  assert.equal(isOlderBook(null, '2026-11-27 07:45 SGT'), false);
+  assert.equal(isOlderBook(null, '2026-11-27 07:45 SGT'), true, 'A16 EDGE-04: an undated book never replaces a dated one');
+  assert.equal(isOlderBook(null, null), false);
   assert.equal(isOlderBook('2026-11-27', '2026-11-27 07:45 SGT'), true);
 });
 
@@ -188,7 +189,7 @@ test('TS-11, TS-12, TS-13', async () => {
 
 // TS-06: a constant speed has zero variance; the pooled correlation must be unavailable, not NaN.
 import { fdmOf, SPEEDS } from './forecast.ts';
-Deno.test('TS-06 fdmOf: a constant speed gives null, not NaN', () => {
+test('TS-06 fdmOf: a constant speed gives null, not NaN', () => {
   let seed = 7;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) - 0.5;
   const n = 900;

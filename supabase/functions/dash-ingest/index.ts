@@ -10,6 +10,15 @@ import { extractQuestions, parseBriefState, type StateQuestion } from '../_share
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
 
 type Json = Record<string, unknown>;
+type Db = typeof sql | postgres.TransactionSql;
+
+// A16 EDGE-03: a digest or a book is written in ONE transaction (a failed child write used to leave the new parent
+// with old or missing children), under one advisory lock, so two overlapping ingests cannot interleave.
+const atomically = <T>(f: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> =>
+  sql.begin(async (tx) => {
+    await tx`select pg_advisory_xact_lock(hashtext('dash.ingest_book_digest'))`;
+    return f(tx);
+  }) as Promise<T>;
 
 // Raw copies keep only what re-parsing needs: no plain-text body, no ADMIN FLAGS section.
 function rawCopy(m: Json): Json {
@@ -17,7 +26,7 @@ function rawCopy(m: Json): Json {
   return { id: m.id, subject: m.subject, date: m.date, htmlBody: html };
 }
 
-async function upsertTested(rows: Tested[]) {
+async function upsertTested(sql: Db, rows: Tested[]) {
   for (const t of rows) {
     await sql`insert into dash.tested ${sql({ ...t, idea: t.idea.slice(0, 500) } as Json)}
       on conflict (model, d, idea) do update set seq = excluded.seq, proxy = excluded.proxy, direction = excluded.direction,
@@ -28,7 +37,7 @@ async function upsertTested(rows: Tested[]) {
 
 // The odds engine as printed: today's moves, list changes and resolutions replace whatever an
 // earlier copy of the same digest left for that day.
-async function ingestQuestions(model: string, d: string, html: string): Promise<string> {
+async function ingestQuestions(sql: Db, model: string, d: string, html: string): Promise<string> {
   const q = extractQuestions(html, d);
   await sql`delete from dash.q_moves where model = ${model} and d = ${d}`;
   await sql`delete from dash.q_events where model = ${model} and d = ${d}`;
@@ -70,7 +79,14 @@ async function ingestBriefState(model: string, text: string): Promise<string[]> 
   return [`brief state ${model} ${asOf}: ${bs.questions.length} questions`];
 }
 
+// One transaction per message, so one bad message does not hold back the others.
 async function ingestThread(data: Json): Promise<string[]> {
+  const out: string[] = [];
+  for (const m of (data.messages as Json[] | undefined) ?? [data]) out.push(...await atomically((tx) => writeThread(tx, { messages: [m] })));
+  return out;
+}
+
+async function writeThread(sql: Db, data: Json): Promise<string[]> {
   const out: string[] = [];
   const msgs = (data.messages as Json[] | undefined) ?? [data];
   for (const m of msgs) {
@@ -110,18 +126,21 @@ async function ingestThread(data: Json): Promise<string[]> {
     const current = cur?.gmail_id === msg.id;
     // The email prints the top tested lines; the ledger has all of them and wins when present.
     const [{ n }] = await sql`select count(*)::int n from dash.tested where model = ${dg.model} and d = ${dg.d} and source = 'ledger'`;
-    if (current && n === 0 && dg.trade_block) {
+    // A16 EDGE-02: a replacement copy with no trade block also clears the superseded copy's email-tested lines.
+    if (current && n === 0) {
       await sql`delete from dash.tested where model = ${dg.model} and d = ${dg.d} and source = 'email'`;
-      await upsertTested(parseEmailTested(dg.trade_block, dg.model, dg.d));
+      if (dg.trade_block) await upsertTested(sql, parseEmailTested(dg.trade_block, dg.model, dg.d));
     }
     // EDGE-015: an HTML-only message ('html', no 'htmlBody') is parsed for its odds too.
-    const qs = current ? await ingestQuestions(dg.model, dg.d, String(msg.htmlBody ?? (m as Json).html ?? '')) : 'questions skipped (older copy)';
+    const qs = current ? await ingestQuestions(sql, dg.model, dg.d, String(msg.htmlBody ?? (m as Json).html ?? '')) : 'questions skipped (older copy)';
     out.push(`digest ${dg.model} ${dg.d}: ${dg.themes.length} themes, ${dg.sixty.length} bullets, ${qs}`);
   }
   return out;
 }
 
-async function ingestBook(data: Json | string, fileId?: string): Promise<string[]> {
+const ingestBook = (data: Json | string, fileId?: string) => atomically((tx) => writeBook(tx, data, fileId));
+
+async function writeBook(sql: Db, data: Json | string, fileId?: string): Promise<string[]> {
   const text = typeof data === 'string' ? data : String((data as Json).fileContent ?? '');
   const tb = parseTradeBook(text);
   // EDGE-012: the desk day is the Singapore date (a 07:45 SGT ingest is 23:45 UTC the day before).
@@ -174,7 +193,7 @@ async function ingestBook(data: Json | string, fileId?: string): Promise<string[
   const days = [...new Set(tb.tested.map((t) => t.d))];
   // The ledger's list for a day is complete: it replaces whatever was stored for that day.
   for (const d of days) await sql`delete from dash.tested where model = ${tb.model} and d = ${d}`;
-  await upsertTested(tb.tested);
+  await upsertTested(sql, tb.tested);
   return [`book ${tb.model} (${tb.updated}): ${tb.trades.length} trades, ${tb.marks.length} marks, ${tb.tested.length} tested over ${days.length} days`];
 }
 

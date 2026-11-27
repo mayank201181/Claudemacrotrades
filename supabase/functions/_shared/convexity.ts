@@ -282,7 +282,8 @@ export function cardFromMeta(proxy: string, meta: Record<string, string>, op: ''
   const struct = (meta.struct ?? '').trim().toLowerCase() as Struct;
   if (!STRUCTS.includes(struct)) return `struct ${meta.struct ?? 'missing'}`;
   const ks = (meta.strike ?? '').replace(/[−–]/g, '-').replace(/,/g, '').match(new RegExp(NUM_RE.source.replace('[+-]?', '-?'), 'g'))?.map(Number) ?? [];
-  if (!ks.length || (isSpread(struct) && ks.length < 2)) return `strike ${meta.strike ?? 'missing'}`;
+  // A16 TS08: exactly two strikes for a spread and one otherwise (a third or second strike was silently dropped)
+  if (ks.length !== (isSpread(struct) ? 2 : 1)) return `strike ${meta.strike ?? 'missing'}`;
   // TS-08: a spread's strikes are near then far: a call spread rises (K < Kf), a put spread falls (K > Kf).
   if (struct === 'cs' ? !(ks[0] < ks[1]) : struct === 'ps' ? !(ks[0] > ks[1]) : false) return `strike ${meta.strike}: spread strikes out of order`;
   const cut = parseSgt(meta.cut);
@@ -316,7 +317,8 @@ export function cardFromMeta(proxy: string, meta: Record<string, string>, op: ''
 // an FX symbol (Sunday-evening bars fall outside it) and an XNYS session date otherwise. Returns stamped copies.
 export function liveSinceFill(bars: Bar[], fillTs: number, fx: boolean): Bar[] {
   const sess = (t: number) => (fx ? (weekday(t) ? ymd(t) : null) : sessionOf(t));
-  const before = bars.filter((b) => b.ts < fillTs);
+  // A16 TS02: only bars that had ended by the fill (a bar straddling it carries post-fill highs and lows)
+  const before = bars.filter((b) => b.ts + HOUR <= fillTs);
   const dates = [...new Set(before.map((b) => sess(b.ts)).filter((d) => d != null))].slice(-20);
   const keep = new Set(dates);
   // TS-02: with no bars before the fill there is nothing to judge liveness by, so nothing is live (the card
@@ -341,20 +343,24 @@ export interface ConvexMark {
 
 // Marks one card. `hourly` carries `live` (liveSinceFill, or legs combined); `daily` holds complete daily
 // bars only. A touch freezes the card; at the cut it settles; otherwise R = V / p0fill − 1.
-export function markConvexity(c: ConvexCard, hourly: Bar[], daily: Bar[], fillTs: number, now: number): ConvexMark | null {
+export function markConvexity(c: ConvexCard, hourly: Bar[], daily: Bar[], fillTs: number, now: number, liveSnapshot = false): ConvexMark | null {
   // TS-01: a bar counts once its hour has ended by `now`. The bar still running is used only when no later
   // hourly bar exists (the live feed: its high, low and close have all traded); in a replay as of an
   // earlier time its high and low include prices after `now`, so it is left out.
   // (Yahoo appends a flat tick at the current time after the running bar; a tick is no later hourly bar.)
   const lastTs = hourly.length ? hourly[hourly.length - 1].ts : -Infinity;
-  const seen = (b: Bar) => b.ts + HOUR <= now || (b.ts <= now && lastTs < b.ts + HOUR);
+  // A16 TS01: only the live producer (liveSnapshot) vouches for a running bar; in a replay of a truncated
+  // series the last bar is a completed historical hour whose range traded after `now`.
+  const seen = (b: Bar) => b.ts + HOUR <= now || (liveSnapshot && b.ts <= now && lastTs <= now && lastTs < b.ts + HOUR);
   const live = hourly.filter((b) => b.live && b.ts >= fillTs && b.ts + HOUR <= c.cut && seen(b));
   const lastLive = hourly.filter((b) => b.live && seen(b)).pop();
   if (!lastLive) return null;
   const hi = live.length ? Math.max(...live.map((b) => b.h)) : null;
   const lo = live.length ? Math.min(...live.map((b) => b.l)) : null;
   const cutD = cutSessionDate(c.cut);
-  const dSince = daily.filter((b) => dailyValTime(c, barDate(b)) > fillTs && (c.fx ? dailyValTime(c, barDate(b)) <= c.cut : barDate(b) <= cutD));
+  // A16 FXCLOSE: a bar that carries its own close time (`ce`, e.g. the 17:00 New York FX session) is valued then
+  const closeAt = (b: Bar) => (b.ce != null && Number.isFinite(b.ce) ? b.ce : dailyValTime(c, barDate(b)));
+  const dSince = daily.filter((b) => closeAt(b) > fillTs && (c.fx ? closeAt(b) <= c.cut : barDate(b) <= cutD));
   const dl = daily[daily.length - 1];
 
   const out: ConvexMark = {
@@ -369,7 +375,7 @@ export function markConvexity(c: ConvexCard, hourly: Bar[], daily: Bar[], fillTs
     const up = upperBarrier(c.struct);
     const hb = live.find((b) => (up ? b.h >= c.k : b.l <= c.k));
     const db = dSince.find((b) => (up ? b.c >= c.k : b.c <= c.k));
-    const hTs = hb ? hb.ts : Infinity, dTs = db ? dailyValTime(c, barDate(db)) : Infinity;
+    const hTs = hb ? hb.ts : Infinity, dTs = db ? closeAt(db) : Infinity;
     if (hb || db) {
       out.touched_at = Math.min(hTs, dTs);
       out.touched_px = hTs <= dTs ? (up ? hb!.h : hb!.l) : db!.c;
@@ -406,7 +412,7 @@ export function markConvexity(c: ConvexCard, hourly: Bar[], daily: Bar[], fillTs
   const hv = valueAtTime(c, lastLive.c, Math.min(lastLive.ts + HOUR, now, c.cut)); // a running bar is valued at now
   out.v = hv.v; out.r = scoreR(hv.v, c.p0fill); out.left_n = hv.n;
   if (dl) {
-    const dv = valueAtTime(c, dl.c, dailyValTime(c, barDate(dl)));
+    const dv = valueAtTime(c, dl.c, closeAt(dl));
     out.daily_v = dv.v; out.daily_r = scoreR(dv.v, c.p0fill);
   }
   return out;
