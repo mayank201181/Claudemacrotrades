@@ -3,7 +3,7 @@
 // drivers-engine snapshots (kind 'drivers') through dash.put_drivers.
 // Auth: body.token must equal dash.config.ingest_token. {kind:'reparse'} replays dash.raw.
 import postgres from 'npm:postgres@3.4.4';
-import { parseDigest, parseEmailTested, parseTradeBook, setPrivateTerms, type Tested } from '../_shared/parse.ts';
+import { isOlderBook, parseDigest, parseEmailTested, parseTradeBook, setPrivateTerms, type Tested } from '../_shared/parse.ts';
 import { parseFeed, privacyFilter, type Family, type FeedSection } from '../_shared/feeds.ts';
 import { extractQuestions, parseBriefState, type StateQuestion } from '../_shared/questions.ts';
 
@@ -44,6 +44,9 @@ async function ingestQuestions(model: string, d: string, html: string): Promise<
   if (q.scorecard) {
     await sql`insert into dash.q_scorecard (model, d, body) values (${model}, ${d}, ${sql.json(q.scorecard)})
       on conflict (model, d) do update set body = excluded.body`;
+  } else {
+    // EDGE-009: a copy that replaces the day's digest without a scorecard leaves none behind from the older copy.
+    await sql`delete from dash.q_scorecard where model = ${model} and d = ${d}`;
   }
   return `${q.moves.length} odds moves, ${q.events.length} list events`;
 }
@@ -101,15 +104,18 @@ async function ingestThread(data: Json): Promise<string[]> {
         built = excluded.built, header = excluded.header, sixty = excluded.sixty, themes = excluded.themes,
         sections = excluded.sections, trade_block = excluded.trade_block, parsed_at = now()
       where excluded.sent_at >= dash.digests.sent_at or dash.digests.gmail_id = excluded.gmail_id`;
+    // A later copy of the same day's digest (a re-run) wins; an older one never overwrites it, neither its
+    // parent row nor the tested lines and odds taken from it (EDGE-008).
+    const [cur] = await sql`select gmail_id from dash.digests where model = ${dg.model} and d = ${dg.d}`;
+    const current = cur?.gmail_id === msg.id;
     // The email prints the top tested lines; the ledger has all of them and wins when present.
     const [{ n }] = await sql`select count(*)::int n from dash.tested where model = ${dg.model} and d = ${dg.d} and source = 'ledger'`;
-    if (n === 0 && dg.trade_block) {
+    if (current && n === 0 && dg.trade_block) {
       await sql`delete from dash.tested where model = ${dg.model} and d = ${dg.d} and source = 'email'`;
       await upsertTested(parseEmailTested(dg.trade_block, dg.model, dg.d));
     }
-    // A later copy of the same day's digest (a re-run) wins; an older one never overwrites it.
-    const [cur] = await sql`select gmail_id from dash.digests where model = ${dg.model} and d = ${dg.d}`;
-    const qs = cur?.gmail_id === msg.id ? await ingestQuestions(dg.model, dg.d, msg.htmlBody ?? '') : 'questions skipped (older copy)';
+    // EDGE-015: an HTML-only message ('html', no 'htmlBody') is parsed for its odds too.
+    const qs = current ? await ingestQuestions(dg.model, dg.d, String(msg.htmlBody ?? (m as Json).html ?? '')) : 'questions skipped (older copy)';
     out.push(`digest ${dg.model} ${dg.d}: ${dg.themes.length} themes, ${dg.sixty.length} bullets, ${qs}`);
   }
   return out;
@@ -118,10 +124,21 @@ async function ingestThread(data: Json): Promise<string[]> {
 async function ingestBook(data: Json | string, fileId?: string): Promise<string[]> {
   const text = typeof data === 'string' ? data : String((data as Json).fileContent ?? '');
   const tb = parseTradeBook(text);
-  const today = new Date().toISOString().slice(0, 10);
+  // EDGE-012: the desk day is the Singapore date (a 07:45 SGT ingest is 23:45 UTC the day before).
+  const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
   await sql`insert into dash.raw (kind, model, d, source_id, payload)
     values ('trade_book', ${tb.model}, ${today}, ${`${fileId ?? tb.model}|${tb.updated ?? today}`}, ${sql.json({ text, fileId: fileId ?? null })})
     on conflict (kind, source_id) do update set payload = excluded.payload, received_at = now()`;
+  // EDGE-014: a snapshot older than the book already stored (a delayed post, a stale Drive read) is kept raw only:
+  // it must not overwrite the header or reopen a trade the newer book closed. 'Last updated' is
+  // 'YYYY-MM-DD HH:MM SGT', which orders as text.
+  const [held] = await sql`select updated from dash.book_state where model = ${tb.model}`;
+  if (isOlderBook(tb.updated, held?.updated)) {
+    // Its marks and log lines for days the newer book no longer prints are still history: add, never replace.
+    for (const m of tb.marks) await sql`insert into dash.trade_marks ${sql(m as unknown as Json)} on conflict (model, pid, d) do nothing`;
+    for (const l of tb.log) await sql`insert into dash.trade_log (model, d, ref, text) values (${l.model}, ${l.d}, ${l.ref}, ${l.text}) on conflict do nothing`;
+    return [`book ${tb.model} (${tb.updated}): older than the stored ${held.updated}; header, trades and tested left as they are`];
+  }
   await sql`insert into dash.book_state (model, updated, scorecard, rules, ingested_at)
     values (${tb.model}, ${tb.updated}, ${tb.scorecard}, ${tb.rules}, now())
     on conflict (model) do update set updated = excluded.updated, scorecard = excluded.scorecard, rules = excluded.rules, ingested_at = now()`;

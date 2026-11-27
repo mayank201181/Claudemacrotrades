@@ -9,7 +9,7 @@ VannaVolgaBarrierEngine recipe for barriers). test_fxopt.py checks every number 
 QuantLib-Python (BSD-3; https://github.com/lballabio/QuantLib); no QuantLib code is copied here.
 
 Usage: python3 fxopt.py '<json>'   (or the JSON on stdin; a JSON list prices several legs)
-  pair        "USDJPY" (base then terms; prices are in terms currency per 1 unit of base)
+  pair        "USDJPY" (base then terms; prices are in terms currency per 1 unit of base; price_pips in pips)
   type        call | put | digital_call | digital_put | one_touch | no_touch | double_no_touch |
               double_one_touch | strike (strike from delta)
   spot        spot rate
@@ -42,6 +42,19 @@ _N = NormalDist()
 N = _N.cdf
 n = _N.pdf
 Ninv = _N.inv_cdf
+
+
+def log_ncdf(z):
+    """log N(z), accurate far into the left tail (N itself underflows to 0 below about -38)."""
+    if z > -30:
+        return math.log(0.5 * math.erfc(-z / math.sqrt(2)))
+    u = 1.0 / (z * z)  # Mills-ratio asymptotic series
+    return -0.5 * z * z - math.log(-z) - 0.5 * math.log(2 * math.pi) + math.log1p(-u + 3 * u ** 2 - 15 * u ** 3 + 105 * u ** 4)
+
+
+def _wN(logw, z):
+    """exp(logw) * N(z) without overflow or underflow (A14 EX02: a huge reflection weight times a far-left N)."""
+    return math.exp(logw + log_ncdf(z))
 
 
 def _pct(v):
@@ -127,37 +140,61 @@ class Mkt:
         return self.dfd * N(phi * (d1 - sd))
 
     # ---- touches
-    def touch_prob(self, H, vol, measure='terms'):
-        """Probability of touching H before expiry under the terms (domestic) or base measure."""
+    def touch_prob(self, H, vol, measure='terms', up=None):
+        """Probability of touching H before expiry under the terms (domestic) or base measure. `up` fixes the
+        barrier's side (A14 EX06: a spot bump through H must read as touched, not as a barrier on the other side)."""
         S, T = self.S, self.T
-        if H == S:
+        if up is None:
+            up = H > S
+        if H == S or (up and S >= H) or (not up and S <= H):
             return 1.0
         mu = self.rd - self.rf + (0.5 if measure == 'base' else -0.5) * vol * vol
         sd = vol * math.sqrt(T)
         h = math.log(H / S)
-        if H > S:
-            return N((-h + mu * T) / sd) + math.exp(2 * mu * h / (vol * vol)) * N((-h - mu * T) / sd)
-        return N((h - mu * T) / sd) + math.exp(2 * mu * h / (vol * vol)) * N((h + mu * T) / sd)
+        lw = 2 * mu * h / (vol * vol)
+        if up:
+            return min(1.0, N((-h + mu * T) / sd) + _wN(lw, (-h - mu * T) / sd))
+        return min(1.0, N((h - mu * T) / sd) + _wN(lw, (h + mu * T) / sd))
 
-    def one_touch(self, H, vol, pay='terms', when='expiry'):
-        if H == self.S:
+    def one_touch(self, H, vol, pay='terms', when='expiry', up=None):
+        if up is None:
+            up = H > self.S
+        if H == self.S or (up and self.S >= H) or (not up and self.S <= H):
+            # touched: paid now at hit (A14 EX03: not discounted to expiry), else at expiry
+            if when == 'hit':
+                return 1.0
             return self.dfd if pay == 'terms' else self.dff
         if when == 'expiry':
             if pay == 'base':
-                return self.dff * self.touch_prob(H, vol, 'base')
-            return self.dfd * self.touch_prob(H, vol, 'terms')
+                return self.dff * self.touch_prob(H, vol, 'base', up)
+            return self.dfd * self.touch_prob(H, vol, 'terms', up)
         # paid at hit (Rubinstein-Reiner); base-currency pay at hit is worth H units of terms
         S, T = self.S, self.T
         b = self.rd - self.rf
         mu = (b - 0.5 * vol * vol) / (vol * vol)
-        lam = math.sqrt(mu * mu + 2 * self.rd / (vol * vol))
+        rad = mu * mu + 2 * self.rd / (vol * vol)
+        if rad < 0:
+            # A14 EX04: a negative terms rate below -mu^2 vol^2 / 2 has no real Laplace exponent; integrate
+            # E[exp(-rd tau) 1(tau <= T)] by parts on the hitting-time CDF: dfd P(T) + rd * int_0^T e^{-rd t} P(t) dt.
+            def P(t):
+                return Mkt(S, t, self.rd, self.rf).touch_prob(H, vol, 'terms', up) if t > 0 else 0.0
+            k = 400  # Simpson on t = T x^2 (the CDF rises like sqrt-of-time near 0)
+            acc = 0.0
+            for i in range(k + 1):
+                x = i / k
+                w = 1 if i in (0, k) else (4 if i % 2 else 2)
+                t = T * x * x
+                acc += w * 2 * T * x * math.exp(-self.rd * t) * P(t)
+            v = self.dfd * P(T) + self.rd * acc / (3 * k)
+            return v * (H / S if pay == 'base' else 1.0)
+        lam = math.sqrt(rad)
         z = math.log(H / S) / (vol * math.sqrt(T)) + lam * vol * math.sqrt(T)
         eta = 1.0 if H < S else -1.0
         v = (H / S) ** (mu + lam) * N(eta * z) + (H / S) ** (mu - lam) * N(eta * z - 2 * eta * lam * vol * math.sqrt(T))
         return v * (H / S if pay == 'base' else 1.0)
 
     # ---- double touches (Hui 1996 series, as in Haug's Complete Guide), paid at expiry
-    def double_no_touch(self, L, U, vol, pay='terms'):
+    def double_no_touch(self, L, U, vol, pay='terms', method=None):
         """Value, per unit of payout in the pay currency, of a payout at expiry if spot stays inside (L, U)."""
         S, T = self.S, self.T
         if not L < S < U:
@@ -166,6 +203,27 @@ class Mkt:
         b = self.rd - self.rf + (vol * vol if pay == 'base' else 0.0)
         r = self.rf if pay == 'base' else self.rd
         s2, Z = vol * vol, math.log(U / L)
+        sd = vol * math.sqrt(T)
+        if method == 'images' or (method is None and sd / Z < 0.5):
+            # A14 EX01: for a corridor wide against the remaining diffusion, the sine series cancels to nothing
+            # (the 3%-vol, 30-day 0.7/1.4 corridor priced 0). Method of images instead: for X = log(S_T/S) with
+            # drift m and killing at a = log(L/S) < 0 < c = log(U/S), the surviving mass is
+            # sum_n [M(2nZ) - M(2a + 2nZ)], M(k) = exp(m k / s2) [N((c - k - mT)/sd) - N((a - k - mT)/sd)].
+            m_, lo_, hi_ = b - 0.5 * s2, math.log(L / S), math.log(U / S)
+
+            def M(k):
+                x, y = (lo_ - k - m_ * T) / sd, (hi_ - k - m_ * T) / sd
+                if x > 0:  # use the upper tail: N(y) - N(x) = N(-x) - N(-y)
+                    x, y = -y, -x
+                lx, ly = log_ncdf(x), log_ncdf(y)
+                if lx >= ly:
+                    return 0.0
+                return math.exp(m_ * k / s2 + ly + math.log(-math.expm1(lx - ly)))
+
+            terms = []
+            for j in range(-12, 13):
+                terms += [M(2 * j * Z), -M(2 * lo_ + 2 * j * Z)]
+            return math.exp(-r * T) * min(1.0, max(0.0, math.fsum(terms)))
         a = -0.5 * (2 * b / s2 - 1)
         be = -0.25 * (2 * b / s2 - 1) ** 2 - 2 * r / s2
         xl, xu, lsl = (S / L) ** a, (S / U) ** a, math.log(S / L)
@@ -181,6 +239,8 @@ class Mkt:
 
     # ---- single barriers, no rebate (Reiner-Rubinstein, as in Haug's Complete Guide)
     def barrier(self, phi, K, H, btype, vol):
+        if btype not in BARRIER_TYPES:  # A14 EX07: up_otu was priced as up_in
+            raise ValueError('barrier_type must be one of ' + ', '.join(BARRIER_TYPES))
         S, T, r, b = self.S, self.T, self.rd, self.rd - self.rf
         up = btype.startswith('up')
         out = btype.endswith('out')
@@ -216,6 +276,9 @@ class Mkt:
         return max(vout if out else vin, 0.0)
 
 
+BARRIER_TYPES = ('up_out', 'up_in', 'down_out', 'down_in')
+
+
 # ---- vanna-volga smile
 class Smile:
     """Three pillars (25d put, ATM, 25d call) and the vanna-volga smile between and beyond them."""
@@ -234,6 +297,8 @@ class Smile:
     def vol(self, K):
         """Vanna-volga vol at strike K: the vanna-volga call price (ATM-vol Black price plus the
         vega-weighted market-minus-model premia of the three pillars), inverted to a Black vol."""
+        if self.vc == self.atm == self.vp:  # A14 VAN-004: a flat surface is flat everywhere (no deep-wing re-inversion)
+            return self.atm
         m, s2 = self.m, self.atm
         ks = (self.k_p, self.k_atm, self.k_c)
         vs = (self.vp, self.atm, self.vc)
@@ -298,11 +363,18 @@ def market_strangle_smile(m, atm, rr25, bf_ms, delta_type, atm_type):
     def f(bf):
         sm = Smile(m, atm, rr25, bf, delta_type, atm_type)
         return m.vanilla(1, kc, sm.vol(kc)) + m.vanilla(-1, kp, sm.vol(kp)) - target, sm
-    lo, hi = bf_ms - 0.02, bf_ms + 0.02
-    while f(lo)[0] > 0:
-        lo -= 0.02
-    while f(hi)[0] < 0:
-        hi += 0.02
+    # A14 VAN-003: the bracket keeps both wing vols positive (atm + bf - |rr|/2 > 0), starts at the quote and is bounded.
+    if atm <= 0 or v <= 0:
+        raise ValueError('ATM and market strangle vols must be positive')
+    floor = abs(rr25) / 2 - atm + 1e-6
+    width = min(0.002, atm / 10)
+    for _ in range(40):
+        lo, hi = max(floor, bf_ms - width), bf_ms + width
+        if f(lo)[0] <= 0 <= f(hi)[0]:
+            break
+        width *= 1.6
+    else:
+        raise ValueError('no market strangle calibration with positive wing vols')
     for _ in range(60):
         mid = 0.5 * (lo + hi)
         if f(mid)[0] > 0:
@@ -370,9 +442,10 @@ def price(leg):
             notes.append('rd not given: discounting at 0, carry from the forward')
         rf = rd - math.log(float(fwd) / S) / T
     else:
-        rd = rd or 0.0
+        # one rate or none: zero carry, so the other rate equals it (A14 VAN-005: rf alone used to set rd = 0)
+        rd = rd if rd is not None else (rf if rf is not None else 0.0)
         rf = rf if rf is not None else rd
-        notes.append('no forward or rates: zero carry assumed')
+        notes.append('no forward or both rates: zero carry assumed')
     m = Mkt(S, T, rd, rf)
     dtype = leg.get('delta_type') or ('spot_pa' if base in PA_BASES else 'spot')
     if T > 1.0 and not leg.get('delta_type'):
@@ -397,7 +470,17 @@ def price(leg):
         d = float(leg['delta'])
         phi = 1 if d > 0 else -1
         vol = smile.vc if (smile and phi > 0) else smile.vp if smile else vol_in
-        out.update(strike=m.strike_from_delta(phi, d, vol, dtype), vol=vol)
+        k = m.strike_from_delta(phi, d, vol, dtype)
+        if smile:
+            # A14 VAN-001: the vol is the smile's at the returned strike (the 25d wing vol was used for every delta)
+            for _ in range(200):
+                vol = smile.vol(k)
+                if abs(m.delta(phi, k, vol, dtype) - d) < 1e-10:
+                    break
+                k = math.sqrt(k * m.strike_from_delta(phi, d, vol, dtype))
+            else:
+                raise ValueError('no strike on this smile has that delta')
+        out.update(strike=k, vol=vol)
         out['notes'] = notes
         return out
     notional = float(leg.get('notional', 1e6))
@@ -407,7 +490,12 @@ def price(leg):
         vol = smile.vol(K) if smile else vol_in
         van = m.vanilla(phi, K, vol)
         if leg.get('barrier') is not None:
-            H, bt = float(leg['barrier']), leg['barrier_type']
+            H, bt = float(leg['barrier']), leg.get('barrier_type')
+            if bt not in BARRIER_TYPES:
+                raise ValueError('barrier_type must be one of ' + ', '.join(BARRIER_TYPES))
+            if float(leg.get('rebate') or 0) != 0:  # A14 EX08: never price a rebate as zero without saying so
+                raise ValueError('single barriers are priced without a rebate; rebate must be 0')
+            up_b = bt.startswith('up')
             if smile:
                 px = smile.vv_barrier(phi, K, H, bt, van)
                 out['bs_atm'] = m.barrier(phi, K, H, bt, smile.atm)
@@ -416,13 +504,19 @@ def price(leg):
             out.update(barrier=H, barrier_type=bt, vanilla=van)
             def reprice(s, v):
                 return Mkt(s, T, rd, rf).barrier(phi, K, H, bt, v)
-            out['p_touch'] = Mkt(S, T, rd, rf).touch_prob(H, smile.atm if smile else vol)
+            # A14 EX05: a barrier already through its trigger has touched (p = 1)
+            out['p_touch'] = Mkt(S, T, rd, rf).touch_prob(H, smile.atm if smile else vol, 'terms', up_b)
         else:
             px = van
             def reprice(s, v):
                 return Mkt(s, T, rd, rf).vanilla(phi, K, v)
             out['delta_' + dtype] = m.delta(phi, K, vol, dtype)
-            out['p_exercise'] = N(phi * ((math.log(m.F / K) - 0.5 * vol * vol * T) / (vol * math.sqrt(T))))
+            if smile:  # A14 VAN-002: the smile's own exercise probability, -dC/dK with the smile slope, undiscounted
+                h = 1e-4 * K
+                c = lambda k: m.vanilla(phi, k, smile.vol(k))
+                out['p_exercise'] = min(1.0, max(0.0, -phi * (c(K + h) - c(K - h)) / (2 * h * m.dfd)))
+            else:
+                out['p_exercise'] = N(phi * ((math.log(m.F / K) - 0.5 * vol * vol * T) / (vol * math.sqrt(T))))
         out.update(strike=K, vol=vol)
     elif typ in ('digital_call', 'digital_put'):
         K = float(leg['strike'])
@@ -458,32 +552,43 @@ def price(leg):
         H = float(leg['barrier'])
         pay, when = leg.get('pay', 'terms'), leg.get('when', 'expiry')
         vol = smile.atm if smile else vol_in
-        ot = m.one_touch(H, vol, pay, when if typ == 'one_touch' else 'expiry')
+        up_t = H > S  # fixed for the bumps (A14 EX06)
+        ot = m.one_touch(H, vol, pay, when if typ == 'one_touch' else 'expiry', up_t)
         dfp = m.dfd if pay == 'terms' else m.dff
         px = ot if typ == 'one_touch' else dfp - ot
         if smile:
             notes.append('touch priced at ATM vol; smile not applied to touches (no QuantLib cross-check)')
         def reprice(s, v):
             mm = Mkt(s, T, rd, rf)
-            o = mm.one_touch(H, v, pay, when if typ == 'one_touch' else 'expiry')
+            o = mm.one_touch(H, v, pay, when if typ == 'one_touch' else 'expiry', up_t)
             return o if typ == 'one_touch' else (mm.dfd if pay == 'terms' else mm.dff) - o
         out.update(barrier=H, vol=vol, pay=pay, when=when, payout=notional,
-                   p_touch=m.touch_prob(H, vol, 'terms' if pay == 'terms' else 'base'))
+                   p_touch=m.touch_prob(H, vol, 'terms' if pay == 'terms' else 'base', up_t))
     else:
         raise ValueError('unknown type ' + typ)
     # greeks by bump on the flat vol used (sticky strike), in base-notional terms
     v0 = out['vol']
     e = 1e-4
-    dS = S * 1e-4
+    # A14 EX09: the spot bump is kept well inside the remaining diffusion width (a fixed 1 bp smoothed ATM digital
+    # and short-dated deltas), and never reaches a touch barrier.
+    dS = S * max(1e-9, min(1e-4, 1e-3 * v0 * math.sqrt(T)))
+    if typ in ('one_touch', 'no_touch') and H != S:
+        dS = min(dS, abs(H - S) / 4)
     up_, dn_ = reprice(S + dS, v0), reprice(S - dS, v0)
     if typ in ('call', 'put'):
-        out['price_pips'] = px
+        # A14 FX-UNIT-01: price_pips is pips (1e-4 of terms, 1e-2 for JPY terms); price_terms is terms per unit of base
+        out['price_terms'] = px
+        out['price_pips'] = px / (0.01 if terms == 'JPY' else 1e-4)
         out['price_pct_base'] = 100 * px / S
         out['premium_terms'] = px * notional
         out['premium_base'] = px * notional / S
         out['delta_spot_pct'] = 100 * (up_ - dn_) / (2 * dS)
         out['vega_per_volpt_terms'] = (reprice(S, v0 + e) - reprice(S, v0 - e)) / (2 * e) * 0.01 * notional
-        out['gamma_per_1pct_pct'] = 100 * (up_ - 2 * reprice(S, v0) + dn_) / (dS * dS) * S * 0.01
+        if leg.get('barrier') is None:  # A14 VAN-006: exact Black gamma for a vanilla (a bump smooths the kink)
+            sd0 = v0 * math.sqrt(T)
+            out['gamma_per_1pct_pct'] = m.dff * n(math.log(m.F / K) / sd0 + 0.5 * sd0) / sd0
+        else:
+            out['gamma_per_1pct_pct'] = 100 * (up_ - 2 * reprice(S, v0) + dn_) / (dS * dS) * S * 0.01
     else:  # binaries: price as a share of the payout
         out['price_share'] = px
         out['premium_payccy'] = px * notional

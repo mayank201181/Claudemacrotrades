@@ -468,7 +468,7 @@ def load_source_days(out, topics):
         if not t.get("gkg"):
             continue
         res["gkg"][t["key"]] = [(d["date"], d["counts"].get(t["key"], 0), d["articles"],
-                                 d["files_ok"] >= GKG_MIN_FILES and d["articles"] >= GKG_MIN_ARTICLES) for d in gdays]
+                                 t["key"] in d["counts"] and d["files_ok"] >= GKG_MIN_FILES and d["articles"] >= GKG_MIN_ARTICLES) for d in gdays]
     if gdays:
         last = gdays[-1]
         notes["gkg"] = (f"GDELT GKG English edition, hourly sample, Singapore days; latest day {last['date']} "

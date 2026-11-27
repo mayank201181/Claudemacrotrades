@@ -15,6 +15,7 @@ WORLD = {  # pair: spot, base rate, quote rate
     "USDKRW": (1400.0, USD, 0.025),
 }
 GBPUSD = (1.3400, 0.045, USD)  # only its forward drift is needed, to find the sterling rate for EURGBP
+REAL_IV_SPOT = mp.iv_spot
 mp.iv_spot = lambda pair, ts: WORLD[pair][0]
 mp.USD_RATE[:] = [USD]
 N = mp._ncdf
@@ -378,6 +379,29 @@ with tempfile.TemporaryDirectory() as tmp:
     flag("after a weekend every day is from its full-day file", last == "2026-11-13" and not marks(tmp)
          and "Latest DTCC day: 2026-11-13 (UTC day, full-day file)" in "\n".join(out))
 mp.get, mp.NOW = real_get, real_now
+
+print("8. Astra A14: execution spot is never a later close (PY01); a backfill day's carry uses no later day (PY02)")
+spot_fn = mp.iv_spot
+mp.iv_spot = REAL_IV_SPOT
+mp._BARS["EURUSD"] = ([1000.0 + 300 * i for i in range(10)], [1.10 + 0.001 * i for i in range(10)])  # close times
+check("spot at 1550 is the close at 1300, not the nearer one at 1600", mp.iv_spot("EURUSD", 1550.0), 1.101, 1e-12)
+flag("no close before the first bar: none", mp.iv_spot("EURUSD", 999.0) is None)
+flag("a close older than 30 minutes: none", mp.iv_spot("EURUSD", 3700.0 + 1801) is None)
+del mp._BARS["EURUSD"]
+mp.iv_spot = spot_fn
+# EURUSD: day 1 carries a 2% drift (history), day 2's straddles 6%; a day-1 single call priced on the 2% world
+S = WORLD["EURUSD"][0]
+w1, w2 = (S, 0.03, 0.05), (S, 0.0, 0.06)
+t1 = dt.datetime(2026, 11, 9, 14, 0, tzinfo=dt.timezone.utc)
+t2 = t1 + dt.timedelta(days=1)
+hist = [["2026-11-0%d" % d, "EURUSD", 30.0, "F", 0.0, 0.02] for d in (4, 5, 6)]
+K1 = round(S * 1.01, 4)
+single = row("EURUSD", True, K1, 60, 0.08, t1, world=w1)[0]
+day2 = [row("EURUSD", call, round(S * math.exp(0.06 * d / 365.0), 4), d, 0.07, t2 + dt.timedelta(minutes=m, seconds=lag), world=w2)[0]
+        for m, d in enumerate((20, 30, 45, 60, 91)) for call, lag in ((True, 0), (False, 10))]
+o = mp.iv_observe({"2026-11-09": {"EURUSD": prints("EURUSD", [single])}, "2026-11-10": {"EURUSD": prints("EURUSD", day2)}}, hist)
+c1 = [r for r in o if r[0] == "2026-11-09" and r[3] == "C"]
+check("day-1 single call vol off day-1 carry", c1[0][5] if c1 else None, 0.08, 3e-4)
 
 print("FAILED: " + "; ".join(fails) if fails else "test_marketpack_iv: all checks passed")
 sys.exit(1 if fails else 0)

@@ -36,7 +36,7 @@ const DAY = 24 * HOUR;
 const SGT = 8 * HOUR;
 
 const num = (s: string | undefined | null): number | null => {
-  const m = (s ?? '').replace(/[−–]/g, '-').replace(/(\d),(?=\d{3}(?!\d))/g, '$1').match(/[+-]?\d+(?:\.\d+)?/);
+  const m = (s ?? '').replace(/[−–]/g, '-').replace(/(\d),(?=\d{3}(?!\d))/g, '$1').match(/[+-]?(?:\d+(?:\.\d*)?|\.\d+)/); // TS-07: leading-dot decimals
   const v = m ? parseFloat(m[0]) : NaN;
   return Number.isFinite(v) ? v : null;
 };
@@ -183,7 +183,7 @@ export function exitBar(hourly: Bar[], closedDate: string, px: number | null): n
   let best: Bar | null = null;
   for (const b of hourly) {
     const end = b.ts + HOUR;
-    if (end <= d0 || end > d0 + DAY) continue;
+    if (end < d0 || end >= d0 + DAY) continue; // A14 TS-11: the Singapore close date as a half-open day
     if (!best || Math.abs(b.c - px) < Math.abs(best.c - px)) best = b;
   }
   return best && Math.abs(best.c / px - 1) <= 5e-4 ? best.ts + HOUR : null;
@@ -230,8 +230,9 @@ export function markTwin(card0: TwinCard, hourly: Bar[], fillTs: number, now: nu
   const card: TwinCard = { ...card0, p0fill };
   const e = opts.early;
   const end = e && e.ts > fillTs && e.ts < card.cut && e.ts <= now ? e.ts : null;
-  // An early close at `end` sees only the bars that had ended by then; the last of them prices it.
-  const m = markConvexity(card, hourly, [], fillTs, end != null ? end - 1 : now);
+  // An early close at `end` sees only the bars that had ended by then; the last of them prices it (markConvexity
+  // leaves out a bar still running at `end` when later bars exist, TS-01).
+  const m = markConvexity(card, hourly, [], fillTs, end ?? now);
   if (!m) return 'no live hourly bars';
   const base = { p0fill, tv, fill_px: fillPx, vol: card.vol * Math.sqrt(252) * 100 };
   if (m.paid != null) {
@@ -244,7 +245,7 @@ export function markTwin(card0: TwinCard, hourly: Bar[], fillTs: number, now: nu
     return { ...base, state: 'view', r: earlyCloseR(isBinary(card.struct), v, p0fill, tier), v, as_of: end, px, left_n: 0 };
   }
   // The running mark, on the smile: the last live bar's close, valued at that bar's end.
-  const v = twinValue(card, m.price, Math.min(m.as_of + HOUR, card.cut)).v;
+  const v = twinValue(card, m.price, Math.min(m.as_of + HOUR, now, card.cut)).v;
   return { ...base, state: 'open', r: scoreR(v, p0fill), v, as_of: m.as_of, px: m.price, left_n: m.left_n };
 }
 

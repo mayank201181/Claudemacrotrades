@@ -54,7 +54,7 @@ def main():
             if not (rel or plc or sig): continue
             label = 'DXY' if r['asset'] == 'FX_USD.CLOSE' else r['asset'].split('.')[0].split('_', 1)[1]
             cells.append([r['event_type'], label, r['window'], str(n), num(r['multiplier'], 2), num(r['ci_lo'], 2), num(r['ci_hi'], 2),
-                          num(r['q_value_bh'], 3), '1' if rel else '0', '1' if plc else '0',
+                          (r['q_value_bh'].strip() if math.isfinite(q) else ''), '1' if rel else '0', '1' if plc else '0',
                           num(r['mean_abs_event'], 2), num(r['mean_abs_control'], 2), num(r['var_ratio'], 2),
                           num(r['addon_vol_1w'], 2), num(r['addon_vol_1m'], 2), num(r['addon_vol_1w_now'], 2), num(r['addon_vol_1m_now'], 2),
                           num(r['multiplier_shrunk'], 2)])

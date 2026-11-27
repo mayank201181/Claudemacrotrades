@@ -20,7 +20,13 @@ Deno.serve(async (req) => {
   if (body.interval && !['1d', '60m'].includes(body.interval)) return new Response('bad interval', { status: 400 });
   const p2 = Math.floor(Date.now() / 1000);
   // Yahoo serves hourly bars for the last 730 days only.
-  const p1 = Math.max(Math.floor(Date.parse(body.start ?? '1990-01-01') / 1000), hourly ? p2 - 729 * 86400 : 0);
+  // A14 EDGE-007: a start that is not a real YYYY-MM-DD date is refused (it went upstream as NaN or rolled over).
+  const start = String(body.start ?? '1990-01-01');
+  const t0 = Date.parse(start + 'T00:00:00Z');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || !Number.isFinite(t0) || new Date(t0).toISOString().slice(0, 10) !== start) {
+    return new Response('bad start', { status: 400 });
+  }
+  const p1 = Math.max(Math.floor(t0 / 1000), hourly ? p2 - 729 * 86400 : 0);
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?period1=${p1}&period2=${p2}&interval=${hourly ? '60m' : '1d'}&events=div%2Csplit`;
   const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
   if (!r.ok) return new Response(`yahoo ${r.status}`, { status: 502 });
@@ -36,7 +42,7 @@ Deno.serve(async (req) => {
     res.timestamp.forEach((t: number, i: number) => {
       const c = q.close?.[i];
       if (typeof c !== 'number') return;
-      rows.push([new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' '), num(q.open?.[i]), num(q.high?.[i]), num(q.low?.[i]), num(c), num(q.volume?.[i] ?? 0)].join(','));
+      rows.push([new Date(t * 1000).toISOString().slice(0, 16).replace('T', ' '), num(q.open?.[i]), num(q.high?.[i]), num(q.low?.[i]), num(c), num(q.volume?.[i])].join(',')); // A14 EDGE-005: a missing volume stays blank
     });
     return new Response(rows.join('\n') + '\n', { headers: { 'content-type': 'text/csv', 'x-rows': String(rows.length - 1), 'x-tz': 'UTC' } });
   }
@@ -48,7 +54,10 @@ Deno.serve(async (req) => {
     const d = day.format(new Date(t * 1000));
     if (d === last) lines.pop(); // a same-day duplicate (today's live bar) replaces the earlier row
     last = d;
-    lines.push([d, num(q.open?.[i]), num(q.high?.[i]), num(q.low?.[i]), num(c), num(adj?.[i] ?? c), num(q.volume?.[i] ?? 0)].join(','));
+    // A14 EDGE-006: when Yahoo sends an adjusted series, a missing point stays blank (an unadjusted close there made a
+    // spurious adjusted return); with no adjusted series at all (FX, indices) Adj Close is the close. EDGE-005: a
+    // missing volume stays blank, never 0.
+    lines.push([d, num(q.open?.[i]), num(q.high?.[i]), num(q.low?.[i]), num(c), num(adj ? adj[i] : c), num(q.volume?.[i])].join(','));
   });
   return new Response(lines.join('\n') + '\n', {
     headers: { 'content-type': 'text/csv', 'x-rows': String(lines.length - 1), 'x-tz': tz },

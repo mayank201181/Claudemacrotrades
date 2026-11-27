@@ -95,6 +95,8 @@ export function fdmOf(series: number[][][]): number | null {
   }
   if (cnt < 500) return null;
   const mu = sx.map((x) => x / cnt), cov = sxx.map((r, a) => r.map((x, b) => x / cnt - mu[a] * mu[b]));
+  // A14 TS-06: a speed that never varies has no correlation (and rounding can leave a tiny variance).
+  if (cov.some((row, i) => !(row[i] > 1e-12 * (1 + mu[i] * mu[i])))) return null;
   let wcw = 0;
   for (let a = 0; a < k; a++) for (let b = 0; b < k; b++) {
     const c = a === b ? 1 : Math.max(0, cov[a][b] / Math.sqrt(cov[a][a] * cov[b][b]));

@@ -499,7 +499,8 @@ def iv_print(r, base, quote):
 
 
 def iv_spot(pair, ts):
-    """Yahoo 5-minute close nearest to an execution time, within 30 minutes; else None."""
+    """The latest Yahoo 5-minute close at or before an execution time, no older than 30 minutes; else None.
+    (A14 PY01: the nearest close could be one after the trade, and the first bar of the day had no earlier one.)"""
     if pair not in _BARS:
         bars = []
         for sym in IV_YAHOO[pair].split("|"):
@@ -515,9 +516,8 @@ def iv_spot(pair, ts):
     times, px = _BARS[pair]
     if not times:
         return None
-    i = bisect.bisect_left(times, ts)
-    j = min((k for k in (i - 1, i) if 0 <= k < len(times)), key=lambda k: abs(times[k] - ts))
-    return px[j] if abs(times[j] - ts) <= 1800 else None
+    j = bisect.bisect_right(times, ts) - 1  # times are bar close times (start + 300 s)
+    return px[j] if j >= 0 and ts - times[j] <= 1800 else None
 
 
 def usd_rate():
@@ -576,13 +576,18 @@ def iv_observe(day_prints, carry_hist):
                 if T * 365 >= 6 and abs(drift) < 0.25:
                     obs.append([iso, pair, round(T * 365, 1), "F", 0.0, round(drift, 5)])
             singles += [(iso, pair, x) for x in uniq if x not in used]
-    drifts = {}
-    for row in list(carry_hist) + obs:
-        if row[3] == "F":
-            drifts.setdefault(row[1], []).append(float(row[5]))
-    drift = {pair: _median(d) for pair, d in drifts.items() if len(d) >= 3}
+    # A14 PY02: each day's carry is the median of the forwards observed up to and including that day; pooled over
+    # a whole backfill, later days moved the forwards, deltas and vols of earlier ones.
+    carry_rows = [r for r in list(carry_hist) + obs if r[3] == "F"]
+    drift_for_day = {}
+    for day in day_prints:
+        pool = {}
+        for row in carry_rows:
+            if row[0] <= day:
+                pool.setdefault(row[1], []).append(float(row[5]))
+        drift_for_day[day] = {pair: _median(d) for pair, d in pool.items() if len(d) >= 3}
 
-    def quote_rate(pair):
+    def quote_rate(pair, drift):
         q = pair[3:]
         if q == "USD":
             return usd_rate()
@@ -590,7 +595,8 @@ def iv_observe(day_prints, carry_hist):
         return usd_rate() + drift.get("USD" + q, 0.0) - drift.get(q + "USD", 0.0)
 
     for iso, pair, T, s, K, cu, pu in strads:
-        df = math.exp(-quote_rate(pair) * T)
+        drift = drift_for_day[iso]
+        df = math.exp(-quote_rate(pair, drift) * T)
         F = K + (cu - pu) / df
         if F <= 0 or abs(math.log(F / K)) > 0.03:
             continue
@@ -599,12 +605,13 @@ def iv_observe(day_prints, carry_hist):
         if vol and 0.01 < vol < 0.8:
             obs.append([iso, pair, round(T * 365, 1), "S", 0.0, round(vol, 5)])
     for iso, pair, x in singles:
+        drift = drift_for_day[iso]
         T = (x[6] - x[5]) / (365 * 86400.0)
         s = iv_spot(pair, x[5])
         if not s or not 3 <= T * 365 <= 400:
             continue
         F = s * math.exp(drift.get(pair, 0.0) * T)
-        pu, K, call = (x[3] * s if x[4] else x[3]) / x[2] / math.exp(-quote_rate(pair) * T), x[1], x[0]
+        pu, K, call = (x[3] * s if x[4] else x[3]) / x[2] / math.exp(-quote_rate(pair, drift) * T), x[1], x[0]
         if abs(math.log(K / F)) > 0.12:
             continue
         sd = _solve_sd(pu, lambda v: _black(F, K, v, call))
@@ -922,7 +929,10 @@ def section_d(outdir, backfill_days=22):
     agg = {}
     for r in strikes:
         if t0 <= r["expiry"] <= t1 and r["pair"] in WATCH:
-            key = (r["pair"], r["strike"], r["expiry"])
+            try:  # A14 PY18: cached strikes come back from the CSV as text, new ones as floats; one key for both
+                key = (r["pair"], float(r["strike"]), r["expiry"])
+            except (TypeError, ValueError):
+                continue
             agg[key] = agg.get(key, 0.0) + float(r["usd"])
     big = sorted(((v, k) for k, v in agg.items() if v >= (100e6 if k[0][:3] in PRIO and k[0][3:] in PRIO else 50e6)),
                  key=lambda x: x[0], reverse=True)  # ties: strikes can mix str and float, so sort on notional only
@@ -1013,7 +1023,7 @@ def section_e():
                     when = when.replace(tzinfo=dt.timezone.utc)
             except Exception:  # noqa: BLE001
                 continue
-            if when < since or (len(title) < 25 and not keep_all):
+            if not since <= when <= NOW or (len(title) < 25 and not keep_all):
                 continue
             if "Stock Price & Latest News" in title or "Trending News" in title or not (keep_all or words.search(title)):
                 continue
@@ -1168,7 +1178,7 @@ def _asof(rows, day):
 
 def credit_state(vix_z, d6_bp):
     """Book rule (Willer and Saunders ch. 3): a VIX +2 sigma spike carries information only when HY spreads are wider over six months."""
-    if vix_z is None or d6_bp is None:
+    if vix_z is None or d6_bp is None or not all(map(math.isfinite, (vix_z, d6_bp))):
         return "n/a"
     if vix_z >= 2.0:
         return "confirmed" if d6_bp > 0 else "unconfirmed"
@@ -1365,7 +1375,7 @@ def _rr25(dlines):
     """RR25 per pair from section D's implied vol table (+ = base-currency calls over)."""
     out = {}
     for ln in dlines:
-        m = re.match(r"([A-Z]{6}) \| fwd .*?RR25 ([+-]?\d+\.\d+) ±(\d+\.\d+)", ln)
+        m = re.match(r"([A-Z]{6})(?: \[5d\])? \| fwd .*?RR25 ([+-]?\d+\.\d+) ±(\d+\.\d+)", ln.replace("USDCNH/CNY [5d]", "USDCNY [5d]"))
         if m:
             out[m[1]] = (float(m[2]), float(m[3]))
     return out
@@ -1379,7 +1389,7 @@ def _cftc_usd():
     data = json.loads(get(f"https://publicreporting.cftc.gov/resource/gpe5-46if.json?$select={cols}&$where={where}&$limit=20000", timeout=90, tries=2))
     spot = {}
     for ccy, _, _, sym, _ in CFTC_FX:
-        _, rows = yahoo_chart(sym, rng="5y", interval="1wk")
+        _, rows = yahoo_chart(sym, rng="5y", interval="1d")
         spot[ccy] = [(dt.datetime.fromtimestamp(r[0], dt.timezone.utc).strftime("%Y-%m-%d"), r[4]) for r in rows]
     meta = {c: (ccy, size, xxxusd) for ccy, c, size, _, xxxusd in CFTC_FX}
     agg = {}  # date -> {"lev": usd bn, "am": usd bn, "n": ccys}
@@ -1388,6 +1398,10 @@ def _cftc_usd():
         d = r["report_date_as_yyyy_mm_dd"][:10]
         s = _asof(spot[ccy], d)
         if not s:
+            continue
+        fields = ("lev_money_positions_long", "lev_money_positions_short",
+                  "asset_mgr_positions_long", "asset_mgr_positions_short")
+        if any(r.get(field) in (None, "") for field in fields):
             continue
         usd_per_ccy = s if xxxusd else 1.0 / s
         a = agg.setdefault(d, {"lev": 0.0, "am": 0.0, "n": 0})
@@ -2080,7 +2094,7 @@ def section_j(outdir):
                 when = when if when.tzinfo else when.replace(tzinfo=dt.timezone.utc)
             except Exception:  # noqa: BLE001
                 continue
-            if when >= since and rx.search(title):
+            if since <= when <= NOW and rx.search(title):
                 items.append((when, title, (it.findtext("link") or "").strip()))
         for when, title, link in sorted(items, reverse=True)[:4]:
             L.append(f"- {when.astimezone(SGT):%d %b %H:%M} SGT · {label} · {title} · {link}")
@@ -2113,7 +2127,9 @@ def section_j(outdir):
             except Exception:  # noqa: BLE001
                 continue
             key = re.sub(r"[^a-z0-9]+", " ", title.lower()).strip()[:70]
-            if when < since or key in seen or not RATE_WORDS.search(title) or not rx.search(title) or "TradingView" in src:
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=dt.timezone.utc)
+            if not since <= when <= NOW or key in seen or not RATE_WORDS.search(title) or not rx.search(title) or "TradingView" in src:
                 continue
             if re.search(r"\b(reit|dividend|stock price|shares? price|ipo|mortgage|seasonal returns|fund)\b|\(0P", title, re.I):
                 continue

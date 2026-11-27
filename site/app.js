@@ -287,7 +287,7 @@
     const m = (cmeta(t).cut || '').match(/(\d{4}-\d{2}-\d{2})\s+(\d{1,2}):(\d{2})/);
     if (!m) return null;
     const ms = Date.parse(m[1] + 'T00:00:00Z') - 8 * 3600000 + (Number(m[2]) * 60 + Number(m[3])) * 60000;
-    return new Date(ms - 5 * 3600000).toISOString().slice(0, 10);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms)); // A14 DATE-01: New York's own DST
   };
   const dMon = (d) => (d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '—');
   const sgtTime = (ts) => (ts ? new Date(new Date(ts).getTime() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' SGT' : '');
@@ -330,7 +330,8 @@
     const paid = paidL.length ? paidL.reduce((a, x) => a + x, 0) / paidL.length : null;
     const price = avg(scored.filter((t) => p0fillOf(t) != null), p0fillOf);
     const atGate = settled.filter((t) => cmeta(t).pgate === 'yes').length;
-    const openR = open.reduce((a, t) => a + (curR(t) || 0), 0);
+    // A14 SITE-01: an open card with no mark is not flat; the total is unavailable until every card is marked.
+    const openR = open.every((t) => curR(t) != null) ? open.reduce((a, t) => a + curR(t), 0) : null;
     const pc = (x) => (x == null ? '—' : `${(x * 100).toFixed(1)}%`);
     return {
       cum, html: `settled ${settled.length} · says ${pc(says)} · paid ${pc(paid)} · price ${pc(price)} · at gate ${atGate}`
@@ -382,7 +383,8 @@
     const tw = twinStat(trades);
     const wins = closed.filter((t) => n(t.result_r) > 0).length;
     const cum = closed.reduce((a, t) => a + (n(t.result_r) || 0), 0);
-    const openR = open.reduce((a, t) => a + (curR(t) || 0), 0);
+    const unmarked = open.filter((t) => curR(t) == null).length; // A14 SITE-01: never read as +0.00R
+    const openR = unmarked ? null : open.reduce((a, t) => a + curR(t), 0);
     const notCarded = tested.filter((x) => x.verdict === 'not carded');
     const priced = notCarded.filter((x) => x.outcome && n(x.outcome.ret5) != null);
     const near = priced.filter((x) => n(x.ev) != null && n(x.ev) >= 0.15), far = priced.filter((x) => n(x.ev) != null && n(x.ev) < 0.15);
@@ -394,7 +396,7 @@
     $('#analytics').innerHTML = [
       stat('Closed', `${closed.length}`, `${wins} win${wins === 1 ? '' : 's'} · ${missed.length} missed`),
       stat('Realised', fmtR(cum), `sum of closed ${cx ? 'linear ' : ''}trades, 1R each`, cls(cum)),
-      stat('Open', `${open.length}${pending.length ? ` +${pending.length}p` : ''}`, `marked ${fmtR(openR)} now`, cls(openR)),
+      stat('Open', `${open.length}${pending.length ? ` +${pending.length}p` : ''}`, unmarked ? `${unmarked} of ${open.length} not marked yet` : `marked ${fmtR(openR)} now`, cls(openR)),
       cx ? stat('Convexity', fmtR(cx.cum), `${cx.html} · 1R = premium, never summed with linear R`, cls(cx.cum)) : '',
       tw ? stat('FX option twins', tw.n ? `${fmtR(tw.twin)} vs ${fmtR(tw.card)}` : '—', `average R of the option against its card, ${tw.n} finished pair${tw.n === 1 ? '' : 's'} · ${tw.running} running · R18 trial, outside the book`) : '',
       stat('Gate pass rate', passRate == null ? '—' : `${passRate.toFixed(0)}%`, `${proposed} carded vs ${notCarded.length} rejected (${ideaDays} days)`),
