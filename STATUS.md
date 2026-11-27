@@ -659,6 +659,17 @@ a compliance view). Details in `docs/history.md`.
     form (hit-paid one-touch 0.384 vs 0.417, high-carry long-dated corner); fixes need a separate thread with our own
     tests. A15 event reaction DB: all A9 decisions present, UST2Y moves identical to FRED, 5 BoJ times are posting
     proxies (use A9 times intraday); no rule. A6 still running at 19:00 SGT.
+    ROUND 7 (pasted 27 Nov ~20:30 SGT on his "we can use another 25%", verified ~21:45 SGT, write-up
+    astra_results/VERIFICATION_round7_27nov2026.md): A19 MOF intervention: 389/389 rows identical to the live MOF CSV
+    (incl. 2026 operations), spot = FRED; no warning signal survives OOS; intervention is a jump stress for USDJPY
+    barriers, not a probability haircut. A20 PBoC fix: fixes = ChinaMoney (238/238) but the basket model could not
+    run (no basket vintages, few 16:30 closes); fallback null; consistent with R06. A21 CB speech tone: 6,722 docs,
+    0/48 pass; no weight. A22 dots vs market: Fed 12m dot RMSE 101 bp; UK OIS over-priced cuts OOS (+33 bp, t 2.5);
+    US market path thin. No rules from A19-A22. A23 process sweep (his ask, process not code): 120 sources; worth
+    adopting: EV after costs (spread/slippage/option bid-offer; nothing in the rules charges them), a named
+    resolution event for each p (touch / terminal / target-before-stop), an option terms check before live tickets
+    in January, and a common-shock loss across the main book and the macro sleeve; drawdown ladder already covered
+    by R31. Owner asked whether to draft them as a rule. A6 uploading its full archive at 21:00 SGT, no slim yet.
 
 29. **Astra A14 code audit fixed (27 Nov; thread "Fix Astra code audit findings").** 89 findings on ec6b1fb; every fix
     came with our own test that fails on the old code (`supabase/functions/_shared/audit_a14.test.ts`,
