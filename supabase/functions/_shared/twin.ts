@@ -70,7 +70,8 @@ export function parseTwin(line: string): Record<string, string> | string {
 function nyCut(s: string): number | null {
   const m = s.match(/\d{4}-\d{2}-\d{2}/);
   const t = m ? Date.parse(m[0] + 'T00:00:00Z') : NaN;
-  if (!Number.isFinite(t) || new Date(t).getUTCDay() % 6 === 0) return null;
+  // A16 TS09: a date that does not round-trip (2027-02-30 became 2 March) is refused
+  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== m![0] || new Date(t).getUTCDay() % 6 === 0) return null;
   return nyClose(m![0]) - 6 * HOUR;
 }
 
@@ -208,6 +209,8 @@ export interface TwinOpts {
   early?: { ts: number; px: number | null } | null;
   // The premium and fill price stored at the first mark; given, they are not recomputed (Yahoo revises old bars).
   frozen?: { p0fill: number; fill_px: number; tv: number } | null;
+  // A16 TS01: only the live feed (dash-mark) may count the running hour's high and low.
+  liveSnapshot?: boolean;
 }
 
 // Marks one twin. `hourly` carries `live` (liveSinceFill) and reaches back to the fill. Touches are judged on
@@ -232,7 +235,7 @@ export function markTwin(card0: TwinCard, hourly: Bar[], fillTs: number, now: nu
   const end = e && e.ts > fillTs && e.ts < card.cut && e.ts <= now ? e.ts : null;
   // An early close at `end` sees only the bars that had ended by then; the last of them prices it (markConvexity
   // leaves out a bar still running at `end` when later bars exist, TS-01).
-  const m = markConvexity(card, hourly, [], fillTs, end ?? now);
+  const m = markConvexity(card, hourly, [], fillTs, end ?? now, end == null && opts.liveSnapshot === true);
   if (!m) return 'no live hourly bars';
   const base = { p0fill, tv, fill_px: fillPx, vol: card.vol * Math.sqrt(252) * 100 };
   if (m.paid != null) {
@@ -271,7 +274,7 @@ export function twinFrozen(meta: Record<string, string>): { p0fill: number; fill
 // `closing` the book's closing mark when the card closed on a changed view or a reader's close (a spot price).
 // A twin that already holds a mark keeps it through a failure (a Yahoo outage, say): `meta` is then null.
 export interface TwinTrade { proxy: string; direction: number | string | null; status: string; filled: string | null; closed: string | null; meta: Record<string, string> | null }
-export function scoreTwin(t: TwinTrade, raw: Bar[], closing: number | null, now: number): { meta: Record<string, string> | null; skipped: string | null } {
+export function scoreTwin(t: TwinTrade, raw: Bar[], closing: number | null, now: number, liveSnapshot = false): { meta: Record<string, string> | null; skipped: string | null } {
   const meta = t.meta ?? {};
   const line = meta.twin_terms ?? meta.twin ?? '';
   const frozen = twinFrozen(meta);
@@ -288,6 +291,6 @@ export function scoreTwin(t: TwinTrade, raw: Bar[], closing: number | null, now:
     // With no bar matching the closing mark, 09:00 SGT: the close of the first hour after a morning run.
     early = { ts: exitBar(h, d, closing) ?? Date.parse(d + 'T01:00:00Z'), px: closing };
   }
-  const m = markTwin(card, h, fillTs, now, twinTier(t.proxy), { early, frozen });
+  const m = markTwin(card, h, fillTs, now, twinTier(t.proxy), { early, frozen, liveSnapshot });
   return typeof m === 'string' ? fail(m) : { meta: twinMeta(m, line), skipped: null };
 }

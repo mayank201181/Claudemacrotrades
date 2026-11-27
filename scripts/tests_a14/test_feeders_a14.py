@@ -76,7 +76,8 @@ check("PY24 seasonal counts downs as r < 0", lambda: "r < 0" in src)
 
 # PY03 CFTC base rate starts at the Friday release, not the Tuesday position date.
 src = inspect.getsource(sc.cftc_scan)
-check("PY03 cftc forward move starts after the Friday release", lambda: "timedelta(days=4)" in src)
+check("PY03 cftc forward move starts after the Friday release (A16 PY01: cftc_release)",
+      lambda: "cftc_release(dates[i])" in src and sc.cftc_release("2026-11-17") == dt.date(2026, 11, 20))
 
 print(f"\n{len(fails)} failed" if fails else "\nall passed")
 sys.exit(1 if fails else 0)

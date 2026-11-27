@@ -291,7 +291,8 @@
   };
   const dMon = (d) => (d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '—');
   const sgtTime = (ts) => (ts ? new Date(new Date(ts).getTime() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' SGT' : '');
-  const strikeNear = (t) => { const k = (cmeta(t).strike || '').replace(/[−–]/g, '-').match(/-?\d+(?:\.\d+)?/); return k ? Number(k[0]) : null; };
+  // A16 SITE-01: '.875' is 0.875 (not 875) and '1,250' is 1250 (not 1), as dash-mark reads them
+  const strikeNear = (t) => { const k = String(cmeta(t).strike ?? '').replace(/[−–]/g, '-').replace(/,/g, '').match(/-?(?:\d+(?:\.\d*)?|\.\d+)/); return k ? Number(k[0]) : null; };
   const YIELD = /^\^(IRX|FVX|TNX|TYX)$/i;
   // An "A-B" difference, split as dash-mark splits a synthetic proxy; null for anything else.
   const diffLegs = (t) => {

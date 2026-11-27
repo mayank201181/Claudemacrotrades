@@ -251,7 +251,7 @@ def found(tok_forms, text_l):
     for form in tok_forms:
         pattern = re.escape(form.lower())
         if form[0].isdigit():
-            pattern = r"(?<!\d[.,])" + pattern + r"(?![.,]\d)"
+            pattern = r"(?<!\d[.,])(?<!\.)" + pattern + r"(?![.,]\d)"  # A16 PY04: ".37" is not 37
         if re.search(r"(?<!\w)" + pattern + r"(?!\w)", text_l):
             return True
     return False

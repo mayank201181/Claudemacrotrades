@@ -45,14 +45,52 @@ export function zonedTime(date: string, hh: number, mm: number, tz: string): num
   const t = guess - tzOffset(guess, tz);
   return guess - tzOffset(t, tz);
 }
-// When a venue's daily session is over, in ms UTC. Yahoo FX ('=X') bars run on the London day and have always
-// been taken to close at 21:00 UTC of their date (about the New York 17:00 cut); US venues close at 16:00 New
-// York (17:00 for futures, '=F'); Europe at 17:30 local; Asia-Pacific and the rest at 17:00 local.
+// Regular cash closes of the Asia-Pacific venues, as in trend.ts TM1_ASSETS (A16 VENUE: a flat 17:00 local put
+// the TWSE close 3.5 h and the Nikkei 1.5 h late, so a fill after the close could take that day's close as a
+// post-fill price).
+export const VENUE_CLOSE: Record<string, [number, number]> = {
+  'Asia/Tokyo': [15, 30], 'Asia/Hong_Kong': [16, 10], 'Asia/Seoul': [15, 30], 'Asia/Taipei': [13, 30],
+  'Australia/Sydney': [16, 10], 'Asia/Kolkata': [15, 30], 'Asia/Calcutta': [15, 30], 'Asia/Shanghai': [15, 0], 'Asia/Singapore': [17, 0],
+};
+// When a venue's daily session is over, in ms UTC. FX ('=X') closes at the 17:00 New York cut (22:00 UTC in
+// winter, 21:00 UTC in summer; A16 FXCLOSE: it was a fixed 21:00 UTC); US venues close at 16:00 New York (17:00
+// for futures, '=F'); Europe at 17:30 local; Asia-Pacific at its regular close (VENUE_CLOSE), the rest 17:00 local.
+// Yahoo's own FX daily bar ends at London midnight, so its close is NOT the 17:00 New York price: dash-mark builds
+// FX daily bars from hourly bars instead (fxNySessions).
 export function sessionClose(date: string, tz: string, symbol: string): number {
-  if (/=X$/i.test(symbol)) return Date.parse(date + 'T21:00:00Z');
+  if (/=X$/i.test(symbol)) return zonedTime(date, 17, 0, 'America/New_York');
   if (tz.startsWith('America/')) return zonedTime(date, /=F$/i.test(symbol) ? 17 : 16, 0, 'America/New_York');
   if (tz.startsWith('Europe/')) return zonedTime(date, 17, 30, tz);
-  return zonedTime(date, 17, 0, tz);
+  const v = VENUE_CLOSE[tz];
+  return zonedTime(date, v ? v[0] : 17, v ? v[1] : 0, tz);
+}
+
+// FX daily bars on the 17:00 New York cut, built from hourly bars (A16 EDGE-05: Yahoo's daily FX bar is a London-
+// midnight bar, so relabelling it cannot give the cut price). The session dated D runs from 17:00 New York on the
+// previous weekday to 17:00 New York on D. A session is complete when the hour ending at its cut is present and it
+// has at least 18 hourly bars (Monday's starts when Yahoo reopens about two hours into the Sunday session); its close
+// is the close of the hour ending at the cut. Weekend dates (the stray Friday-evening hour) are dropped.
+export function fxNySessions(hourly: Bar[]): Bar[] {
+  const out: Bar[] = [];
+  let sd = '', ce = -Infinity, n = 0, o = 0, h = -Infinity, l = Infinity, atCut: Bar | null = null;
+  const flush = () => {
+    const wd = new Date(Date.parse(sd + 'T00:00:00Z')).getUTCDay();
+    if (sd && atCut && n >= 18 && wd !== 0 && wd !== 6) out.push({ ts: atCut.ts + HOUR - 24 * HOUR, o, h, l, c: atCut.c, sd, ce });
+  };
+  for (const b of hourly) {
+    const end = b.ts + HOUR;
+    if (end > ce) {
+      flush();
+      // the New York date of the instant 7 h after the hour's end (17:00 New York + 7 h is midnight)
+      sd = new Date(end + tzOffset(end, 'America/New_York') + 7 * HOUR - 1).toISOString().slice(0, 10);
+      ce = zonedTime(sd, 17, 0, 'America/New_York');
+      n = 0; o = b.o; h = -Infinity; l = Infinity; atCut = null;
+    }
+    n++; h = Math.max(h, b.h); l = Math.min(l, b.l);
+    if (end === ce) atCut = b;
+  }
+  flush();
+  return out;
 }
 // Yahoo stamps a daily bar at the venue's local midnight or at its open (US stocks 09:30 New York = 14:30 UTC,
 // ^TNX 07:20 Chicago, DAX 09:00 Berlin), so the session date is the stamp's date in the venue's own time zone
@@ -65,7 +103,8 @@ export function stampDaily(bars: Bar[], tz: string | null | undefined, symbol: s
   const out: Bar[] = [];
   const fx = /=X$/i.test(symbol), us = tz.startsWith('America/'), eu = tz.startsWith('Europe/');
   const closeTz = us ? 'America/New_York' : tz;
-  const closeMin = fx ? 0 : us ? (/=F$/i.test(symbol) ? 17 : 16) * 60 : eu ? 17 * 60 + 30 : 17 * 60;
+  const vc = VENUE_CLOSE[tz];
+  const closeMin = fx ? 0 : us ? (/=F$/i.test(symbol) ? 17 : 16) * 60 : eu ? 17 * 60 + 30 : vc ? vc[0] * 60 + vc[1] : 17 * 60;
   let prevTod: number | null = null;
   for (let i = 0; i < bars.length; i++) {
     const b = bars[i];
@@ -77,7 +116,7 @@ export function stampDaily(bars: Bar[], tz: string | null | undefined, symbol: s
     if (out.length && out[out.length - 1].sd! >= sd) continue;
     // the stamp and the close fall on the same local day, and DST never changes inside a trading day
     const day = Date.parse(sd + 'T00:00:00Z');
-    const ce = fx ? day + 21 * HOUR : day + closeMin * 60000 - tzOffset(b.ts, closeTz);
+    const ce = fx ? sessionClose(sd, tz, symbol) : day + closeMin * 60000 - tzOffset(b.ts, closeTz);
     out.push({ ...b, sd, ce: running ? Infinity : ce });
   }
   return out;
@@ -180,7 +219,11 @@ export function markLinear(
   const stopBarH = closedH.find((b) => (dir > 0 ? b.c <= stop : b.c >= stop)) ?? null;
   const dSince = fillTs != null ? d.filter((b) => barCloseTime(b) > fillTs) : [];
   const dl = d[d.length - 1];
-  return {
+  // A16 EDGE-01: when the fetched history starts after the fill, a breach before it is unseen. Positive evidence
+  // (a touch or close seen) stands; "not touched" and the extremes since the fill become unknown (null).
+  const cutH = fillTs != null && h[0].ts > fillTs, cutD = fillTs != null && (!d.length || barCloseTime(d[0]) > fillTs);
+  const known = (v: boolean | null, cut: boolean) => (cut && v === false ? null : v);
+  const out: LinearMark = {
     as_of: last.ts, price: last.c, r: (dir * (last.c - entry)) / oneR,
     hi_since_fill: hi, lo_since_fill: lo,
     stop_touched: since.length ? (dir > 0 ? lo! <= stop : hi! >= stop) : null,
@@ -191,6 +234,13 @@ export function markLinear(
     stop_closed_h: closedH.length ? stopBarH != null : null, stop_closed_h_px: stopBarH?.c ?? null,
     stop_closed_h_at: stopBarH ? stopBarH.ts + HOUR : null,
   };
+  if (cutH) {
+    out.hi_since_fill = out.lo_since_fill = null;
+    out.stop_touched = known(out.stop_touched, true); out.target_touched = known(out.target_touched, true);
+    out.stop_closed_h = known(out.stop_closed_h, true); // a breach seen keeps its hour: the exit still fires
+  }
+  if (cutD) { out.stop_closed = known(out.stop_closed, true); out.target_closed = known(out.target_closed, true); }
+  return out;
 }
 
 // A daily bar is final once its session close has passed by an hour (bars without a close time: 22h after the

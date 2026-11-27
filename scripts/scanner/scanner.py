@@ -35,6 +35,7 @@ import sys
 import time
 import urllib.parse
 import urllib.request
+from zoneinfo import ZoneInfo
 
 SGT = dt.timezone(dt.timedelta(hours=8))
 UA = {"User-Agent": "Mozilla/5.0"}   # Yahoo answers 429 to fuller browser strings and to the python default
@@ -135,19 +136,28 @@ def yahoo_bars(sym, rng):
     now = dt.datetime.now(dt.timezone.utc)
     regular = res.get("meta", {}).get("currentTradingPeriod", {}).get("regular", {})
     session_end = regular.get("end")
+    # A16 PY02: the session date is the stamp's date in the venue's own time zone (Yahoo stamps Tokyo and Sydney
+    # bars at local midnight, the previous UTC day). FX keeps Yahoo's London-day bar (00:00 to 00:00 London): the
+    # scanner's multi-year base rates need its 15-year history, and hourly bars (17:00 New York) go back 730 days only.
+    try:
+        vtz = ZoneInfo(res.get("meta", {}).get("exchangeTimezoneName") or "UTC")
+    except Exception:
+        vtz = dt.timezone.utc
+    today = now.astimezone(vtz).date()
     for i, ts in enumerate(res.get("timestamp") or []):
-        d_utc = dt.datetime.fromtimestamp(ts, dt.timezone.utc).date()
-        if d_utc > now.date():
+        d_loc = dt.datetime.fromtimestamp(ts, vtz).date()
+        if d_loc > today:
             continue
-        if d_utc == now.date() and not (
-                session_end and dt.datetime.fromtimestamp(session_end, dt.timezone.utc).date() == d_utc
+        # today's bar only once its regular session has ended
+        if d_loc == today and not (
+                session_end and dt.datetime.fromtimestamp(session_end, vtz).date() == d_loc
                 and ts <= session_end <= now.timestamp()):
             continue
         c = q["close"][i]
         if c is None or not (c == c) or c <= 0:
             continue
         h, l = q["high"][i], q["low"][i]
-        d = dt.datetime.fromtimestamp(ts, dt.timezone.utc).date().isoformat()
+        d = d_loc.isoformat()
         out.append((d, float(c), float(h) if h else float(c), float(l) if l else float(c)))
     return out
 
@@ -212,11 +222,17 @@ def merge(old, new):
     return [r for r in rows if r[0] < today or (r[0] == today and today_seen)]
 
 
+VENUE_DATES_MARK = "venue_dates_v1"  # A16 PY02: caches written before venue-dated bars are rebuilt once
+
+
 def load_history(outdir, fetch=True):
     series = {}
+    mark = os.path.join(outdir, "history", VENUE_DATES_MARK)
+    rebuild = fetch and not os.path.exists(mark)
+    rebuild_failed = False
     for label, syms, kind, group in ASSETS:
         path = cache_path(outdir, label)
-        rows = read_cache(path)
+        rows = [] if rebuild else read_cache(path)
         if fetch:
             rng = "15y" if len(rows) < 500 else "3mo"   # "max" serves sparse bars for some indices
             got = []
@@ -232,12 +248,17 @@ def load_history(outdir, fetch=True):
                 rows = merge(rows, got)
                 write_cache(path, rows)
             else:
+                if rebuild:  # keep the old cache this run; the rebuild is tried again next run
+                    rows, rebuild_failed = read_cache(path), True
                 note(f"{label}: no bars fetched, cache of {len(rows)} used")
             time.sleep(0.7)
         if len(rows) >= 300:
             series[label] = {"kind": kind, "group": group, "rows": rows}
         else:
             note(f"{label}: only {len(rows)} bars, skipped")
+    if rebuild and not rebuild_failed:
+        os.makedirs(os.path.dirname(mark), exist_ok=True)
+        open(mark, "w").close()
     for label, a, b, kind, group in SYNTH:
         if a in series and b in series:
             db = {r[0]: r[1] for r in series[b]["rows"]}
@@ -592,6 +613,49 @@ def pct_rank(xs, x):
     return sum(1 for v in xs if v <= x) / len(xs)
 
 
+def us_federal_holidays(year):
+    """US federal holidays observed in a year (the CFTC's release calendar shifts around them)."""
+    D = dt.date
+    def nth(month, wd, n):  # n-th weekday wd (Mon 0) of a month; n = -1 the last
+        if n > 0:
+            d = D(year, month, 1)
+            return d + dt.timedelta(days=(wd - d.weekday()) % 7 + 7 * (n - 1))
+        d = D(year, month + 1, 1) - dt.timedelta(days=1) if month < 12 else D(year, 12, 31)
+        return d - dt.timedelta(days=(d.weekday() - wd) % 7)
+    def obs(d):
+        return d - dt.timedelta(days=1) if d.weekday() == 5 else d + dt.timedelta(days=1) if d.weekday() == 6 else d
+    out = {obs(D(year, 1, 1)), nth(1, 0, 3), nth(2, 0, 3), nth(5, 0, -1), obs(D(year, 7, 4)), nth(9, 0, 1),
+           nth(10, 0, 2), obs(D(year, 11, 11)), nth(11, 3, 4), obs(D(year, 12, 25))}
+    if year >= 2021:
+        out.add(obs(D(year, 6, 19)))
+    out.add(obs(D(year + 1, 1, 1)))  # 1 Jan on a Saturday is observed on 31 Dec
+    return out
+
+
+# Report dates whose release ran late beyond the holiday rule: US government shutdowns (Oct 2013, Dec 2018 to Jan 2019,
+# Oct to Nov 2025) and the ION incident (Feb 2023). Windows are generous (each runs to the end of the catch-up as
+# best known); an event inside one has no known publication date and gives no forward return (A16 PY01).
+CFTC_DELAYED = [("2013-09-30", "2013-11-05"), ("2018-12-18", "2019-03-12"), ("2023-01-31", "2023-03-21"),
+                ("2025-09-23", "2026-01-31")]
+
+
+def cftc_release(report_date):
+    """Publication date of the COT report for a Tuesday position date: Friday 15:30 New York, the next business
+    day for each federal holiday in that week; None inside a known delay window."""
+    d = dt.date.fromisoformat(report_date)
+    if any(a <= report_date <= b for a, b in CFTC_DELAYED):
+        return None
+    fri = d + dt.timedelta(days=(4 - d.weekday()) % 7)
+    mon = fri - dt.timedelta(days=4)
+    hol = us_federal_holidays(fri.year) | us_federal_holidays(mon.year)
+    rel = fri
+    for _ in range(sum(1 for k in range(5) if mon + dt.timedelta(days=k) in hol)):
+        rel += dt.timedelta(days=1)
+        while rel.weekday() >= 5 or rel in hol:
+            rel += dt.timedelta(days=1)
+    return rel
+
+
 def cftc_scan(cache, series):
     out = []
     for label, ds, code, grp, px, sign in CFTC:
@@ -639,9 +703,13 @@ def cftc_scan(cache, series):
                 for i, fl in evs:
                     if fl != direction:
                         continue
-                    # A14 PY03: a Tuesday position is published on Friday at 15:30 New York (later after a US
-                    # holiday), so its forward move starts at the first close after that Friday, never on Tuesday.
-                    j = px_index((dt.date.fromisoformat(dates[i]) + dt.timedelta(days=4)).isoformat())
+                    # A14 PY03 / A16 PY01: a Tuesday position is published on Friday at 15:30 New York (a business
+                    # day later per federal holiday that week; unknown inside a delay window), so its forward move
+                    # starts at the first close after the publication day.
+                    rel = cftc_release(dates[i])
+                    if rel is None:
+                        continue
+                    j = px_index((rel + dt.timedelta(days=1)).isoformat())
                     if j is None:
                         continue
                     for k in HORIZONS:

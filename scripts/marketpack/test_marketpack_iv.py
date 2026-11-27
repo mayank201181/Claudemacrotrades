@@ -18,6 +18,7 @@ GBPUSD = (1.3400, 0.045, USD)  # only its forward drift is needed, to find the s
 REAL_IV_SPOT = mp.iv_spot
 mp.iv_spot = lambda pair, ts: WORLD[pair][0]
 mp.USD_RATE[:] = [USD]
+mp.IRX_HIST = {}  # no bill history: every day uses USD_RATE
 N = mp._ncdf
 fails = []
 
