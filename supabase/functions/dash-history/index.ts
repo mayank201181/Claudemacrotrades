@@ -5,6 +5,7 @@
 // at the bar's start in UTC.
 // POST {token, symbol, start?: 'YYYY-MM-DD', interval?: '1d' | '60m'}; the token is the ingest token. Read-only.
 import postgres from 'npm:postgres@3.4.4';
+import { dailyCsv } from '../_shared/history.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : '');
@@ -34,9 +35,6 @@ Deno.serve(async (req) => {
   const res = j?.chart?.result?.[0];
   const q = res?.indicators?.quote?.[0];
   if (!res?.timestamp || !q) return new Response('no data', { status: 404 });
-  const adj = res.indicators?.adjclose?.[0]?.adjclose;
-  const tz = res.meta?.exchangeTimezoneName || 'UTC';
-  const day = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' });
   if (hourly) {
     const rows = ['Datetime_UTC,Open,High,Low,Close,Volume'];
     res.timestamp.forEach((t: number, i: number) => {
@@ -46,20 +44,7 @@ Deno.serve(async (req) => {
     });
     return new Response(rows.join('\n') + '\n', { headers: { 'content-type': 'text/csv', 'x-rows': String(rows.length - 1), 'x-tz': 'UTC' } });
   }
-  const lines = ['Date,Open,High,Low,Close,Adj Close,Volume'];
-  let last = '';
-  res.timestamp.forEach((t: number, i: number) => {
-    const c = q.close?.[i];
-    if (typeof c !== 'number') return;
-    const d = day.format(new Date(t * 1000));
-    if (d === last) lines.pop(); // a same-day duplicate (today's live bar) replaces the earlier row
-    last = d;
-    // A14 EDGE-006: when Yahoo sends an adjusted series, a missing point stays blank (an unadjusted close there made a
-    // spurious adjusted return); with no adjusted series at all (FX, indices) Adj Close is the close. EDGE-005: a
-    // missing volume stays blank, never 0.
-    lines.push([d, num(q.open?.[i]), num(q.high?.[i]), num(q.low?.[i]), num(c), num(adj ? adj[i] : c), num(q.volume?.[i])].join(','));
-  });
-  return new Response(lines.join('\n') + '\n', {
-    headers: { 'content-type': 'text/csv', 'x-rows': String(lines.length - 1), 'x-tz': tz },
-  });
+  const out = dailyCsv(res, symbol);
+  if ('error' in out) return new Response(out.error, { status: 502 });
+  return new Response(out.csv, { headers: { 'content-type': 'text/csv', 'x-rows': String(out.rows), 'x-tz': out.tz } });
 });

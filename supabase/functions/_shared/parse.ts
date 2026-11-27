@@ -291,7 +291,8 @@ export function ideaDirection(idea: string, proxy?: string | null): number | nul
   // A bond position priced on a single yield index moves opposite to the yield.
   // A14 TS-10: only a yield named as the thing traded ("long 10y yield", "short the yield") keeps the sign;
   // "buy 10Y Treasuries as the yield falls" is a bond position. Curve words anywhere keep it, as before.
-  const object = s.slice((m.index ?? 0) + m[0].length).trimStart();
+  // A16 TS10: 'u.s.' is the same object word as 'us' (its dots ended the word list, so the yield was missed).
+  const object = s.slice((m.index ?? 0) + m[0].length).trimStart().replace(/\bu\.s\.(?=\s)/g, 'us');
   const explicitYield = /^(?:the\s+)?(?:(?:us|ust|treasury|bond|\d+[- ]?(?:year|yr|y)s?)\s+)*yields?\b/.test(object);
   if (proxy && YIELD_PROXY.test(proxy.trim()) && !/steepener|flattener|widener|tightener/.test(s) && !explicitYield) dir = -dir;
   return dir;
@@ -497,7 +498,10 @@ export function parseTradeBook(docText: string): TradeBook {
 export function isOlderBook(incoming: string | null, stored: string | null | undefined): boolean {
   const key = (s: string | null | undefined) => (s ?? '').match(/(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}):(\d{2}))?/);
   const a = key(incoming), b = key(stored);
-  if (!a || !b) return false;
+  // A16 EDGE-04: an undated snapshot never replaces a dated book (it is kept raw only); with no dated book stored
+  // it may establish one.
+  if (!a) return b != null;
+  if (!b) return false;
   const norm = (m: RegExpMatchArray) => `${m[1]} ${(m[2] ?? '00').padStart(2, '0')}:${m[3] ?? '00'}`;
   return norm(a) < norm(b);
 }

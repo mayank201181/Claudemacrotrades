@@ -441,6 +441,7 @@ IV_RANGE = ["5d"]  # Yahoo 5-minute bars: "1mo" when a day older than four days 
 IV_FLOOR = {"atm": 0.0015, "wing": 0.0020}  # error floors in vol: the mix of expiries inside a tenor shifts a median this much
 _BARS = {}
 USD_RATE = []      # the US 3-month bill yield, read once
+IRX_HIST = None    # A16 PY05: {NY date: 3-month bill yield} for dating backfills, read once
 
 
 def _ncdf(x):
@@ -531,6 +532,22 @@ def usd_rate():
     return USD_RATE[0]
 
 
+def usd_rate_before(day):
+    """A16 PY05: the 3-month bill yield of the last NY session before `day` (an ISO date), so a backfilled print is
+    discounted at the rate known then, not at the run's rate; the run's rate when no history is held."""
+    global IRX_HIST
+    if IRX_HIST is None:
+        IRX_HIST = {}
+        try:
+            for t, _o, _h, _l, c, _v in yahoo_chart("^IRX", rng="2y")[1]:
+                if 0 < c / 100 < 0.15:
+                    IRX_HIST[dt.datetime.fromtimestamp(t, dt.timezone.utc).date().isoformat()] = c / 100
+        except Exception:  # noqa: BLE001
+            pass
+    prior = [d for d in IRX_HIST if d < day]
+    return IRX_HIST[max(prior)] if prior else usd_rate()
+
+
 def _median(xs):
     xs = sorted(xs)
     return xs[len(xs) // 2] if len(xs) % 2 else 0.5 * (xs[len(xs) // 2 - 1] + xs[len(xs) // 2])
@@ -587,16 +604,17 @@ def iv_observe(day_prints, carry_hist):
                 pool.setdefault(row[1], []).append(float(row[5]))
         drift_for_day[day] = {pair: _median(d) for pair, d in pool.items() if len(d) >= 3}
 
-    def quote_rate(pair, drift):
+    def quote_rate(pair, drift, day):
         q = pair[3:]
+        r = usd_rate_before(day)
         if q == "USD":
-            return usd_rate()
+            return r
         q = "CNY" if q == "CNH" else q
-        return usd_rate() + drift.get("USD" + q, 0.0) - drift.get(q + "USD", 0.0)
+        return r + drift.get("USD" + q, 0.0) - drift.get(q + "USD", 0.0)
 
     for iso, pair, T, s, K, cu, pu in strads:
         drift = drift_for_day[iso]
-        df = math.exp(-quote_rate(pair, drift) * T)
+        df = math.exp(-quote_rate(pair, drift, iso) * T)
         F = K + (cu - pu) / df
         if F <= 0 or abs(math.log(F / K)) > 0.03:
             continue
@@ -611,7 +629,7 @@ def iv_observe(day_prints, carry_hist):
         if not s or not 3 <= T * 365 <= 400:
             continue
         F = s * math.exp(drift.get(pair, 0.0) * T)
-        pu, K, call = (x[3] * s if x[4] else x[3]) / x[2] / math.exp(-quote_rate(pair, drift) * T), x[1], x[0]
+        pu, K, call = (x[3] * s if x[4] else x[3]) / x[2] / math.exp(-quote_rate(pair, drift, iso) * T), x[1], x[0]
         if abs(math.log(K / F)) > 0.12:
             continue
         sd = _solve_sd(pu, lambda v: _black(F, K, v, call))
@@ -1709,6 +1727,15 @@ def _chg(ser, n=None, days=None):
     return (ser[last][0] - ser[old[-1]][0]) * 100
 
 
+def _sess_chg(idx_days, sr, asof, k):
+    """A16 PY03: change in bp of a tenor between `asof` and the index's k-th report day before it; None when the
+    tenor did not print (3+) on both days."""
+    ds = [d for d in idx_days if d <= asof]
+    if len(ds) <= k or ds[-1] != asof or asof not in sr or ds[-1 - k] not in sr:
+        return None
+    return (sr[asof][0] - sr[ds[-1 - k]][0]) * 100
+
+
 def _sig(ser, k=5, need=30):
     """The latest k-observation change in units of the series' own k-observation changes (last 250 obs), or None."""
     ds = sorted(ser)[-251:]
@@ -2028,12 +2055,17 @@ def section_j(outdir):
         x = src.split("n=")[-1]
         return int(x) if x.isdigit() else 0
     for lab, _c, _rx in SWAP_IDX:
+        # A16 PY03: 1d and 3d changes run between the same report days for every tenor: the index's own days (any
+        # tenor printed). A tenor thin on the reference day has no change, rather than a longer window that made a
+        # flat 3Y read +40bp and CHECK.
+        idx_days = sorted({d for t in SWAP_TENORS for d in H.get(("swap", lab, f"{t}Y"), {})})
+        sess_chg = lambda sr, asof, k, _days=idx_days: _sess_chg(_days, sr, asof, k)  # noqa: E731
         # day changes of the other tenors of this index, for the curve-consistency check below
         d1s = {}
         for t in SWAP_TENORS:
             sr = {d: v for d, v in H.get(("swap", lab, f"{t}Y"), {}).items() if _n(v[1]) >= 3}
             if sr and max(sr) == latest.isoformat():
-                d1s[t] = _chg(sr, n=1)
+                d1s[t] = sess_chg(sr, latest.isoformat(), 1)
         for t in SWAP_TENORS:
             ten = f"{t}Y"
             ser = H.get(("swap", lab, ten), {})
@@ -2049,7 +2081,7 @@ def section_j(outdir):
             sg = f"{(v - g[gd][0]) * 100:+.0f}bp" if gd and (dt.date.fromisoformat(last) - dt.date.fromisoformat(gd)).days <= 3 else ""
             # changes only between days with 3+ prints: a 1- or 2-print day is often one off-market trade (27 Nov: SORA 3Y "-46 1w")
             sr = {d: x for d, x in ser.items() if _n(x[1]) >= 3}
-            d1, d3, w1 = (_chg(sr, n=1), _chg(sr, n=3), _chg(sr, days=7)) if last in sr else (None, None, None)
+            d1, d3, w1 = (sess_chg(sr, last, 1), sess_chg(sr, last, 3), _chg(sr, days=7)) if last in sr else (None, None, None)
             thin = " thin" if n.isdigit() and int(n) < 3 else ""
             others = [x for k, x in d1s.items() if k != t and x is not None]
             if not thin and d1 is not None and len(others) >= 2 and abs(d1 - _median(others)) > 10:

@@ -14,7 +14,7 @@
 // Invoked by pg_cron with the ingest token; read-only towards trades, except the twin_* keys it adds to a
 // card's meta (the book never writes those keys, and ingest merges meta, so neither side overwrites the other).
 import postgres from 'npm:postgres@3.4.4';
-import { type Bar, barDate, completeDaily as completeDailyAt, HOUR, ideaRef, markLinear, markLive, oneR as planned1R, stampDaily } from '../_shared/marks.ts';
+import { type Bar, barDate, completeDaily as completeDailyAt, fxNySessions, HOUR, ideaRef, markLinear, markLive, oneR as planned1R, stampDaily } from '../_shared/marks.ts';
 import { cardFromMeta, fxBase, liveSinceFill, markConvexity } from '../_shared/convexity.ts';
 import { scoreTwin } from '../_shared/twin.ts';
 
@@ -41,7 +41,10 @@ async function yahoo(symbol: string, interval: '60m' | '1d', range: string): Pro
     out.push({ ts: t * 1000, o: q.open?.[i] ?? c, h: q.high?.[i] ?? c, l: q.low?.[i] ?? c, c });
   });
   // Daily bars carry the venue's session date and close time (EDGE-001: a US stock bar is stamped 14:30 UTC).
-  return interval === '1d' ? stampDaily(out, res.meta?.exchangeTimezoneName, symbol) : out;
+  // A16 EDGE-07: a daily series with no venue time zone cannot be dated, so it is not used (hourly bars are UTC).
+  if (interval !== '1d') return out;
+  const tz = res.meta?.exchangeTimezoneName;
+  return tz ? stampDaily(out, tz, symbol) : [];
 }
 
 function combine(a: Bar[], b: Bar[], op: '-' | '/', daily: boolean): Bar[] {
@@ -132,12 +135,17 @@ Deno.serve(async (req) => {
     }
     const hourly = new Map<string, Bar[]>(), daily = new Map<string, Bar[]>(), hourlyRaw = new Map<string, Bar[]>();
     for (const s of symbols) {
-      const long = longHourly.has(s);
-      const [h, d, h6] = await Promise.all([yahoo(s, '60m', '1mo'), yahoo(s, '1d', '1y'), long ? yahoo(s, '60m', '6mo') : Promise.resolve([])]);
+      // A16 EDGE-05: an FX symbol's daily bars are built from its hourly bars on the 17:00 New York cut (Yahoo's
+      // daily FX bar is a London-midnight bar), so FX always fetches six months of hourly bars, and only those.
+      const fx = /=X$/i.test(s);
+      const long = longHourly.has(s) || fx;
+      const [h1, d, h6] = await Promise.all([fx ? Promise.resolve([]) : yahoo(s, '60m', '1mo'), yahoo(s, '1d', '1y'), long ? yahoo(s, '60m', '6mo') : Promise.resolve([])]);
+      const h = fx ? h6 : h1;
       if (long) hourlyRaw.set(s, h6);
       // Linear marks and idea references read the six-month series where one was fetched (copies: the
       // convexity code stamps its own liveness on hourlyRaw).
-      hourly.set(s, markLive(long && h6.length ? h6.map((b) => ({ ...b })) : h)); daily.set(s, d);
+      hourly.set(s, markLive(long && h6.length ? h6.map((b) => ({ ...b })) : h));
+      daily.set(s, fx ? fxNySessions(h6) : d);
       const rows = [
         // The archive takes the latest two days of hourly bars and two weeks of daily bars each hour (it took 200
         // and 60, nearly all unchanged: with ~150 symbols the upserts pushed the run past the worker's 2 s CPU cap).
@@ -164,7 +172,7 @@ Deno.serve(async (req) => {
       if (typeof card === 'string' || fillTs == null) { convexSkipped.push(`${t.model} ${t.pid}: ${typeof card === 'string' ? card : 'no fill'}`); return false; }
       const lb = ls.map((s) => liveSinceFill(hourlyRaw.get(s) ?? [], fillTs, fxBase(s) != null));
       const h = op ? combine(lb[0], lb[1], op, false) : lb[0];
-      const m = markConvexity(card, h, completeDaily(series(t.proxy, true)), fillTs, now);
+      const m = markConvexity(card, h, completeDaily(series(t.proxy, true)), fillTs, now, true); // A16 TS01: the live feed
       if (!m) { convexSkipped.push(`${t.model} ${t.pid}: no live hourly bars`); return false; }
       const row = {
         model: t.model, pid: t.pid, as_of: new Date(m.as_of), price: m.price, r: m.r,
@@ -221,7 +229,7 @@ Deno.serve(async (req) => {
       }
       for (const t of twins) {
         try {
-          const res = scoreTwin(t as never, hourlyRaw.get(t.proxy) ?? [], closing.get(`${t.model}|${t.pid}`) ?? null, now);
+          const res = scoreTwin(t as never, hourlyRaw.get(t.proxy) ?? [], closing.get(`${t.model}|${t.pid}`) ?? null, now, true);
           if (res.skipped) twinSkipped.push(`${t.model} ${t.pid}: ${res.skipped}`); else nTwin++;
           if (res.meta && dry) would.twin_meta.push({ model: t.model, pid: t.pid, ...res.meta });
           else if (res.meta) await sql`update dash.trades set meta = meta || ${sql.json(res.meta)}::jsonb where model = ${t.model} and pid = ${t.pid}`;
@@ -234,7 +242,6 @@ Deno.serve(async (req) => {
     for (const i of ideas) {
       const spread = legs(i.proxy).op !== '';
       const d = completeDaily(series(i.proxy, true));
-      const h = series(i.proxy, false);
       const cut = Date.parse(i.d + 'T00:00:00Z'); // 08:00 SGT on the idea's date
       const before = d.filter((b) => barDate(b) < i.d);
       const after = d.filter((b) => barDate(b) >= i.d);
@@ -243,6 +250,7 @@ Deno.serve(async (req) => {
       // Once set, the reference never moves. Only a reference dealt on hourly bars is set: with no hourly
       // history (a failed download) the idea waits for the next run (EDGE-013), never the prior daily close.
       const prev = known.get(`${i.model}|${i.d}|${i.idea}`);
+      const h = prev?.ref != null ? [] : series(i.proxy, false); // A16 CPU-01: a frozen reference needs no hourly join
       let ref: number | null = null, refD: string | null = null;
       if (prev?.ref != null) { ref = Number(prev.ref); refD = prev.ref_d; }
       else if (h.length && h[0].ts <= cut - 2 * 86400000) {
