@@ -10,11 +10,32 @@ export const HOUR = 3600000;
 // ---------- session dates of daily bars ----------
 
 // Offset of a time zone from UTC at instant t, in ms (Intl carries the IANA rules, so DST is exact).
+// Formatters are cached per zone (building one costs far more than using it; the edge worker has a 2 s CPU cap).
+const FMT = new Map<string, Intl.DateTimeFormat>();
+// Offsets are cached per zone and UTC month: when a month starts and ends on the same offset (no DST change
+// inside it), every instant in it has that offset.
+const MONTH_OFF = new Map<string, number | null>();
 export function tzOffset(t: number, tz: string): number {
-  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
-    timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
-  }).formatToParts(new Date(t)).map((x) => [x.type, x.value]));
-  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second) - Math.floor(t / 1000) * 1000;
+  const d = new Date(t), y = d.getUTCFullYear(), mo = d.getUTCMonth(), key = `${tz}|${y}|${mo}`;
+  let m = MONTH_OFF.get(key);
+  if (m === undefined) {
+    const a = exactOffset(Date.UTC(y, mo, 1), tz), b = exactOffset(Date.UTC(y, mo + 1, 1) - 1000, tz);
+    m = a === b ? a : null;
+    MONTH_OFF.set(key, m);
+  }
+  return m ?? exactOffset(t, tz);
+}
+function exactOffset(t: number, tz: string): number {
+  let f = FMT.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+    FMT.set(tz, f);
+  }
+  const p: Record<string, number> = {};
+  for (const x of f.formatToParts(new Date(t))) if (x.type !== 'literal') p[x.type] = +x.value;
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(t / 1000) * 1000;
 }
 // The local calendar date of instant t in a time zone.
 export const localDate = (t: number, tz: string) => new Date(t + tzOffset(t, tz)).toISOString().slice(0, 10);
@@ -37,13 +58,27 @@ export function sessionClose(date: string, tz: string, symbol: string): number {
 // ^TNX 07:20 Chicago, DAX 09:00 Berlin), so the session date is the stamp's date in the venue's own time zone
 // (the old +12h rule moved every US stock and ETF bar to the next day: EDGE-001). A second bar on a date already
 // seen is Yahoo's in-progress bar of the next futures session, stamped with the current time; it is dropped.
+// A last bar stamped at another local time of day than the bar before it is that running bar too (CL=F on
+// Thanksgiving: Wed 05:00 UTC, then Fri 01:01 UTC, which is Thursday evening in New York): it is never complete.
 export function stampDaily(bars: Bar[], tz: string | null | undefined, symbol: string): Bar[] {
   if (!tz) return bars;
   const out: Bar[] = [];
-  for (const b of bars) {
-    const sd = localDate(b.ts, tz);
+  const fx = /=X$/i.test(symbol), us = tz.startsWith('America/'), eu = tz.startsWith('Europe/');
+  const closeTz = us ? 'America/New_York' : tz;
+  const closeMin = fx ? 0 : us ? (/=F$/i.test(symbol) ? 17 : 16) * 60 : eu ? 17 * 60 + 30 : 17 * 60;
+  let prevTod: number | null = null;
+  for (let i = 0; i < bars.length; i++) {
+    const b = bars[i];
+    const off = tzOffset(b.ts, tz);
+    const sd = new Date(b.ts + off).toISOString().slice(0, 10);
+    const tod = (b.ts + off) % (24 * HOUR);
+    const running = i === bars.length - 1 && prevTod != null && tod !== prevTod;
+    prevTod = tod;
     if (out.length && out[out.length - 1].sd! >= sd) continue;
-    out.push({ ...b, sd, ce: sessionClose(sd, tz, symbol) });
+    // the stamp and the close fall on the same local day, and DST never changes inside a trading day
+    const day = Date.parse(sd + 'T00:00:00Z');
+    const ce = fx ? day + 21 * HOUR : day + closeMin * 60000 - tzOffset(b.ts, closeTz);
+    out.push({ ...b, sd, ce: running ? Infinity : ce });
   }
   return out;
 }

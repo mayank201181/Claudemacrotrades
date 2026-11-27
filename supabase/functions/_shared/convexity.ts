@@ -342,11 +342,12 @@ export interface ConvexMark {
 // Marks one card. `hourly` carries `live` (liveSinceFill, or legs combined); `daily` holds complete daily
 // bars only. A touch freezes the card; at the cut it settles; otherwise R = V / p0fill − 1.
 export function markConvexity(c: ConvexCard, hourly: Bar[], daily: Bar[], fillTs: number, now: number): ConvexMark | null {
-  // TS-01: a bar counts once its hour has ended by `now`. The bar still running is used only when it is the
-  // latest bar in the series (the live feed: its high, low and close have all traded); in a replay as of an
+  // TS-01: a bar counts once its hour has ended by `now`. The bar still running is used only when no later
+  // hourly bar exists (the live feed: its high, low and close have all traded); in a replay as of an
   // earlier time its high and low include prices after `now`, so it is left out.
+  // (Yahoo appends a flat tick at the current time after the running bar; a tick is no later hourly bar.)
   const lastTs = hourly.length ? hourly[hourly.length - 1].ts : -Infinity;
-  const seen = (b: Bar) => b.ts + HOUR <= now || (b.ts <= now && b.ts === lastTs);
+  const seen = (b: Bar) => b.ts + HOUR <= now || (b.ts <= now && lastTs < b.ts + HOUR);
   const live = hourly.filter((b) => b.live && b.ts >= fillTs && b.ts + HOUR <= c.cut && seen(b));
   const lastLive = hourly.filter((b) => b.live && seen(b)).pop();
   if (!lastLive) return null;

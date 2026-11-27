@@ -139,8 +139,10 @@ Deno.serve(async (req) => {
       // convexity code stamps its own liveness on hourlyRaw).
       hourly.set(s, markLive(long && h6.length ? h6.map((b) => ({ ...b })) : h)); daily.set(s, d);
       const rows = [
-        ...h.slice(-200).map((b) => ({ symbol: s, interval: '60m', ts: new Date(b.ts), o: b.o, h: b.h, l: b.l, c: b.c })),
-        ...d.slice(-60).map((b) => ({ symbol: s, interval: '1d', ts: new Date(b.ts), o: b.o, h: b.h, l: b.l, c: b.c })),
+        // The archive takes the latest two days of hourly bars and two weeks of daily bars each hour (it took 200
+        // and 60, nearly all unchanged: with ~150 symbols the upserts pushed the run past the worker's 2 s CPU cap).
+        ...h.slice(-48).map((b) => ({ symbol: s, interval: '60m', ts: new Date(b.ts), o: b.o, h: b.h, l: b.l, c: b.c })),
+        ...d.slice(-10).map((b) => ({ symbol: s, interval: '1d', ts: new Date(b.ts), o: b.o, h: b.h, l: b.l, c: b.c })),
       ];
       if (rows.length && !dry) await sql`insert into dash.bars ${sql(rows)} on conflict (symbol, interval, ts) do update set o = excluded.o, h = excluded.h, l = excluded.l, c = excluded.c`;
     }
@@ -228,6 +230,7 @@ Deno.serve(async (req) => {
     }
 
     let nOut = 0;
+    const outRows: Record<string, unknown>[] = [];
     for (const i of ideas) {
       const spread = legs(i.proxy).op !== '';
       const d = completeDaily(series(i.proxy, true));
@@ -255,11 +258,16 @@ Deno.serve(async (req) => {
         last_d: lastB && ref != null ? barDate(lastB) : null,
         ret_last: lastB && ref != null ? (dir * (lastB.c - ref)) / atr : null, updated_at: new Date(), ref_v: 4,
       };
-      if (dry) would.idea_outcomes.push(row); else await sql`insert into dash.idea_outcomes ${sql(row)} on conflict (model, d, idea) do update set
+      outRows.push(row);
+      nOut++;
+    }
+    // One upsert per 400 rows (it was one query per idea, about a thousand an hour).
+    if (dry) would.idea_outcomes = outRows;
+    else for (let k = 0; k < outRows.length; k += 400) {
+      await sql`insert into dash.idea_outcomes ${sql(outRows.slice(k, k + 400))} on conflict (model, d, idea) do update set
         proxy = excluded.proxy, direction = excluded.direction, ref_d = excluded.ref_d, ref = excluded.ref, atr20 = excluded.atr20,
         ret1 = excluded.ret1, ret5 = excluded.ret5, ret10 = excluded.ret10, ret20 = excluded.ret20,
         last_d = excluded.last_d, ret_last = excluded.ret_last, updated_at = excluded.updated_at, ref_v = excluded.ref_v`;
-      nOut++;
     }
     return new Response(JSON.stringify({ ok: true, symbols: symbols.size, live: nLive, convexity: nConvex, convexity_skipped: convexSkipped,
       twins: nTwin, twins_skipped: twinSkipped, outcomes: nOut,

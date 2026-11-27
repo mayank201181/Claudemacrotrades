@@ -30,6 +30,9 @@ test('EDGE-001: a second bar on a date (Yahoo\'s running futures bar) is dropped
   // CL=F: Wed 25 stamped 05:00 UTC (00:00 New York), the running bar stamped Fri 27 01:01 UTC (Thu 20:01 New York)
   const d = stampDaily([bar(U('2026-11-25T05:00:00Z'), 60), bar(U('2026-11-26T05:00:00Z'), 61), bar(U('2026-11-27T01:01:00Z'), 62)], 'America/New_York', 'CL=F');
   assert.deepEqual(d.map(barDate), ['2026-11-25', '2026-11-26']);
+  // Thanksgiving: no Thursday bar, so the running Friday bar (01:01 UTC = Thu 20:01 New York) is never complete
+  const tg = stampDaily([bar(U('2026-11-24T05:00:00Z'), 60), bar(U('2026-11-25T05:00:00Z'), 61), bar(U('2026-11-27T01:01:00Z'), 62)], 'America/New_York', 'CL=F');
+  assert.deepEqual(completeDaily(tg, U('2026-11-27T01:20:00Z')).map(barDate), ['2026-11-24', '2026-11-25']);
 });
 
 test('EDGE-001: session close times follow the venue and its DST', () => {
@@ -117,6 +120,9 @@ test('TS-01: a replay as of an earlier time does not see the high and low of the
   // in the live feed the running bar is the latest one, and its traded low counts at once
   const feed = lv.filter((b) => b.ts <= hit.ts);
   assert.equal(markConvexity(c, feed, [], fill, U('2026-11-19T10:07:00Z'))!.touched_at, hit.ts);
+  // ... also with Yahoo's flat tick at the current time appended after it
+  const tick = { ts: U('2026-11-19T10:06:30Z'), o: 146.4, h: 146.4, l: 146.4, c: 146.4, live: false };
+  assert.equal(markConvexity(c, [...feed, tick], [], fill, U('2026-11-19T10:07:00Z'))!.touched_at, hit.ts);
 });
 
 test('TS-02: with no bars before the fill nothing is live (post-fill bars never set their own floor)', () => {
