@@ -2006,10 +2006,20 @@ def section_j(outdir):
 
     # ---- swaps table
     L.append(f"### J2. SWAPS (DTCC US-reported prints, {swap_note or 'latest day not read'}; rate = median fixed rate %, "
-             "n = prints kept; changes in bp between daily medians, so a thin day (n<3) is noisy; "
+             "n = prints kept; changes in bp between daily medians of days with 3+ prints; thin = under 3 prints today; "
+             "CHECK = the day's change sits 10bp+ apart from the same index's other tenors (likely off-market prints); thin and CHECK rows are left out of MOVERS and never cited; "
              "swap-gov = swap minus the same-tenor government yield where both print)")
     L.append("index | tenor | rate | n | 1d | 3d | 1w | swap-gov | as of")
+    def _n(src):
+        x = src.split("n=")[-1]
+        return int(x) if x.isdigit() else 0
     for lab, _c, _rx in SWAP_IDX:
+        # day changes of the other tenors of this index, for the curve-consistency check below
+        d1s = {}
+        for t in SWAP_TENORS:
+            sr = {d: v for d, v in H.get(("swap", lab, f"{t}Y"), {}).items() if _n(v[1]) >= 3}
+            if sr and max(sr) == latest.isoformat():
+                d1s[t] = _chg(sr, n=1)
         for t in SWAP_TENORS:
             ten = f"{t}Y"
             ser = H.get(("swap", lab, ten), {})
@@ -2023,8 +2033,13 @@ def section_j(outdir):
             g = H.get(("gov", SWAP_GOV.get(lab, ""), ten), {})
             gd = max((d for d in g if d <= last), default=None)
             sg = f"{(v - g[gd][0]) * 100:+.0f}bp" if gd and (dt.date.fromisoformat(last) - dt.date.fromisoformat(gd)).days <= 3 else ""
-            d1, d3, w1 = _chg(ser, n=1), _chg(ser, n=3), _chg(ser, days=7)
+            # changes only between days with 3+ prints: a 1- or 2-print day is often one off-market trade (27 Nov: SORA 3Y "-46 1w")
+            sr = {d: x for d, x in ser.items() if _n(x[1]) >= 3}
+            d1, d3, w1 = (_chg(sr, n=1), _chg(sr, n=3), _chg(sr, days=7)) if last in sr else (None, None, None)
             thin = " thin" if n.isdigit() and int(n) < 3 else ""
+            others = [x for k, x in d1s.items() if k != t and x is not None]
+            if not thin and d1 is not None and len(others) >= 2 and abs(d1 - _median(others)) > 10:
+                thin = " CHECK"  # moved 10bp+ apart from its own curve on the day (27 Nov: MYR 2Y +21 with 1Y/5Y +1/+2)
             L.append(f"{lab} | {ten} | {v:.3f} | {n}{thin} | {_bp(d1)} | {_bp(d3)} | {_bp(w1)} | {sg} | {last}"
                      f"{'' if last == latest.isoformat() else ' (no prints on ' + latest.isoformat() + ')'}")
             if not thin and last == latest.isoformat():
@@ -2126,7 +2141,7 @@ HOW_TO = """HOW TO USE (Macro Takeaways; part of STEP 2 item 1, added 1 Nov 2026
 8. FUNDAMENTALS (added 6 Nov 2026): section G is the weekly fundamentals pack (inflation, cycle, trade, reserves, credit, real rates for G10 and Asia). Follow its own HOW TO USE: a slow anchor for each theme's top-down view and its risks line, never a trigger, never a reason to raise p.
 9. CREDIT AND CYCLE (added 16 Nov 2026, rule R22): section H gives one CREDIT line (HY OAS, its 6-month change, the VIX z-score and a state) and one CYCLE line (Fed target, last move, what fed funds futures price, a stage and the book prior for it). R22 says where they print. Evidence lines only: never a gate, never a reason by themselves to raise or lower p.
 10. DOLLAR DRIVERS (added 23 Nov 2026): section I gives the inputs of the DOLLAR DRIVERS block that the rule of that name prints: 2y differentials of USD against EUR and JPY with their changes and how much of USD's 1m move a rate model explains, USD's sign on SPX and SOX down days over 20 and 60 sessions, sell-America days, KRW and TWD against SOX, CFTC net USD and the DTCC skew signed to USD, and a mechanical TAG. The run makes the regime call; the TAG is where it starts, and the call says where it departs from it.
-11. ASIA RATES (added 26 Nov 2026, owner's ask): section J gives Asia government bond yields (JGB, KTB, CGB, SGS, IGB, INDOGB, MGS, ThaiGB, TGB, RPGB, HKGB) and swap rates from DTCC prints (JPY TONA, SGD SORA, KRW CD, TWD TAIBOR, CNY repo, THB THOR, MYR KLIBOR, HKD HIBOR), each with 1d | 3d | 1w changes in bp, a MOVERS line, curve changes, swap-minus-govvy spreads and a commentary list (central banks, ING Think, press). The rule of that name says where the block prints. Cite levels and changes from J only, with its as-of dates; a commentary line is a lead, checked at its source before it carries a claim; "n/a" stays n/a, never filled from the web.
+11. ASIA RATES (added 26 Nov 2026, owner's ask): section J gives Asia government bond yields (JGB, KTB, CGB, SGS, IGB, INDOGB, MGS, ThaiGB, TGB, RPGB, HKGB) and swap rates from DTCC prints (JPY TONA, SGD SORA, KRW CD, TWD TAIBOR, CNY repo, THB THOR, MYR KLIBOR, HKD HIBOR), each with 1d | 3d | 1w changes in bp, a MOVERS line, curve changes, swap-minus-govvy spreads and a commentary list (central banks, ING Think, press). The rule of that name says where the block prints. Cite levels and changes from J only, with its as-of dates; a commentary line is a lead, checked at its source before it carries a claim; "n/a" stays n/a, never filled from the web. A swap row marked thin or CHECK is never cited, in MOVERS or anywhere else.
 12. Footer line: "Market pack: <build time> · A <n> assets · B <n> futures · D <DTCC date> · E <n> headlines · G <fund pack date> · H <credit state>/<cycle stage> · I <tag> · J <status>", or "Market pack: not found / stale (<date>)" if the file is missing or built more than 20 hours before the run; then fall back to web-searched TAPE levels and skip items 2 to 11."""
 
 
