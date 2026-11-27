@@ -185,3 +185,16 @@ test('TS-11, TS-12, TS-13', async () => {
   const q = extractQuestions('<p>SCORECARD: resolved 4 · hit 2 · miss 1 · flat 1</p>', '2026-11-27');
   if (q.scorecard) assert.equal('against_calls' in q.scorecard, false);
 });
+
+// TS-06: a constant speed has zero variance; the pooled correlation must be unavailable, not NaN.
+import { fdmOf, SPEEDS } from './forecast.ts';
+Deno.test('TS-06 fdmOf: a constant speed gives null, not NaN', () => {
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647) - 0.5;
+  const n = 900;
+  const s = SPEEDS.map((_, j) => Array.from({ length: n }, () => (j === 0 ? 0.3 : rnd())));
+  const v = fdmOf([s]);
+  if (v !== null) throw new Error(`want null, got ${v}`);
+  const ok = fdmOf([SPEEDS.map(() => Array.from({ length: n }, rnd))]);
+  if (!(ok != null && Number.isFinite(ok))) throw new Error(`varying speeds should give a number, got ${ok}`);
+});
