@@ -17,13 +17,14 @@ test('each copy of a digest gets its own source', () => {
   assert.equal(feedSource('YouTube Digest — 2026-09-20: Macro'), 'claude');
 });
 
-test('family and date come from the subject; the takeaways and alert stubs are not feeds', () => {
+test('family and date come from the subject; the Fable/Opus takeaways and alert stubs are not feeds', () => {
   assert.equal(feedFamily('YouTube Digest [Gemini] — 2026-11-11: Macro'), 'youtube');
   assert.equal(feedFamily('ChatGPT Work — Podcast Digest — 2026-11-11: 10 new episodes'), 'podcast');
   assert.equal(feedFamily('GROK CROWDING CHECK — 11 Nov 2026'), 'grok');
   assert.equal(feedFamily('ChatGPT Work — Email Digest — 11 Nov 2026: 140 emails'), 'substack');
   assert.equal(feedFamily('Email Digest — source alert'), null);
-  assert.equal(feedFamily('MACRO TAKEAWAYS [Gemini] — Wed 11 Nov 2026'), null);
+  assert.equal(feedFamily('MACRO TAKEAWAYS [Gemini] — Wed 11 Nov 2026'), 'takeaways'); // since 28 Nov 2026
+  assert.equal(feedFamily('MACRO TAKEAWAYS [Fable 5.2] — Wed 11 Nov 2026'), null);
   assert.equal(feedDate('GROK CROWDING CHECK — 11 Nov 2026'), '2026-11-11');
   assert.equal(feedDate('YouTube Digest [Gemini] — 2026-11-11: Macro'), '2026-11-11');
 });

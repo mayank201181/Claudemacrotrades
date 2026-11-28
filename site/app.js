@@ -136,10 +136,11 @@
     document.querySelectorAll('#mainTabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === state.tab));
     document.querySelectorAll('#modelSeg button').forEach((b) => b.classList.toggle('active', b.dataset.model === state.model));
     document.querySelectorAll('#tradeSeg button').forEach((b) => b.classList.toggle('active', b.dataset.sub === state.sub));
-    $('#view-themes').hidden = state.tab !== 'themes';
+    const ft = feedTab();
+    $('#view-themes').hidden = state.tab !== 'themes' || !!ft;
     $('#view-trades').hidden = state.tab !== 'trades';
-    $('#view-scores').hidden = !SCORES[state.tab] && !['positioning', 'trend', 'drivers'].includes(state.tab);
-    $('#view-feed').hidden = !FEEDS[state.tab];
+    $('#view-scores').hidden = !!ft || (!SCORES[state.tab] && !['positioning', 'trend', 'drivers'].includes(state.tab));
+    $('#view-feed').hidden = !ft;
     $('#modelSeg').hidden = !!FEEDS[state.tab] || ['voices', 'review', 'positioning', 'trend', 'drivers'].includes(state.tab);
     const bk = state.index?.book?.[state.model];
     $('#freshness').textContent = bk ? `book ${bk.updated || ''} · synced ${ago(bk.ingested_at)}` : '';
@@ -151,7 +152,8 @@
   document.querySelectorAll('#tradeSeg button').forEach((b) => (b.onclick = () => { state.sub = b.dataset.sub; store('sub', state.sub); state.open.clear(); syncChrome(); render(); }));
 
   function render() {
-    if (FEEDS[state.tab]) return renderFeed(state.tab);
+    const ft = feedTab();
+    if (ft) return renderFeed(ft);
     if (SCORES[state.tab]) return renderScores(state.tab);
     // Positioning lives in positioning.js and draws into the scores panel.
     if (state.tab === 'positioning') return window.MacroDeskPositioning.render($('#scoresBody'), { rpc, esc, store, active: () => state.tab === 'positioning' });
@@ -168,8 +170,17 @@
     podcast: { name: 'Podcast Digest', open: /take|overview|synthesis/i },
     grok: { name: 'Grok Full Consolidated', open: /network pulse a|markets intel/i },
     substack: { name: 'Newsletters (from the Email Digest)', open: /market/i },
+    // Not a tab: the Gemini Takeaways editions, shown on Themes and Questions when the Gemini button is on.
+    takeaways: { name: 'Gemini Macro Takeaways', open: /top line|trade book|positions/i },
   };
-  const SOURCE_NAME = { fable: 'Fable 5.2', opus: 'Opus 5.5', chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude', crowding: 'Crowding check', grokbot: 'Grok Bot' };
+  // The feed a tab shows: its own, or the Gemini editions on Themes and Questions (the Gemini book is on Trades).
+  function feedTab() {
+    if (FEEDS[state.tab] && state.tab !== 'takeaways') return state.tab;
+    if (state.model === 'gemini' && (state.tab === 'themes' || state.tab === 'questions')) return 'takeaways';
+    return null;
+  }
+  const SOURCE_NAME = { fable: 'Fable 5.2', opus: 'Opus 5.5', chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude', crowding: 'Crowding check', grokbot: 'Grok Bot',
+    carbon: 'Carbon', neon: 'Neon', pipeline_neon: 'Pipeline Neon' };
   const feedState = {};
 
   async function renderFeed(family) {
@@ -181,7 +192,7 @@
       $('#feedBody').innerHTML = `<div class="card empty">Could not load ${esc(FEEDS[family].name)}: ${esc(e.message || e)}</div>`;
       return;
     }
-    if (state.tab !== family) return;
+    if (feedTab() !== family) return;
     const ds = fs.index.map((x) => x.d);
     if (!ds.length) { $('#feedBody').innerHTML = `<div class="card empty">No ${esc(FEEDS[family].name)} emails ingested yet.</div>`; $('#feedDate').innerHTML = ''; $('#sourceSeg').innerHTML = ''; return; }
     if (!fs.date || !ds.includes(fs.date)) fs.date = ds[0];
@@ -198,10 +209,10 @@
       if (my === seq) $('#feedBody').innerHTML = `<div class="card empty">Could not load this date: ${esc(e.message || e)}</div>`;
       return;
     }
-    if (my !== seq || state.tab !== family) return;
+    if (my !== seq || feedTab() !== family) return;
     const rows = fs.rows[key] || [];
     const sources = [...new Set(rows.map((r) => r.source))];
-    const pref = [fs.source, state.model, 'opus', 'fable', 'chatgpt', 'grokbot', 'gemini', 'claude'];
+    const pref = [fs.source, state.model, 'carbon', 'opus', 'fable', 'chatgpt', 'grokbot', 'gemini', 'claude'];
     const src = pref.find((s) => s && sources.includes(s)) || sources[0];
     fs.source = src;
     $('#sourceSeg').innerHTML = sources.length > 1 ? sources.map((s) => `<button data-src="${s}" class="${s === src ? 'active' : ''}">${esc(SOURCE_NAME[s] || s)}</button>`).join('') : '';
@@ -209,11 +220,12 @@
     document.querySelectorAll('#sourceSeg button').forEach((b) => (b.onclick = () => { fs.source = b.dataset.src; renderFeed(family); }));
     const parts = rows.filter((r) => r.source === src);
     $('#feedMeta').textContent = `${SOURCE_NAME[src] || src} · ${parts.length > 1 ? parts.length + ' emails' : (parts[0]?.subject || '').replace(/^.*?—\s*/, '').slice(0, 80)}`;
-    const openRe = FEEDS[family].open;
-    $('#feedBody').innerHTML = parts.map((r) => `
+    const qOnly = family === 'takeaways' && state.tab === 'questions';
+    const openRe = qOnly ? /question|qxx/i : FEEDS[family].open;
+    $('#feedBody').innerHTML = (qOnly ? '<p class="note">Gemini keeps its own open questions; they are shown as each edition printed them (not scored here).</p>' : '') + parts.map((r) => `
       ${parts.length > 1 ? `<h2 class="sec">${esc(r.subject)}</h2>` : ''}
-      ${r.intro ? `<div class="card rich small" style="margin-bottom:12px">${r.intro}</div>` : ''}
-      ${(r.sections || []).map((s, i) => `<div class="card" style="margin-bottom:10px"><details ${openRe.test(s.title) || (i === 0 && !r.sections.some((x) => openRe.test(x.title))) ? 'open' : ''}>
+      ${r.intro && !qOnly ? `<div class="card rich small" style="margin-bottom:12px">${r.intro}</div>` : ''}
+      ${(r.sections || []).filter((s) => !qOnly || /question|qxx|brier|scorecard/i.test(s.title)).map((s, i) => `<div class="card" style="margin-bottom:10px"><details ${openRe.test(s.title) || (i === 0 && !r.sections.some((x) => openRe.test(x.title))) ? 'open' : ''}>
         <summary><b>${esc(s.title || 'Digest')}</b></summary><div class="rich">${s.html}</div></details></div>`).join('')}
     `).join('') || '<div class="card empty">Nothing for this date.</div>';
   }
@@ -438,6 +450,7 @@
     $('#tradesBody').innerHTML = `<div class="tablewrap"><table class="grid"><thead><tr>
       <th>P</th><th>Trade</th><th>Status</th><th class="hide-sm">Opened</th><th>Entry</th><th>Stop</th><th>Target</th><th class="hide-sm">R:R</th><th class="hide-sm">p / EV</th><th>Mark</th><th>R</th>
       </tr></thead><tbody>${rows}</tbody></table></div>
+      ${state.model === 'gemini' ? '<p class="note">Gemini book (Pxx tactical, Sxx 3-month structural), lifted from the Carbon edition each morning. Open trades: Gemini\'s levels (forwards and NDFs shifted to spot by the card\'s spot ref), R marked hourly with our own prices, not Gemini\'s. Closed P01-P18, S01 and S05: R as Gemini booked them. A trade the book stops listing for three days is closed at our last mark.</p>' : ''}
       <p class="note">Levels are exactly as carded and never edited except by a logged roll. R on open trades is the latest hourly mark; the book's official exits use daily closes (trade_book_spec), so an intraday touch is flagged, not booked.${anyCx ? ' · convexity: 1R = premium, R = model value' : ''}</p>`;
     bindRows();
   }
