@@ -16,7 +16,7 @@ for code, s in sorted(snap['series'].items()):
     rows.append({
         'c': s['country'], 'b': m.get('block', ''), 'i': s['indicator'], 'v': v, 'u': s.get('unit') or '',
         'd': s.get('observation_date'), 'age': s.get('observation_age_days'), 'dir': s.get('three_month_direction'),
-        'chg': round(chg, 4) if isinstance(chg, float) else chg, 'pct': s.get('percentile_10y'), 'n10': s.get('n_10y'),
+        'chg': round(chg, 4) if isinstance(chg, float) else chg, 'pct': s.get('percentile_10y'), 'pcts': s.get('percentile') or {}, 'n10': s.get('n_10y'),
         'st': s.get('state'), 'f': s.get('frequency') or '', 'ag': m.get('agency', ''), 'src': m.get('fallback') or s.get('source_url', ''),
         'note': (m.get('notes') or '')[:220],
     })
