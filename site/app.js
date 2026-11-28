@@ -139,9 +139,9 @@
     const ft = feedTab();
     $('#view-themes').hidden = state.tab !== 'themes' || !!ft;
     $('#view-trades').hidden = state.tab !== 'trades';
-    $('#view-scores').hidden = !!ft || (!SCORES[state.tab] && !['positioning', 'trend', 'drivers'].includes(state.tab));
+    $('#view-scores').hidden = !!ft || (!SCORES[state.tab] && !['positioning', 'trend', 'drivers', 'countries'].includes(state.tab));
     $('#view-feed').hidden = !ft;
-    $('#modelSeg').hidden = !!FEEDS[state.tab] || ['voices', 'review', 'positioning', 'trend', 'drivers'].includes(state.tab);
+    $('#modelSeg').hidden = !!FEEDS[state.tab] || ['voices', 'review', 'positioning', 'trend', 'drivers', 'countries'].includes(state.tab);
     const bk = state.index?.book?.[state.model];
     $('#freshness').textContent = bk ? `book ${bk.updated || ''} · synced ${ago(bk.ingested_at)}` : '';
     const al = digestAlert(state.index, Date.now());
@@ -161,6 +161,8 @@
     if (state.tab === 'trend') return window.MacroDeskTrend.render($('#scoresBody'), { rpc, esc, store, active: () => state.tab === 'trend' });
     // Drivers lives in drivers.js and draws into the same panel.
     if (state.tab === 'drivers') return window.MacroDeskDrivers.render($('#scoresBody'), { rpc, esc, store, active: () => state.tab === 'drivers' });
+    // Countries lives in countries.js (public official data from the countries-data branch, no database call).
+    if (state.tab === 'countries') return window.MacroDeskCountries.render($('#scoresBody'), { esc, store, active: () => state.tab === 'countries' });
     return state.tab === 'themes' ? renderThemes() : renderTrades();
   }
 
