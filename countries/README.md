@@ -15,3 +15,8 @@ both runs returned.
 
 Local run: `python3 countries/fetch_all.py --out /tmp/snap.json --previous countries/seed_snapshot.json`
 (about 80 s from a cloud container; RBNZ, the Philippine statistics site, StatCan's advance GDP page and CBO answer 403 there).
+
+Added 28 Nov 2026 evening (owner's ask): block `credit` (Credit and housing), 7 BIS quarterly lines per economy
+(private and household credit % GDP, private credit growth y/y, credit-to-GDP gap, debt service ratio, real and nominal
+house prices y/y; 125 PASS, Taiwan and some others not published by BIS), module `mod/bis_credit.py`. Percentiles for
+1, 2, 5 and 10 years (`percentile` in the snapshot, `pcts` in countries.json); the page has a window switch.

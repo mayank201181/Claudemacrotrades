@@ -10,7 +10,7 @@
   const CODE = { 'United States': 'US', 'Euro area': 'EA', 'United Kingdom': 'UK', Japan: 'JP', Canada: 'CA', Australia: 'AU', 'New Zealand': 'NZ',
     Switzerland: 'CH', China: 'CN', 'South Korea': 'KR', Taiwan: 'TW', India: 'IN', Indonesia: 'ID', Philippines: 'PH', Malaysia: 'MY',
     Singapore: 'SG', Thailand: 'TH', Brazil: 'BR', Mexico: 'MX', 'South Africa': 'ZA' };
-  const BLOCKS = [['growth_fast', 'Growth, fast'], ['growth_slow', 'Growth'], ['inflation', 'Inflation'], ['policy', 'Policy'],
+  const BLOCKS = [['growth_fast', 'Growth, fast'], ['growth_slow', 'Growth'], ['inflation', 'Inflation'], ['policy', 'Policy'], ['credit', 'Credit and housing'],
     ['fiscal', 'Fiscal'], ['external', 'External and flows'], ['markets', 'Markets']];
   const LABEL = {
     fast_tracker: 'Port calls (PortWatch)', nowcast: 'Official nowcast', nyfed_nowcast: 'NY Fed nowcast', jobless_claims: 'Initial jobless claims',
@@ -24,11 +24,17 @@
     budget_balance_gdp: 'Budget balance, % GDP', budget_forecast_gdp: 'Budget forecast, % GDP', government_debt_gdp: 'Government debt, % GDP',
     monthly_fiscal: 'Monthly fiscal balance', current_account_gdp: 'Current account, % GDP', current_account: 'Current account',
     trade_balance: 'Trade balance', fx_reserves: 'FX reserves', portfolio_bop: 'Portfolio inflows (BoP)', foreign_equity_flow: 'Foreign equity flow',
-    foreign_bond_flow: 'Foreign bond flow', yield_2y: '2y yield', yield_10y: '10y yield', equity_index: 'Equity index', fx_usd: 'FX per USD',
+    foreign_bond_flow: 'Foreign bond flow', private_credit_gdp: 'Private credit, % GDP', household_credit_gdp: 'Household credit, % GDP',
+    private_credit_yoy: 'Private credit growth y/y', credit_gap: 'Credit-to-GDP gap', debt_service_ratio: 'Debt service ratio',
+    house_price_real_yoy: 'House prices y/y, real', house_price_yoy: 'House prices y/y, nominal', yield_2y: '2y yield', yield_10y: '10y yield', equity_index: 'Equity index', fx_usd: 'FX per USD',
   };
   const ord = (n) => n + ((n % 100 >= 11 && n % 100 <= 13) ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th');
   const lbl = (i) => LABEL[i] || i.replace(/_/g, ' ');
-  let data = null, loading = null, gen = 0;
+  let data = null, loading = null, gen = 0, win = '10';
+  try { win = localStorage.getItem('md.cty.win') || win; } catch (_) {}
+  const WINS = ['1', '2', '5', '10'];
+  // Percentile in the chosen window; older files carry only the 10-year one.
+  const pctOf = (r) => (r.pcts && Object.keys(r.pcts).length ? r.pcts[win] : win === '10' ? r.pct : null);
 
   function injectStyle() {
     if (document.getElementById('countries-css')) return;
@@ -79,10 +85,11 @@
   function rowHtml(r, esc, withCountry) {
     const arrow = r.dir === 'up' ? '▲' : r.dir === 'down' ? '▼' : r.dir === 'flat' ? '■' : '';
     const chg = r.chg == null ? '' : `${arrow} ${r.chg > 0 ? '+' : ''}${fmt(r.chg)}`;
-    const pc = r.pct == null ? '<span class="pcttxt">no 10y base</span>'
-      : `<div class="pctbar ${r.pct >= 90 ? 'hi' : r.pct <= 10 ? 'lo' : ''}"><i style="left:${r.pct}%"></i></div><span class="pcttxt">${ord(Math.round(r.pct))} pct, 10y</span>`;
+    const p = pctOf(r);
+    const pc = p == null ? `<span class="pcttxt">no ${win}y base</span>`
+      : `<div class="pctbar ${p >= 90 ? 'hi' : p <= 10 ? 'lo' : ''}"><i style="left:${p}%"></i></div><span class="pcttxt">${ord(Math.round(p))} pct, ${win}y</span>`;
     const kept = r.st !== 'ok';
-    const stale = r.age != null && r.age > staleDays(r.f);
+    const stale = r.age != null && r.age > (r.b === 'credit' ? 300 : staleDays(r.f)); // BIS credit and property prints lag about six months
     const name = withCountry ? `${esc(CODE[r.c] || r.c)} · ${esc(r.c)}` : esc(lbl(r.i));
     return `<div class="cty-row${kept ? ' kept' : ''}${stale ? ' stale' : ''}" data-k="${esc(r.c + '|' + r.i)}">
       <div>${name}</div>
@@ -119,8 +126,9 @@
         <button data-v="indicator" class="${view === 'indicator' ? 'active' : ''}">By indicator</button></div>
         ${view === 'indicator' ? `<select id="ctyInd">${BLOCKS.map(([b, n]) => `<optgroup label="${esc(n)}">${indicators.filter((i) => d.rows.some((r) => r.i === i && r.b === b))
           .map((i) => `<option value="${esc(i)}"${i === ind ? ' selected' : ''}>${esc(lbl(i))}</option>`).join('')}</optgroup>`).join('')}</select>` : ''}
+        <div class="seg" id="ctyWin" title="Percentile window">${WINS.map((w) => `<button data-w="${w}" class="${w === win ? 'active' : ''}">${w}y</button>`).join('')}</div>
         <span class="small muted">as of ${esc(d.as_of)} · ${d.ok} of ${d.total} lines fresh today · free official sources</span></div>`;
-      const colHead = (first) => `<div class="cty-head"><div>${first}</div><div>Latest</div><div>Date</div><div>3m change</div><div>10y range</div></div>`;
+      const colHead = (first) => `<div class="cty-head"><div>${first}</div><div>Latest</div><div>Date</div><div>3m change</div><div>${win}y range</div></div>`;
       let body;
       if (view === 'country') {
         const rows = d.rows.filter((r) => r.c === sel);
@@ -135,8 +143,9 @@
         body = `<div class="card cty-block"><h3>${esc(lbl(ind))}</h3>${colHead('Economy')}${rs.map((r) => rowHtml(r, esc, true)).join('')}
           ${missing.length ? `<p class="note">No free official series: ${missing.map((c) => esc(CODE[c])).join(', ')}.</p>` : ''}</div>`;
       }
-      el.innerHTML = head + body + `<p class="note">Percentile is the latest value's place in its own last ten years (shown only with ten years of data; red at 90th and above, green at 10th and below, whatever the indicator). "kept" means today's fetch failed and the last good value is shown. Dates in amber are older than the series' usual release gap. Tap a line for its source.</p>`;
+      el.innerHTML = head + body + `<p class="note">Percentile is the latest value's place in its own history over the chosen window (1, 2, 5 or 10 years; shown only when the series covers the whole window, a quarterly series has just 4 points in 1 year, annual series only 5 and 10 years; red at 90th and above, green at 10th and below, whatever the indicator). "kept" means today's fetch failed and the last good value is shown. Dates in amber are older than the series' usual release gap. Tap a line for its source.</p>`;
       el.querySelectorAll('#ctyView button').forEach((b) => (b.onclick = () => { view = b.dataset.v; try { localStorage.setItem('md.cty.view', view); } catch (_) {} draw(); }));
+      el.querySelectorAll('#ctyWin button').forEach((b) => (b.onclick = () => { win = b.dataset.w; try { localStorage.setItem('md.cty.win', win); } catch (_) {} draw(); }));
       el.querySelectorAll('.cty-chips button').forEach((b) => (b.onclick = () => { sel = b.dataset.c; try { localStorage.setItem('md.cty.sel', sel); } catch (_) {} draw(); }));
       const s = el.querySelector('#ctyInd'); if (s) s.onchange = () => { ind = s.value; try { localStorage.setItem('md.cty.ind', ind); } catch (_) {} draw(); };
       el.querySelectorAll('.cty-row').forEach((row) => (row.onclick = () => {

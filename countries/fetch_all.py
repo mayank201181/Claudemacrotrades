@@ -55,18 +55,25 @@ def metrics(points, row):
         i = opts[-1]; delta=value-points[i][1]
         out.update(three_month_direction='up' if delta>0 else 'down' if delta<0 else 'flat',
                    three_month_change=delta,comparison_date=dates[i].isoformat())
-    start=shift_months(latest,-120)
-    values=[v for (s,v),d in zip(points,dates) if d>start]
-    out['n_10y']=len(values)
-    if any(t in f for t in ('daily','business day','trading day')): min_n,gap=1750,10
-    elif 'week' in f: min_n,gap=420,15
-    elif 'month' in f: min_n,gap=108,35
-    elif 'quarter' in f: min_n,gap=36,95
-    elif 'annual' in f or 'yearly' in f: min_n,gap=10,370
+    # Percentile of the latest value in its own last 1, 2, 5 and 10 years (owner's ask 28 Nov 2026: a window switch on
+    # the page). Each window needs the history to reach back to its start and about 90% of the points its frequency
+    # gives (the 10-year rule Astra set, scaled by years); annual series get 5 and 10 years only.
+    if any(t in f for t in ('daily','business day','trading day')): per_year,gap=175,10
+    elif 'week' in f: per_year,gap=42,15
+    elif 'month' in f: per_year,gap=10.8,35
+    elif 'quarter' in f: per_year,gap=3.6,95
+    elif 'annual' in f or 'yearly' in f: per_year,gap=1,32
     else: return out
-    allowed_gap=gap if min_n!=10 else 32
-    if dates[0]<=start+timedelta(days=allowed_gap) and len(values)>=min_n:
-        out['percentile_10y']=round(100*(sum(v<value for v in values)+.5*sum(v==value for v in values))/len(values),2)
+    pct={}
+    for years in (1,2,5,10):
+        start=shift_months(latest,-12*years)
+        values=[v for (s,v),d in zip(points,dates) if d>start]
+        if years==10: out['n_10y']=len(values)
+        min_n=max(3,int(per_year*years)) if per_year>1 else (years if years>=5 else 10**9)
+        if dates[0]<=start+timedelta(days=gap) and len(values)>=min_n:
+            pct[str(years)]=round(100*(sum(v<value for v in values)+.5*sum(v==value for v in values))/len(values),2)
+    out['percentile']=pct
+    out['percentile_10y']=pct.get('10')
     return out
 def read_map():
     with (ROOT/'source_map.csv').open(encoding='utf-8',newline='') as f:
