@@ -6,6 +6,8 @@ STATUS entries that sat in pull requests which were never merged. New dated entr
 
 ## Part 0 — entries since 10 Nov 2026 (newest first)
 
+**28 Nov 2026: question ids out of THE LAST 24H IN 60 SECONDS.** The owner said the bracketed labels ("[1 · Q84 NET ↓↓]") meant nothing to him in the first section he reads and asked for plain words there, ids kept below, and a list of every open question's probability move at the bottom, in all five Takeaways. The yellow tags are what dash-ingest parses into `dash.q_moves`; its parser reads them anywhere in the body, so R46 moves them whole to a new OPEN QUESTIONS · ODDS BOARD section before the footer (checked on the 28 Nov Fable HTML: identical moves, events and scorecard). Gemini Carbon and Neon got a prompt item through Chrome; Pipeline Neon got a prompt line plus a render-time strip (its PR #4).
+
 **28 Nov 2026, Gemini in the app.** The owner asked for Gemini beside Fable and Opus in the app. Feed tabs already
 carried every model's copy; Themes, Trades and Questions got a Gemini button (PR #152, dash-ingest v13 at 3b6263c).
 The Gemini editions lay their book out three ways (Carbon tables, Neon "entry / stop / target (1R=...)" triples,
