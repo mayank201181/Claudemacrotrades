@@ -1360,6 +1360,53 @@ def _jgb2y(outdir):
     return {d: out[d] for d in keep}
 
 
+TE_2Y = {"EUR": "germany", "JPY": "japan"}  # live 2y used only to bring the official series up to date
+
+
+def _bdays_after(a, b):
+    """Weekdays after ISO date a up to and including ISO date b (0 when b <= a)."""
+    da, db, n = dt.date.fromisoformat(a), dt.date.fromisoformat(b), 0
+    while da < db:
+        da += dt.timedelta(days=1)
+        n += da.weekday() < 5
+    return n
+
+
+def _splice_live(name, o2):
+    """ECB publishes day T's AAA curve at noon CET on T+1 and MOF day T's JGB curve at 08:30 JST on T+1, so at the
+    06:52 SGT build both end one business day before the latest US Treasury print. When the live Trading Economics 2y
+    (Bund for EUR, JGB for JPY) is dated exactly one business day after the official last print, add its day change
+    to that print (the level stays on the official basis). Returns (spliced date or None, note)."""
+    last = max(o2)
+    try:
+        rows = [r for r in _te_page(None, TE_2Y[name]) if r[0] == "2Y"]
+    except Exception as e:  # noqa: BLE001
+        return None, f"live 2y not available ({type(e).__name__})"
+    if not rows:
+        return None, "live 2y not on the page"
+    _t, y, chg, _m, day = rows[0]
+    d = _te_date(day)
+    if not d or d <= last:
+        return None, None
+    if _bdays_after(last, d) != 1 or abs(chg) > 0.25:
+        return None, f"live 2y {d} {y:.3f}% (day {chg * 100:+.1f}bp) not spliced: not one business day after {last}" if abs(chg) <= 0.25 else f"live 2y day change {chg * 100:+.1f}bp rejected as implausible"
+    o2[d] = round(o2[last] + chg, 4)
+    return d, f"official {last} + live day change {chg * 100:+.1f}bp (Trading Economics {y:.3f}%)"
+
+
+def _ffill_diff(us, o2):
+    """USD minus other 2y in bp on every date either side publishes, each side carried from its own last print, so a
+    US holiday or a one-day publication lag no longer pulls the whole differential back to the last shared date."""
+    start = max(min(us), min(o2))
+    cal = sorted(k for k in set(us) | set(o2) if k >= start)
+    d = {}
+    a, b = us[max(k for k in us if k <= start)], o2[max(k for k in o2 if k <= start)]
+    for k in cal:
+        a, b = us.get(k, a), o2.get(k, b)
+        d[k] = (a - b) * 100
+    return cal, d
+
+
 def _bars(label, sym):
     rows = BARS.get(label)
     if not rows:
@@ -1488,12 +1535,23 @@ def section_i(outdir, dlines):
             except Exception as e:  # noqa: BLE001
                 L.append(f"RATES {name}: 2y not available ({type(e).__name__})")
         eur_px, jpy_px = _bars("EURUSD", "EURUSD=X"), _bars("USDJPY", "JPY=X")
+        asof, stale = [], []
         for name, o2, px, usd_base in (("EUR", others.get("EUR"), eur_px, False), ("JPY", others.get("JPY"), jpy_px, True)):
             if not o2:
                 continue
-            dates = sorted(set(us) & set(o2))
-            d = {k: (us[k] - o2[k]) * 100 for k in dates}  # bp
+            off_last = max(o2)
+            sp, note = _splice_live(name, o2)
+            dates, d = _ffill_diff(us, o2)  # bp, freshest print of each leg
             last = dates[-1]
+            ref = max([k for k in px if k <= NOW.strftime("%Y-%m-%d")] + [last])  # last FX close the move is measured to
+            lag_us, lag_o = _bdays_after(max(us), ref), _bdays_after(max(o2), ref)
+            src = {"EUR": "ECB AAA", "JPY": "MOF"}[name]
+            asof.append(f"USD-{name} to {last} (US {max(us)} Treasury{'' if lag_us <= 1 else f', {lag_us} business days old'}; "
+                        f"{name} {max(o2)} {'via ' + note if sp else src}{'' if lag_o <= 1 else f', {lag_o} business days old'})"
+                        + (f" [{note}]" if note and not sp else ""))
+            for leg, lg, dd in (("US", lag_us, max(us)), (name, lag_o, max(o2))):
+                if lg > 1:
+                    stale.append(f"{leg} 2y last print {dd} is {lg} business days before the {ref} FX close")
             ch = lambda n: d[last] - d[dates[-1 - n]] if len(dates) > n else None  # noqa: E731
             pct1y = _pct([d[k] for k in dates[-250:]], d[last])
             # rate model: daily pair % move on daily diff change, last 120 common days, USD-up sign
@@ -1507,12 +1565,12 @@ def section_i(outdir, dlines):
                 act = (px[cd[-1]] / px[cd[-22]] - 1) * 100 * (1 if usd_base else -1)
             W[name] = (d, px, usd_base, beta)
             diffs[name] = dict(last=last, lvl=d[last], d1=ch(1), d5=ch(5), d21=ch(21), fit=fit, act=act, corr=corr)
-            L.append(f"RATES USD-{name} 2y: {d[last]:+.0f}bp ({last}; US {us[last]:.2f}%, {name} {o2[last]:.2f}%) · 1d {fmt(ch(1), 0)} · 1w {fmt(ch(5), 0)} · 1m {fmt(ch(21), 0)}bp · 1y pct {pct1y:.0f}"
+            L.append(f"RATES USD-{name} 2y: {d[last]:+.0f}bp ({last}; US {us[max(us)]:.2f}% {max(us)}, {name} {o2[max(o2)]:.2f}% {max(o2)}) · 1d {fmt(ch(1), 0)} · 1w {fmt(ch(5), 0)} · 1m {fmt(ch(21), 0)}bp · 1y pct {pct1y:.0f}"
                      f" · USD vs {name} 1m {fmt(act, 2)}%, of which the rate model explains {fmt(fit, 2)}% (daily fit over 120 days, corr {fmt(corr, 2)}; the rest is risk premium, flows or the other side's story)")
             row[f"diff_{name.lower()}"] = f"{d[last]:.0f}"
-        common = min(v["last"] for v in diffs.values()) if diffs else max(us)
-        since = f", {fmt((us[max(us)] - us[common]) * 100, 0)}bp since {common}, not yet in the differentials" if max(us) > common and common in us else ""
-        L.append(f"US 2y as of {max(us)}: {us[max(us)]:.2f}%{since}. Each side's date is printed: the differential is taken on the last date both sides publish (ECB about one day behind, MOF and Treasury same day).")
+        L.append(f"US 2y as of {max(us)}: {us[max(us)]:.2f}%. Each differential uses the freshest print of each leg (a leg with no print that day is carried from its last one); "
+                 "ECB and MOF publish a day late, so their latest day is taken from the live Trading Economics 2y day change on top of the official last print.")
+        L.append("RATES AS-OF: " + " · ".join(asof) + (" · STALE: " + "; ".join(stale) + " (print the as-of date in red)" if stale else " · FRESH (every leg within one business day)"))
         agree = [k for k, v in diffs.items() if v["d21"] is not None and v["act"] is not None and v["d21"] * v["act"] > 0 and abs(v["act"]) >= 0.3]
         against = [k for k, v in diffs.items() if v["d21"] is not None and v["act"] is not None and v["d21"] * v["act"] < 0 and abs(v["act"]) >= 0.3]
         if agree:
@@ -1824,9 +1882,9 @@ def _gov_chinamoney(H):
     return n
 
 
-def _te_page(mkt):
+def _te_page(mkt, slug=None):
     """Trading Economics country bond table: [(tenor, yield, day chg in pp, month chg in pp, 'Mon/DD')]."""
-    t = get(f"https://tradingeconomics.com/{TE_SLUG[mkt]}/government-bond-yield", timeout=30, tries=2).decode("utf-8", "replace")
+    t = get(f"https://tradingeconomics.com/{slug or TE_SLUG[mkt]}/government-bond-yield", timeout=30, tries=2).decode("utf-8", "replace")
     i = t.find("<table")
     j = t.find("</table>", i)
     out = []
