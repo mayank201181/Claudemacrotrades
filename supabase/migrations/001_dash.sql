@@ -165,7 +165,7 @@ begin
     'trades', (select coalesce(jsonb_agg(to_jsonb(t) || jsonb_build_object(
                   'marks', (select coalesce(jsonb_agg(to_jsonb(m) - 'model' - 'pid' order by m.d), '[]') from dash.trade_marks m where m.model = t.model and m.pid = t.pid),
                   'log', (select coalesce(jsonb_agg(jsonb_build_object('d', l.d, 'text', l.text) order by l.d), '[]') from dash.trade_log l where l.model = t.model and l.ref = t.pid),
-                  'live', (select to_jsonb(v) - 'model' - 'pid' from dash.live_marks v where v.model = t.model and v.pid = t.pid))
+                  'live', (select to_jsonb(lm) - 'model' - 'pid' from dash.live_marks lm where lm.model = t.model and lm.pid = t.pid))
                 order by t.pid desc), '[]') from dash.trades t where t.model = p_model),
     'tested', (select coalesce(jsonb_agg(to_jsonb(x) || jsonb_build_object(
                   'outcome', (select to_jsonb(o) - 'model' - 'd' - 'idea' from dash.idea_outcomes o where o.model = x.model and o.d = x.d and o.idea = x.idea))
