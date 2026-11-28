@@ -751,8 +751,18 @@ a compliance view). Details in `docs/history.md`.
     `dash.put_gemini_trades()`, open trades from each Carbon edition; R in the app is our mark, not Gemini's. The Apps Script feeder cannot read the Gemini Drive book
     (BOOK_FOLDERS has fable and opus only, the project is not visible to a thread), hence the email route. Feed spec
     enabled 28 Nov 11:09 UTC; backfill from 23 Sep runs over the feeder's next passes. The ChatGPT YouTube/Podcast
-    copies stopped after 23 Nov: the owner paused them, fine. (d) OPEN: Countries page, 20 countries, approved by the
-    owner 28 Nov; Astra A29 source map first (project file `astra_tasks/`), then a daily cloud fetch and the page.
+    copies stopped after 23 Nov: the owner paused them, fine. (d) Countries page LIVE 28 Nov
+    (PR #156): Astra A29 source map (809 lines asked, 567 PASS) checked by us (22 endpoints by hand; the full fetch
+    re-run from the cloud matched Astra on all 526 lines both returned). `countries/` holds the map, fetch and parsers;
+    FRED needs the default User-Agent and two requests at a time. GitHub workflow `countries` (05:40 SGT and on demand)
+    force-writes `snapshot.json` and `countries.json` to branch `countries-data` (public official statistics only); the
+    Countries tab reads countries.json, no database. First run 28 Nov 11:52 UTC: 553 of 567; RBNZ, Philippine sources,
+    StatCan advance GDP and CBO refuse cloud fetches (last good value kept, marked "kept"). No swaps, CDS or Redbook
+    (no free source passed). OPEN: confirm the 05:40 SGT schedule fires on Sun 29 Nov (workflow runs list); if not,
+    dispatch it daily from the Haiku feeder thread. Gemini Themes (owner's ask, 28 Nov evening): 60 seconds first
+    (Neon's TOP LINE stands in), one card per theme split on the edition's "THEME n"/"Theme X" headings with the Lean
+    (Carbon), Transmission (Neon) or What happened (Pipeline Neon) line open, synthesis and open questions open, the
+    trade book last.
     (e) The owner's ask to drop bare Qxx ids from "the last 24h in 60 seconds" in all five Takeaways went to its own
     thread.
 

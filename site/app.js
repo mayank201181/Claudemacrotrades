@@ -224,12 +224,68 @@
     $('#feedMeta').textContent = `${SOURCE_NAME[src] || src} · ${parts.length > 1 ? parts.length + ' emails' : (parts[0]?.subject || '').replace(/^.*?—\s*/, '').slice(0, 80)}`;
     const qOnly = family === 'takeaways' && state.tab === 'questions';
     const openRe = qOnly ? /question|qxx/i : FEEDS[family].open;
+    if (family === 'takeaways' && state.tab === 'themes') { $('#feedBody').innerHTML = parts.map((r) => geminiThemes(r, parts.length > 1)).join('') || '<div class="card empty">Nothing for this date.</div>'; return; }
     $('#feedBody').innerHTML = (qOnly ? '<p class="note">Gemini keeps its own open questions; they are shown as each edition printed them (not scored here).</p>' : '') + parts.map((r) => `
       ${parts.length > 1 ? `<h2 class="sec">${esc(r.subject)}</h2>` : ''}
       ${r.intro && !qOnly ? `<div class="card rich small" style="margin-bottom:12px">${r.intro}</div>` : ''}
       ${(r.sections || []).filter((s) => !qOnly || /question|qxx|brier|scorecard/i.test(s.title)).map((s, i) => `<div class="card" style="margin-bottom:10px"><details ${openRe.test(s.title) || (i === 0 && !r.sections.some((x) => openRe.test(x.title))) ? 'open' : ''}>
         <summary><b>${esc(s.title || 'Digest')}</b></summary><div class="rich">${s.html}</div></details></div>`).join('')}
     `).join('') || '<div class="card empty">Nothing for this date.</div>';
+  }
+
+  // A Gemini edition laid out like the Fable and Opus Themes page (28 Nov 2026, his ask): the 60-second summary
+  // first, then one card per theme (split on the edition's own "THEME 1" / "Theme A" headings), then the other
+  // sections collapsed, synthesis and open questions open, the trade book last (the book itself is on Trades).
+  function splitThemes(html) {
+    const box = document.createElement('div'); box.innerHTML = html;
+    const re = /^\s*THEME\s*(\d{1,2}(?!\d)|[A-H](?![A-Za-z]))\s*[:.—–-]?\s*/i;
+    let heads = [...box.querySelectorAll('*')].filter((e) => re.test(e.textContent) && e.textContent.trim().length < 400);
+    heads = heads.filter((e) => !heads.some((o) => o !== e && e.contains(o))); // innermost match only
+    // A bare "THEME 1" badge inside its title line: use the line, not the badge.
+    heads = heads.map((e) => (e.textContent.trim().replace(re, '') === '' && e.parentElement && e.parentElement !== box ? e.parentElement : e));
+    heads = heads.filter((e, i) => heads.indexOf(e) === i);
+    if (heads.length < 2) return null;
+    const out = [];
+    const pre = document.createRange(); pre.setStart(box, 0); pre.setEndBefore(heads[0]);
+    const lead = document.createElement('div'); lead.appendChild(pre.cloneContents());
+    heads.forEach((h, i) => {
+      const r = document.createRange(); r.setStartAfter(h);
+      if (i + 1 < heads.length) r.setEndBefore(heads[i + 1]); else r.setEnd(box, box.childNodes.length);
+      const d = document.createElement('div'); d.appendChild(r.cloneContents());
+      // The line shown open, as Fable's lean: Carbon prints "Lean:", Neon "Transmission:", Pipeline Neon only "What happened:".
+      const txt = d.textContent.replace(/\s+/g, ' ');
+      let lean = '';
+      for (const lab of ['Lean', 'Transmission', 'What happened']) {
+        const m = txt.match(new RegExp(`\\b${lab}\\s*:\\s*`));
+        if (m) { const body = txt.slice(m.index + m[0].length); const cut = body.search(/\s(?:\d\.\s)?(?:Invalidation[^:]{0,20}|Risk Gate|Qxx Action|The voices|New vs echo|Positioning|EXTREME CHECK):/);
+          lean = `<p><b>${esc(lab)}:</b> ${esc((cut > 0 ? body.slice(0, cut) : body).slice(0, 700))}</p>`; break; }
+      }
+      out.push({ title: h.textContent.trim().replace(/\s+/g, ' ').replace(re, (m, k) => `${k}. `), lean, html: d.innerHTML });
+    });
+    return { lead: lead.textContent.trim() ? lead.innerHTML : '', themes: out };
+  }
+  function geminiThemes(r, many) {
+    const secs = r.sections || [];
+    const pick = (re) => secs.filter((s) => re.test(s.title || ''));
+    const sixty = pick(/24\s*H.*60\s*SECONDS|60\s*SECONDS|TOP LINE/i);
+    const themes = pick(/\bTHEMES\b/i).filter((s) => !sixty.includes(s) && !/CROSS-THEME/i.test(s.title || ''));
+    const book = pick(/TRADE BOOK|POSITIONS|PORTFOLIO/i).filter((s) => !sixty.includes(s) && !themes.includes(s));
+    const rest = secs.filter((s) => !sixty.includes(s) && !themes.includes(s) && !book.includes(s));
+    const card = (s, open) => `<div class="card"><details ${open ? 'open' : ''}><summary><b>${esc(s.title || 'Digest')}</b></summary><div class="rich">${s.html}</div></details></div>`;
+    const themeHtml = themes.map((s) => {
+      const sp = splitThemes(s.html);
+      if (!sp) return `<article class="card theme"><h3>${esc(s.title)}</h3><div class="rich">${s.html}</div></article>`;
+      return (sp.lead ? `<div class="card rich small" style="margin-bottom:12px">${sp.lead}</div>` : '') + sp.themes.map((t) => `
+        <article class="card theme">
+          <h3>${esc(t.title)}</h3>
+          ${t.lean ? `<div class="lean rich">${t.lean}</div>` : ''}
+          <details><summary>Full theme — what happened, voices, positioning, sources</summary><div class="rich">${t.html}</div></details>
+        </article>`).join('');
+    }).join('');
+    return `${many ? `<h2 class="sec">${esc(r.subject)}</h2>` : ''}
+      <div class="card sixty"><h2 class="sec">The last 24h in 60 seconds</h2>${sixty.length ? sixty.map((s) => `<div class="rich">${s.html}</div>`).join('') : '<p class="muted small">This edition prints no 60-second summary.</p>'}</div>
+      ${themes.length ? '<h2 class="sec">Themes</h2>' : ''}${themeHtml}
+      <div class="section-grid">${rest.map((s) => card(s, /SYNTHESIS|OPEN QUESTIONS|QXX/i.test(s.title || ''))).join('')}${book.map((s) => card(s, false)).join('')}</div>`;
   }
 
   // ---------- themes ----------
