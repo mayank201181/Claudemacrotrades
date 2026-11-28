@@ -249,8 +249,8 @@
     if (!g) { $('#themesBody').innerHTML = '<div class="card empty">Not found.</div>'; return; }
     $('#digestMeta').textContent = `built ${g.built || '—'} SGT`;
     const sub = (g.subject || '').split('|').slice(1).join('|').trim();
-    const secs = (g.sections || []).filter((s) => ['radar', 'tape', 'ledger', 'synthesis', 'stances'].includes(s.key));
-    const nameOf = { radar: 'Radar', tape: 'Tape', ledger: 'Ledger', synthesis: 'Cross-theme synthesis & caveats', stances: 'Stance shifts' };
+    const secs = (g.sections || []).filter((s) => ['radar', 'tape', 'ledger', 'synthesis', 'stances', 'odds'].includes(s.key) || /ODDS BOARD/i.test(s.title || ''));
+    const nameOf = { radar: 'Radar', tape: 'Tape', ledger: 'Ledger', synthesis: 'Cross-theme synthesis & caveats', stances: 'Stance shifts', odds: 'Open questions · odds board' };
     $('#themesBody').innerHTML = `
       ${sub ? `<div class="subject">Odds moved: ${esc(sub)}</div>` : ''}
       <div class="card sixty"><h2 class="sec">The last 24h in 60 seconds</h2>${(g.sections || []).filter((s) => s.key === 'sixty_intro').map((s) => `<div class="rich small">${s.html}</div>`).join('')}<ol class="rich">${(g.sixty || []).map((li) => `<li>${li}</li>`).join('')}</ol></div>
@@ -263,7 +263,7 @@
           <details><summary>Full theme — what happened, voices, positioning, sources</summary><div class="rich">${t.html}</div></details>
         </article>`).join('')}
       <div class="section-grid">
-        ${secs.map((s) => `<div class="card"><details ${s.key === 'synthesis' ? 'open' : ''}><summary><b>${esc(nameOf[s.key] || s.title)}</b></summary><div class="rich">${s.html}</div></details></div>`).join('')}
+        ${secs.map((s) => `<div class="card"><details ${s.key === 'synthesis' || /ODDS BOARD/i.test(s.title || '') ? 'open' : ''}><summary><b>${esc(nameOf[s.key] || s.title)}</b></summary><div class="rich">${s.html}</div></details></div>`).join('')}
       </div>`;
   }
 
