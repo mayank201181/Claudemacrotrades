@@ -1,0 +1,39 @@
+# Countries page data: Astra A29's fetch of free official sources for 20 economies, once a day.
+# Writes snapshot.json (full state, the next run's --previous) and countries.json (what the app shows) to the
+# branch countries-data, replaced each run (one commit, no history). The app reads countries.json from raw.githubusercontent.com.
+name: countries
+on:
+  schedule:
+    - cron: '40 21 * * *'   # 05:40 SGT
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency: countries
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install requests==2.32.3
+      - name: previous snapshot
+        run: |
+          mkdir -p out
+          if git fetch --depth 1 origin countries-data 2>/dev/null && git show FETCH_HEAD:snapshot.json > out/prev.json; then
+            echo "previous from countries-data"
+          else
+            cp countries/seed_snapshot.json out/prev.json; echo "previous from the seed"
+          fi
+      - name: fetch
+        run: python3 countries/fetch_all.py --out out/snapshot.json --previous out/prev.json
+      - name: slim
+        run: python3 countries/slim.py out/snapshot.json out/countries.json
+      - name: publish
+        run: |
+          cd out && rm prev.json snapshot.json.lock 2>/dev/null; ls -la
+          git init -q -b countries-data && git add snapshot.json countries.json
+          git -c user.name='countries bot' -c user.email='actions@users.noreply.github.com' commit -q -m "countries data $(date -u +%FT%TZ)"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:countries-data
