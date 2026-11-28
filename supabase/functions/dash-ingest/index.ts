@@ -6,6 +6,7 @@ import postgres from 'npm:postgres@3.4.4';
 import { isOlderBook, parseDigest, parseEmailTested, parseTradeBook, setPrivateTerms, type Tested } from '../_shared/parse.ts';
 import { parseFeed, privacyFilter, type Family, type FeedSection } from '../_shared/feeds.ts';
 import { extractQuestions, parseBriefState, type StateQuestion } from '../_shared/questions.ts';
+import { cleanText, isBookSection, parseGeminiTrades } from '../_shared/gemini.ts';
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!, { max: 1, prepare: false });
 
@@ -108,6 +109,8 @@ async function writeThread(sql: Db, data: Json): Promise<string[]> {
           subject = excluded.subject, sent_at = excluded.sent_at, intro = excluded.intro, sections = excluded.sections,
           stances = excluded.stances, parsed_at = now()`;
       out.push(`feed ${fd.family}/${fd.source} ${fd.d}: ${fd.sections.length} sections`);
+      // The Gemini book comes from the Carbon edition only (it prints each card's spot ref for forwards and NDFs).
+      if (fd.family === 'takeaways' && fd.source === 'carbon') out.push(await writeGeminiBook(sql, fd.d, fd.sent_at, fd.sections));
       continue;
     }
     await sql`insert into dash.raw (kind, model, d, source_id, payload)
@@ -136,6 +139,47 @@ async function writeThread(sql: Db, data: Json): Promise<string[]> {
     out.push(`digest ${dg.model} ${dg.d}: ${dg.themes.length} themes, ${dg.sixty.length} bullets, ${qs}`);
   }
   return out;
+}
+
+// Gemini's open trades, lifted from its edition's book section so dash-mark can mark them with our prices.
+// A closed trade is never reopened or re-levelled; an older email only adds trades not yet known; a trade the
+// book has not listed for three days is closed as dropped (Gemini's own exit is not machine-readable).
+async function writeGeminiBook(sql: Db, d: string, sentAt: string, sections: { title: string; html: string }[]): Promise<string> {
+  const book = sections.filter((s) => isBookSection(s.title));
+  const trades = parseGeminiTrades(book.map((s) => s.html).join(' '));
+  const stamp = new Date(new Date(sentAt).getTime() + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' SGT';
+  const [held] = await sql`select updated from dash.book_state where model = 'gemini'`;
+  const newer = !held?.updated || stamp >= held.updated;
+  for (const t of trades) {
+    const row = {
+      model: 'gemini', pid: t.pid, title: t.title, status: t.status, asset_class: t.asset_class, direction: t.direction, tclass: t.tclass,
+      proxy: t.proxy, opened: t.opened, filled: t.filled, ref: t.ref, entry: t.entry, stop: t.stop, target: t.target,
+      closed: t.status === 'open' ? null : d, exit_reason: t.status === 'open' ? null : 'view', structure: t.structure,
+      meta: sql.json({ ...t.meta, last_listed: d } as Json), first_seen: d, last_seen: d,
+    };
+    if (newer) {
+      await sql`insert into dash.trades ${sql(row as Json)} on conflict (model, pid) do update set
+          status = excluded.status, closed = excluded.closed, exit_reason = excluded.exit_reason,
+          opened = coalesce(dash.trades.opened, excluded.opened), filled = coalesce(dash.trades.filled, excluded.filled),
+          proxy = coalesce(dash.trades.proxy, excluded.proxy), entry = coalesce(dash.trades.entry, excluded.entry),
+          ref = coalesce(dash.trades.ref, excluded.ref), stop = coalesce(dash.trades.stop, excluded.stop),
+          target = coalesce(dash.trades.target, excluded.target), structure = coalesce(dash.trades.structure, excluded.structure),
+          meta = dash.trades.meta || excluded.meta, last_seen = excluded.last_seen, updated_at = now()
+        where dash.trades.status = 'open'`;
+    } else {
+      await sql`insert into dash.trades ${sql(row as Json)} on conflict (model, pid) do nothing`;
+    }
+  }
+  if (!newer) return `gemini book ${stamp}: older than ${held.updated}, ${trades.length} trades added if new`;
+  const dropped = trades.length ? await sql`update dash.trades t set status = 'closed-view', closed = ${d}, exit_reason = 'view',
+      result_r = (select lm.r from dash.live_marks lm where lm.model = t.model and lm.pid = t.pid),
+      meta = t.meta || '{"exit_note": "dropped from the Gemini book; closed at our last mark"}'::jsonb, updated_at = now()
+    where t.model = 'gemini' and t.status = 'open' and coalesce(t.meta->>'last_listed', t.first_seen::text) < (${d}::date - 3)::text
+    returning t.pid` : [];
+  await sql`insert into dash.book_state (model, updated, scorecard, rules, ingested_at)
+    values ('gemini', ${stamp}, ${book.map((s) => cleanText(s.html)).join(' ').slice(0, 700)}, null, now())
+    on conflict (model) do update set updated = excluded.updated, scorecard = excluded.scorecard, ingested_at = now()`;
+  return `gemini book ${stamp}: ${trades.length} trades${dropped.length ? `, closed as dropped ${dropped.map((r) => r.pid).join(' ')}` : ''}`;
 }
 
 const ingestBook = (data: Json | string, fileId?: string) => atomically((tx) => writeBook(tx, data, fileId));

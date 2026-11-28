@@ -3,8 +3,9 @@
 // digests never break the page. The Substack tab is the newsletter part of the Email
 // Digest only: personal, admin, trash and spam sections are dropped here, before storage.
 import { sanitize, stripTags, decodeEntities, scrubPersonal, privacy } from './parse.ts';
+import { cleanText } from './gemini.ts';
 
-export type Family = 'youtube' | 'podcast' | 'grok' | 'substack';
+export type Family = 'youtube' | 'podcast' | 'grok' | 'substack' | 'takeaways';
 export interface FeedSection { title: string; html: string; }
 export interface Feed {
   family: Family; source: string; d: string; gmail_id: string; subject: string; sent_at: string;
@@ -12,7 +13,8 @@ export interface Feed {
 }
 
 export function feedFamily(subject: string): Family | null {
-  if (/^MACRO TAKEAWAYS/i.test(subject)) return null;
+  // The Gemini Takeaways editions are kept whole like a feed; the Fable and Opus ones are parsed as digests (parse.ts).
+  if (/^MACRO TAKEAWAYS/i.test(subject)) return /^MACRO TAKEAWAYS \[(Gemini|Pipeline)/i.test(subject) ? 'takeaways' : null;
   if (/YouTube Digest/i.test(subject)) return 'youtube';
   if (/Podcast Digest/i.test(subject)) return 'podcast';
   if (/GROK FULL CONSOLIDATED|GROK CROWDING CHECK/i.test(subject)) return 'grok';
@@ -21,6 +23,11 @@ export function feedFamily(subject: string): Family | null {
 }
 
 export function feedSource(subject: string): string {
+  if (/^MACRO TAKEAWAYS/i.test(subject)) {
+    if (/\[Pipeline/i.test(subject)) return 'pipeline_neon';
+    if (/\[Neon\]/i.test(subject)) return 'neon';
+    if (/\[Carbon\]/i.test(subject)) return 'carbon';
+  }
   if (/GROK CROWDING CHECK/i.test(subject)) return 'crowding'; // Grok Bot weekly routine (docs/grok_crowding_routine.md)
   if (/Grok Bot/i.test(subject)) return 'grokbot'; // console built by Grok Bot instead of ChatGPT (docs/grok_console_routine.md)
   if (/\[Fable[^\]]*\]/i.test(subject)) return 'fable';
@@ -70,6 +77,16 @@ function splitSections(body: string): { intro: string; parts: FeedSection[] } {
     });
     return { intro: body.slice(0, secs[0].index!), parts };
   }
+  // 3) numbered bold headings in divs ("1. TRADE BOOK", "2. THE LAST 24H ...": the Gemini Takeaways editions)
+  const heads = [...body.matchAll(/<(div|p|td)\b([^>]*)>((?:(?!<\/?(?:div|p|td)\b)[\s\S]){1,400}?)<\/\1>/gi)]
+    .filter((m) => /font-weight:\s*(?:700|800|900|bold)/i.test(m[2]) && /^\d{1,2}\.\s+[A-Z]/.test(stripTags(m[3])));
+  if (heads.length >= 3) {
+    const parts: FeedSection[] = heads.map((m, i) => ({
+      title: cleanText(m[3]).trim(),
+      html: body.slice(m.index! + m[0].length, i + 1 < heads.length ? heads[i + 1].index! : body.length),
+    }));
+    return { intro: body.slice(0, heads[0].index!), parts };
+  }
   return { intro: '', parts: [{ title: '', html: body }] };
 }
 
@@ -102,6 +119,8 @@ export function parseFeed(msg: { id: string; subject: string; date: string; html
 export function privacyFilter(family: Family, sections: FeedSection[], intro: string): { sections: FeedSection[]; intro: string } {
   const clean = (h: string) => scrubPersonal(family === 'substack' ? dropPersonal(h) : h);
   let out = sections.map((p) => ({ title: p.title, html: clean(p.html) })).filter((p) => stripTags(p.html).length > 0 || p.title);
+  // A Takeaways edition's admin block is pipeline housekeeping (feed health, file ids), not market content.
+  if (family === 'takeaways') out = out.filter((s) => !/^\d{1,2}\.\s+ADMIN/i.test(s.title));
   let introHtml = clean(intro);
   if (family === 'substack') {
     out = out.filter((s) => SUBSTACK_KEEP.test(s.title) && !/personal|family|action|trash|spam|noise|important check/i.test(s.title));
